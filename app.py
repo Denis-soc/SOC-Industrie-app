@@ -148,7 +148,7 @@ with onglet4:
     st.subheader("Générer les QR Codes à coller sur votre matériel")
     st.write("Imprimez ces codes. Lorsqu'un technicien le flashera, l'application s'ouvrira directement sur cet appareil.")
     
-    adresse_appli = "http://localhost:8501" 
+    adresse_appli = "https://soc-industrie-app.streamlit.app"
     
     for idx, row in df.iterrows():
         col_q1, col_q2 = st.columns([1, 3])

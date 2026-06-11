@@ -1,0 +1,1 @@
+# SOC-Industrie-app

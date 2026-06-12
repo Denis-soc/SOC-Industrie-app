@@ -67,7 +67,7 @@ def initialiser_db():
         CREATE TABLE IF NOT EXISTS stocks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nom TEXT, marque TEXT, reference TEXT, fournisseur TEXT,
-            quantite INTEGER, seuil_mini INTEGER, seuil_maxi INTEGER,
+            quantite INTEGER, seuil_mini INTEGER DEFAULT 5, seuil_maxi INTEGER DEFAULT 50,
             type_article TEXT DEFAULT 'Consommable', photo_data TEXT
         )
     ''')
@@ -191,41 +191,106 @@ with tab2:
 with tab3:
     st.subheader("📦 Stock Consommables Atelier")
     df_conso = df_stock_total[df_stock_total['type_article'] == 'Consommable'] if not df_stock_total.empty else pd.DataFrame()
+    
     if not df_conso.empty:
         c_index = st.columns(4)
         for idx, row in df_conso.iterrows():
             with c_index[idx % 4]:
                 afficher_image_securisee(row['photo_data'], width=120)
                 st.markdown(f"**{row['nom']}**")
-                st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}\n\nQté en stock : **{row['quantite']}**")
+                
+                # Alerte de couleur si le stock atteint le seuil mini
+                qte_actuelle = int(row['quantite'])
+                seuil_critique = int(row['seuil_mini']) if row['seuil_mini'] is not None else 5
+                
+                if qte_actuelle <= 0:
+                    st.error(f"🚨 RUPTURE DE STOCK : **{qte_actuelle}**")
+                elif qte_actuelle <= seuil_critique:
+                    st.warning(f"⚠️ Stock Critique : **{qte_actuelle}** (Seuil mini: {seuil_critique})")
+                else:
+                    st.success(f"✅ Stock Ok : **{qte_actuelle}**")
+                    
+                st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}")
+                st.write("---")
         
-        st.write("---")
+        st.write("### 🛠️ Déclarer un retrait de consommable")
         with st.form("form_sort_c"):
-            art_id = st.selectbox("Article prélevé", df_conso['id'].tolist(), format_func=lambda x: df_conso[df_conso['id']==x]['nom'].values[0])
-            t_nom = st.text_input("Nom Tech")
+            art_id = st.selectbox("Article prélevé", df_conso['id'].tolist(), format_func=lambda x: f"{df_conso[df_conso['id']==x]['nom'].values[0]} (En stock : {df_conso[df_conso['id']==x]['quantite'].values[0]})")
+            t_nom = st.text_input("Nom du Technicien")
             a_nom = st.text_input("N° d'affaire")
-            q_s = st.number_input("Quantité", min_value=1, value=1)
+            q_s = st.number_input("Quantité retirée", min_value=1, value=1)
+            
             if st.form_submit_button("Déclarer la sortie"):
                 conn = connexion_db()
+                # 1. Mise à jour de la quantité
                 conn.execute("UPDATE stocks SET quantite = quantite - ? WHERE id = ?", (q_s, art_id))
+                # 2. Enregistrement dans l'historique
+                conn.execute("INSERT INTO sorties_stocks (article_id, technicien, num_affaire, quantite_sortie, date_sortie) VALUES (?, ?, ?, ?, ?)", (art_id, t_nom, a_nom, q_s, datetime.now().strftime('%Y-%m-%d %H:%M')))
                 conn.commit()
                 conn.close()
-                st.success("Stock mis à jour !")
+                st.success("Prélèvement enregistré !")
+                st.session_state["derniere_sortie_id"] = art_id
                 st.rerun()
 
-# --- TAB 4 : EPI (MODIFIÉ POUR RAJOUTER LA QTE ET LA TAILLE) ---
+    # --- ALERTE MAIL AUTOMATIQUE SI SEUIL MINI ATTEINT ---
+    if "derniere_sortie_id" in st.session_state:
+        id_verif = st.session_state["derniere_sortie_id"]
+        conn = connexion_db()
+        art_verif = pd.read_sql_query("SELECT * FROM stocks WHERE id=?", conn, params=(id_verif,))
+        conn.close()
+        if not art_verif.empty:
+            row_v = art_verif.iloc[0]
+            if int(row_v['quantite']) <= int(row_v['seuil_mini']):
+                st.error(f"🛑 Attention ! Le stock de **{row_v['nom']}** est descendu à **{row_v['quantite']}** (Seuil mini : {row_v['seuil_mini']}).")
+                sujet_alerte = f"[ALERTE REAPPRO] Stock critique : {row_v['nom']}"
+                corps_alerte = f"Bonjour Olivier,\n\nLe consommable suivant a atteint son seuil d'alerte à l'atelier :\n• Article : {row_v['nom']}\n• Référence : {row_v['reference']}\n• Stock restant : {row_v['quantite']} (Seuil d'alerte : {row_v['seuil_mini']})\n\nMerci de prévoir un réapprovisionnement."
+                st.markdown(f'<a href="{generer_lien_mail(sujet_alerte, corps_alerte)}" target="_blank" style="display:inline-block; padding:12px; background-color:#FF4B4B; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">📧 Envoyer l\'alerte réappro à Olivier</a>', unsafe_allow_html=True)
+
+    # --- AFFICHAGE HISTORIQUE DES SORTIES ---
+    st.write("---")
+    st.write("### 📜 Historique complet des sorties (Consommables & EPI)")
+    conn = connexion_db()
+    df_historique = pd.read_sql_query('''
+        SELECT s.date_sortie as 'Date', st.type_article as 'Type', st.nom as 'Désignation', 
+               st.reference as 'Référence', s.quantite_sortie as 'Quantité', 
+               s.technicien as 'Technicien', s.num_affaire as 'N° Affaire'
+        FROM sorties_stocks s
+        JOIN stocks st ON s.article_id = st.id
+        ORDER BY s.id DESC
+    ''', conn)
+    conn.close()
+    
+    if not df_historique.empty:
+        st.dataframe(df_historique, use_container_width=True)
+    else:
+        st.info("Aucun historique de sortie enregistré pour le moment.")
+
+# --- TAB 4 : EPI ---
 with tab4:
     st.subheader("🦺 Équipements de Sécurité (EPI)")
     df_epi = df_stock_total[df_stock_total['type_article'] == 'EPI'] if not df_stock_total.empty else pd.DataFrame()
+    
     if not df_epi.empty:
         c_epi = st.columns(4)
         for idx, row in df_epi.iterrows():
             with c_epi[idx % 4]:
                 afficher_image_securisee(row['photo_data'], width=120)
                 st.markdown(f"**{row['nom']}**")
-                st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}\n\nEn stock: **{row['quantite']}**")
+                
+                # Alerte de couleur si le stock atteint le seuil mini
+                qte_actuelle_epi = int(row['quantite'])
+                seuil_critique_epi = int(row['seuil_mini']) if row['seuil_mini'] is not None else 5
+                
+                if qte_actuelle_epi <= 0:
+                    st.error(f"🚨 RUPTURE : **{qte_actuelle_epi}**")
+                elif qte_actuelle_epi <= seuil_critique_epi:
+                    st.warning(f"⚠️ Stock Faible : **{qte_actuelle_epi}** (Mini: {seuil_critique_epi})")
+                else:
+                    st.success(f"✅ En stock : **{qte_actuelle_epi}**")
+                    
+                st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}")
+                st.write("---")
         
-        st.write("---")
         st.markdown("### 📢 Formulaire de demande de dotation (Mail Olivier)")
         with st.form("f_epi"):
             col_epi1, col_epi2 = st.columns(2)
@@ -236,10 +301,19 @@ with tab4:
             with col_epi2:
                 qte_demandee = st.number_input("Quantité souhaitée", min_value=1, value=1, step=1)
                 taille_demandee = st.text_input("Taille ou Pointure (ex: XL, 43, M...)", value="-")
+                valider_sortie_epi_direct = st.checkbox("Déduire directement du stock disponible à l'atelier")
             
             if st.form_submit_button("📩 Préparer le Mail pour Olivier"):
                 n_epi = df_epi[df_epi['id']==epi_id]['nom'].values[0]
                 ref_epi = df_epi[df_epi['id']==epi_id]['reference'].values[0]
+                
+                # Si coché, on déduit du stock et on met dans l'historique
+                if valider_sortie_epi_direct:
+                    conn = connexion_db()
+                    conn.execute("UPDATE stocks SET quantite = quantite - ? WHERE id = ?", (qte_demandee, epi_id))
+                    conn.execute("INSERT INTO sorties_stocks (article_id, technicien, num_affaire, quantite_sortie, date_sortie) VALUES (?, ?, ?, ?, ?)", (epi_id, sal, motif, qte_demandee, datetime.now().strftime('%Y-%m-%d %H:%M')))
+                    conn.commit()
+                    conn.close()
                 
                 s_mail = f"[EPI] Demande de matériel - {sal}"
                 c_mail = (
@@ -252,9 +326,9 @@ with tab4:
                     f"• Motif / N° Affaire : {motif}\n\n"
                     f"Merci d'avance.\nCordialement."
                 )
-                
-                # Lien d'envoi visuel et cliquable
                 st.markdown(f'<a href="{generer_lien_mail(s_mail, c_mail)}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #2e7d32; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 10px;">🚀 Cliquer ici pour Envoyer le mail à owasse@soc.fr</a>', unsafe_allow_html=True)
+                if valider_sortie_epi_direct:
+                    st.rerun()
 
 # --- TAB 5 : QR CODES ---
 with tab5:
@@ -307,14 +381,15 @@ with tab6:
                 m_s = st.text_input("Marque")
                 r_s = st.text_input("Référence")
                 f_s = st.text_input("Fournisseur")
-                q_i = st.number_input("Stock initial", min_value=0, value=5)
+                q_i = st.number_input("Stock initial", min_value=0, value=10)
+                s_mini = st.number_input("Seuil Minimal d'alerte", min_value=0, value=5)
             with c4:
                 fichier_photo_s = st.file_uploader("📸 Capture écran ou Photo (JPG/PNG) - Article", type=["jpg", "jpeg", "png"], key="add_s_photo")
                 
             if st.form_submit_button("Enregistrer l'Article"):
                 p_base64_s = convertir_image_en_base64(fichier_photo_s)
                 conn = connexion_db()
-                conn.execute("INSERT INTO stocks (nom, marque, reference, fournisseur, quantite, seuil_mini, seuil_maxi, type_article, photo_data) VALUES (?,?,?,?,?,5,100,?,?)", (n_s, m_s, r_s, f_s, q_i, t_s, p_base64_s))
+                conn.execute("INSERT INTO stocks (nom, marque, reference, fournisseur, quantite, seuil_mini, seuil_maxi, type_article, photo_data) VALUES (?,?,?,?,?,?,100,?,?)", (n_s, m_s, r_s, f_s, q_i, s_mini, t_s, p_base64_s))
                 conn.commit()
                 conn.close()
                 st.success("Article enregistré !")
@@ -343,6 +418,7 @@ with tab6:
                 with col_mod2:
                     edit_fourn = st.text_input("Fournisseur", value=art_actuel['fournisseur'])
                     edit_qte = st.number_input("Quantité en Stock", min_value=0, value=int(art_actuel['quantite']))
+                    edit_seuil = st.number_input("Modifier le Seuil Minimal", min_value=0, value=int(art_actuel['seuil_mini'] if art_actuel['seuil_mini'] is not None else 5))
                     fichier_photo_edit = st.file_uploader("Remplacer la photo", type=["jpg", "jpeg", "png"], key="edit_photo")
                 
                 btn_col1, btn_col2 = st.columns([1, 4])
@@ -354,7 +430,7 @@ with tab6:
             if sauvegarder_changement:
                 nouveau_b64 = convertir_image_en_base64(fichier_photo_edit) if fichier_photo_edit is not None else art_actuel['photo_data']
                 conn = connexion_db()
-                conn.execute('UPDATE stocks SET nom=?, type_article=?, marque=?, reference=?, fournisseur=?, quantite=?, photo_data=? WHERE id=?', (edit_nom, edit_type, edit_marque, edit_ref, edit_fourn, edit_qte, nouveau_b64, id_article_choisi))
+                conn.execute('UPDATE stocks SET nom=?, type_article=?, marque=?, reference=?, fournisseur=?, quantite=?, seuil_mini=?, photo_data=? WHERE id=?', (edit_nom, edit_type, edit_marque, edit_ref, edit_fourn, edit_qte, edit_seuil, nouveau_b64, id_article_choisi))
                 conn.commit()
                 conn.close()
                 st.success("Mis à jour avec succès !")

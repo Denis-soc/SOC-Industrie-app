@@ -11,7 +11,7 @@ from geopy.geocoders import Nominatim
 # Configuration de la page
 st.set_page_config(page_title="SOC Industrie - Gestion Pro", layout="wide")
 
-# --- PARAMÈTRE DE L'URL DE TON APPLICATION (RÉCUPÉRÉ DE TA CAPTURE ECRAN) ---
+# --- PARAMÈTRE DE L'URL DE TON APPLICATION ---
 URL_APPLICATION_EN_LIGNE = "https://soc-industrie-app-z5wnlx3n2pmnbcn5uvy.streamlit.app"
 
 ADRESSE_SIEGE = "70 route de brissac - ZA la Jailletière - 49380 TERRANJOU"
@@ -47,7 +47,7 @@ initialiser_db()
 # --- FONCTIONS REQUÊTES ---
 def geocoder_adresse(adresse):
     try:
-        geolocator = Nominatim(user_agent="soc_industrie_pro_v2")
+        geolocator = Nominatim(user_agent="soc_industrie_final")
         location = geolocator.geocode(adresse)
         if location: return location.latitude, location.longitude
         return COORD_SIEGE
@@ -69,16 +69,12 @@ def charger_stocks():
 df_mat = charger_materiel()
 df_stock = charger_stocks()
 
-# --- GESTION ULTRA-COMPATIBLE DES SCANS QR CODE ---
+# --- GESTION SIMPLE DES SCANS ---
 id_scanne = None
 try:
-    # Cette méthode fonctionne sur l'intégralité des versions de Streamlit existantes
-    parametres = st.experimental_get_query_params() if hasattr(st, "experimental_get_query_params") else st.query_parameters
-    if "mat_id" in parametros:
-        # Gestion du format liste (anciennes versions) ou chaîne (nouvelles versions)
-        valeur = parametros["mat_id"]
-        id_scanne = valeur[0] if isinstance(valeur, list) else valeur
-except Exception:
+    if "mat_id" in st.query_parameters:
+        id_scanne = st.query_parameters["mat_id"]
+except:
     pass
 
 st.title("🛠️ SOC Industrie : Suivi Expert du Matériel")
@@ -93,33 +89,26 @@ if id_scanne:
             mat = materiel_selectionne.iloc[0]
             st.warning(f"📢 **QR Code Scanné** : Appareil **{mat['nom']}** (S/N: {mat['num_serie']})")
             
-            with st.expander("👉 Ouvrir la fiche d'affectation rapide", expanded=True):
-                with st.form("form_flash"):
-                    st.write(f"**Modèle :** {mat['modele']} | **Contrôle requis avant le :** {mat['prochain_controle']}")
-                    nouveau_gars = st.text_input("Technicien qui prend le matériel", value=mat['detenteur'])
-                    chantier = st.text_input("Adresse du chantier affecté", value=mat['adresse'])
-                    d_fin = st.date_input("Date de fin prévue", date.today() + timedelta(days=7))
-                    
-                    if st.form_submit_button("Valider la prise de possession"):
-                        lat, lon = geocoder_adresse(chantier)
-                        conn = connexion_db()
-                        cursor = conn.cursor()
-                        cursor.execute('''
-                            UPDATE materiel SET detenteur=?, adresse=?, lat=?, lon=?, date_debut=?, date_fin=?, statut='En Service'
-                            WHERE id=?
-                        ''', (nouveau_gars, chantier, lat, lon, str(date.today()), str(d_fin), id_scanne_int))
-                        conn.commit()
-                        conn.close()
-                        st.success("Fiche mise à jour ! Bon chantier.")
-                        
-                        # Nettoyage de l'URL compatible toutes versions
-                        if hasattr(st, "experimental_set_query_params"):
-                            st.experimental_set_query_params()
-                        else:
-                            st.query_parameters.clear()
-                        st.rerun()
+            with st.form("form_flash"):
+                st.write(f"**Modèle :** {mat['modele']} | **Contrôle requis avant le :** {mat['prochain_controle']}")
+                nouveau_gars = st.text_input("Technicien qui prend le matériel", value=mat['detenteur'])
+                chantier = st.text_input("Adresse du chantier affecté", value=mat['adresse'])
+                d_fin = st.date_input("Date de fin prévue", date.today() + timedelta(days=7))
+                
+                if st.form_submit_button("Valider la prise de possession"):
+                    lat, lon = geocoder_adresse(chantier)
+                    conn = connexion_db()
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        UPDATE materiel SET detenteur=?, adresse=?, lat=?, lon=?, date_debut=?, date_fin=?, statut='En Service'
+                        WHERE id=?
+                    ''', (nouveau_gars, chantier, lat, lon, str(date.today()), str(d_fin), id_scanne_int))
+                    conn.commit()
+                    conn.close()
+                    st.success("Fiche mise à jour ! Bon chantier.")
+                    st.rerun()
     except Exception as e:
-        st.error(f"Erreur lors de la lecture du QR Code : {e}")
+        st.error(f"Erreur QR Code : {e}")
 
 # --- ONGLETS PRINCIPAUX ---
 onglet1, onglet2, onglet3, onglet4, onglet5 = st.tabs([
@@ -143,7 +132,7 @@ with onglet1:
 # --- ONGLET 2 : MOUVEMENTS ---
 with onglet2:
     st.subheader("Historique et modification manuelle")
-    st.dataframe(df_mat[["id", "nom", "modele", "num_serie", "detenteur", "adresse", "prochain_controle", "statut"]], use_container_width=True)
+    st.dataframe(df_mat, use_container_width=True)
 
 # --- ONGLET 3 : GESTION DES CONSOMMABLES ---
 with onglet3:
@@ -191,7 +180,6 @@ with onglet3:
 # --- ONGLET 4 : GÉNÉRATION QR CODES ---
 with onglet4:
     st.subheader("Impression des QR Codes Industriels")
-    
     if df_mat.empty:
         st.info("Ajoutez du matériel dans l'onglet suivant pour générer des QR Codes.")
     else:
@@ -211,8 +199,7 @@ with onglet4:
             with col1 if index % 2 == 0 else col2:
                 st.write(f"**ID {row['id']} : {row['nom']}** - {row['modele']} (S/N: {row['num_serie']})")
                 st.image(byte_im, width=150)
-                st.caption(f"Lien : `{lien_qr}`")
-                st.download_button(label="💾 Télécharger l'étiquette", data=byte_im, file_name=f"QR_{row['nom']}.png", mime="image/png", key=f"dl_{row['id']}")
+                st.download_button(label="💾 Télécharger", data=byte_im, file_name=f"QR_{row['nom']}.png", mime="image/png", key=f"dl_{row['id']}")
                 st.write("---")
 
 # --- ONGLET 5 : AJOUT MATÉRIEL PRÉCIS ---
@@ -221,18 +208,17 @@ with onglet5:
     with st.form("form_ajout_mat"):
         c1, c2 = st.columns(2)
         with c1:
-            nom_n = st.text_input("Nom de l'appareil (ex: Caméra Thermique)")
-            modele_n = st.text_input("Modèle / Marque (ex: FLIR E8)")
+            nom_n = st.text_input("Nom de l'appareil")
+            modele_n = st.text_input("Modèle / Marque")
             num_serie_n = st.text_input("Numéro de Série (S/N)")
         with c2:
             dernier_ctrl = st.date_input("Date du dernier contrôle", date.today())
-            intervalle = st.number_input("Intervalle entre 2 contrôles (en mois)", min_value=1, value=12)
-            affectation_initiale = st.text_input("Assigné à (par défaut : Entreprise)", value="Entreprise")
+            intervalle = st.number_input("Intervalle contrôles (mois)", min_value=1, value=12)
+            affectation_initiale = st.text_input("Assigné à", value="Entreprise")
             
-        if st.form_submit_button("Créer l'équipement et générer son profil"):
+        if st.form_submit_button("Créer l'équipement"):
             prochain_ctrl = dernier_ctrl + timedelta(days=int(intervalle * 30.5))
             lat, lon = COORD_SIEGE
-            
             conn = connexion_db()
             cursor = conn.cursor()
             cursor.execute('''
@@ -241,5 +227,5 @@ with onglet5:
             ''', (nom_n, modele_n, num_serie_n, "Disponible", affectation_initiale, ADRESSE_SIEGE, lat, lon, "-", "-", str(dernier_ctrl), intervalle, str(prochain_ctrl)))
             conn.commit()
             conn.close()
-            st.success(f"✔️ {nom_n} enregistré ! Prochain contrôle : {prochain_ctrl}")
+            st.success("✔️ Matériel enregistré !")
             st.rerun()

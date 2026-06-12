@@ -11,9 +11,8 @@ from geopy.geocoders import Nominatim
 # Configuration de la page
 st.set_page_config(page_title="SOC Industrie - Gestion Pro", layout="wide")
 
-# --- PARAMÈTRE DE L'URL DE TON APPLICATION ---
-# REMPLACE ICI par ton adresse finale exacte (ex: https://soc-industrie-app.streamlit.app)
-URL_APPLICATION_EN_LIGNE = "https://soc-industrie-app.streamlit.app"
+# --- PARAMÈTRE DE L'URL DE TON APPLICATION (RÉCUPÉRÉ DE TA CAPTURE ECRAN) ---
+URL_APPLICATION_EN_LIGNE = "https://soc-industrie-app-z5wnlx3n2pmnbcn5uvy.streamlit.app"
 
 ADRESSE_SIEGE = "70 route de brissac - ZA la Jailletière - 49380 TERRANJOU"
 COORD_SIEGE = (47.2662, -0.4355)
@@ -48,7 +47,7 @@ initialiser_db()
 # --- FONCTIONS REQUÊTES ---
 def geocoder_adresse(adresse):
     try:
-        geolocator = Nominatim(user_agent="soc_industrie_pro")
+        geolocator = Nominatim(user_agent="soc_industrie_pro_v2")
         location = geolocator.geocode(adresse)
         if location: return location.latitude, location.longitude
         return COORD_SIEGE
@@ -70,10 +69,17 @@ def charger_stocks():
 df_mat = charger_materiel()
 df_stock = charger_stocks()
 
-# --- GESTION DES SCANS QR CODE (CORRIGÉE) ---
+# --- GESTION ULTRA-COMPATIBLE DES SCANS QR CODE ---
 id_scanne = None
-if "mat_id" in st.query_parameters:
-    id_scanne = st.query_parameters["mat_id"]
+try:
+    # Cette méthode fonctionne sur l'intégralité des versions de Streamlit existantes
+    parametres = st.experimental_get_query_params() if hasattr(st, "experimental_get_query_params") else st.query_parameters
+    if "mat_id" in parametros:
+        # Gestion du format liste (anciennes versions) ou chaîne (nouvelles versions)
+        valeur = parametros["mat_id"]
+        id_scanne = valeur[0] if isinstance(valeur, list) else valeur
+except Exception:
+    pass
 
 st.title("🛠️ SOC Industrie : Suivi Expert du Matériel")
 
@@ -105,8 +111,12 @@ if id_scanne:
                         conn.commit()
                         conn.close()
                         st.success("Fiche mise à jour ! Bon chantier.")
-                        # Nettoyer l'URL
-                        st.query_parameters.clear()
+                        
+                        # Nettoyage de l'URL compatible toutes versions
+                        if hasattr(st, "experimental_set_query_params"):
+                            st.experimental_set_query_params()
+                        else:
+                            st.query_parameters.clear()
                         st.rerun()
     except Exception as e:
         st.error(f"Erreur lors de la lecture du QR Code : {e}")
@@ -187,7 +197,6 @@ with onglet4:
     else:
         col1, col2 = st.columns(2)
         for index, row in df_mat.iterrows():
-            # Création du lien parfait pour le smartphone
             lien_qr = f"{URL_APPLICATION_EN_LIGNE}/?mat_id={row['id']}"
             
             qr = qrcode.QRCode(version=1, box_size=10, border=4)

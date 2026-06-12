@@ -47,7 +47,7 @@ initialiser_db()
 # --- FONCTIONS REQUÊTES ---
 def geocoder_adresse(adresse):
     try:
-        geolocator = Nominatim(user_agent="soc_industrie_final")
+        geolocator = Nominatim(user_agent="soc_industrie_final_pro")
         location = geolocator.geocode(adresse)
         if location: return location.latitude, location.longitude
         return COORD_SIEGE
@@ -69,7 +69,7 @@ def charger_stocks():
 df_mat = charger_materiel()
 df_stock = charger_stocks()
 
-# --- GESTION SIMPLE DES SCANS ---
+# --- GESTION DE LA RÉCUPÉRATION DU SCAN QR CODE ---
 id_scanne = None
 try:
     if "mat_id" in st.query_parameters:
@@ -79,36 +79,16 @@ except:
 
 st.title("🛠️ SOC Industrie : Suivi Expert du Matériel")
 
-# Si un QR code est flashé
+# EN-TÊTE : Alerte si un QR Code est détecté
 if id_scanne:
     try:
         id_scanne_int = int(id_scanne)
-        materiel_selectionne = df_mat[df_mat['id'] == id_scanne_int]
-        
-        if not materiel_selectionne.empty:
-            mat = materiel_selectionne.iloc[0]
-            st.warning(f"📢 **QR Code Scanné** : Appareil **{mat['nom']}** (S/N: {mat['num_serie']})")
-            
-            with st.form("form_flash"):
-                st.write(f"**Modèle :** {mat['modele']} | **Contrôle requis avant le :** {mat['prochain_controle']}")
-                nouveau_gars = st.text_input("Technicien qui prend le matériel", value=mat['detenteur'])
-                chantier = st.text_input("Adresse du chantier affecté", value=mat['adresse'])
-                d_fin = st.date_input("Date de fin prévue", date.today() + timedelta(days=7))
-                
-                if st.form_submit_button("Valider la prise de possession"):
-                    lat, lon = geocoder_adresse(chantier)
-                    conn = connexion_db()
-                    cursor = conn.cursor()
-                    cursor.execute('''
-                        UPDATE materiel SET detenteur=?, adresse=?, lat=?, lon=?, date_debut=?, date_fin=?, statut='En Service'
-                        WHERE id=?
-                    ''', (nouveau_gars, chantier, lat, lon, str(date.today()), str(d_fin), id_scanne_int))
-                    conn.commit()
-                    conn.close()
-                    st.success("Fiche mise à jour ! Bon chantier.")
-                    st.rerun()
-    except Exception as e:
-        st.error(f"Erreur QR Code : {e}")
+        mat_selectionne_qr = df_mat[df_mat['id'] == id_scanne_int]
+        if not mat_selectionne_qr.empty:
+            mat_qr = mat_selectionne_qr.iloc[0]
+            st.warning(f"📢 **QR Code Flashé !** Vous mettez à jour l'appareil : **{mat_qr['nom']}** (S/N: {mat_qr['num_serie']})")
+    except:
+        pass
 
 # --- ONGLETS PRINCIPAUX ---
 onglet1, onglet2, onglet3, onglet4, onglet5 = st.tabs([
@@ -129,9 +109,61 @@ with onglet1:
         folium.Marker([row['lat'], row['lon']], popup=popup, tooltip=row['nom'], icon=folium.Icon(color=color)).add_to(m)
     st_folium(m, width=1200, height=450)
 
-# --- ONGLET 2 : MOUVEMENTS ---
+# --- ONGLET 2 : MOUVEMENTS (CORRIGÉ & FIXÉ) ---
 with onglet2:
-    st.subheader("Historique et modification manuelle")
+    st.subheader("Enregistrer un nouveau mouvement (Réservation / Chantier)")
+    
+    if df_mat.empty:
+        st.info("Veuillez d'abord ajouter un équipement dans le dernier onglet.")
+    else:
+        # Si un QR code a été scanné, on pré-sélectionne l'appareil dans la liste déroulante
+        index_defaut = 0
+        if id_scanne:
+            try:
+                id_scanne_int = int(id_scanne)
+                indices = df_mat[df_mat['id'] == id_scanne_int].index.tolist()
+                if indices:
+                    index_defaut = indices[0]
+            except:
+                pass
+
+        with st.form("formulaire_mouvement"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Liste déroulante avec tous les appareils créés
+                appareil_choisi = st.selectbox(
+                    "Sélectionner le matériel concerné", 
+                    options=df_mat['id'].tolist(), 
+                    index=index_defaut,
+                    format_func=lambda x: f"ID {x} : {df_mat[df_mat['id']==x]['nom'].values[0]} (S/N: {df_mat[df_mat['id']==x]['num_serie'].values[0]})"
+                )
+                nouveau_gars = st.text_input("Technicien / Détenteur du matériel")
+                nouvelle_adresse = st.text_area("Lieu du chantier (Adresse précise pour la carte)", value=ADRESSE_SIEGE)
+                
+            with col2:
+                d_debut = st.date_input("Date de début de réservation", date.today())
+                d_fin = st.date_input("Date de fin prévue", date.today() + timedelta(days=7))
+                nouveau_statut = st.selectbox("Statut de l'appareil", ["En Service", "Disponible", "Maintenance"])
+
+            if st.form_submit_button("🔥 Valider l'affectation et le mouvement"):
+                lat, lon = geocoder_adresse(nouvelle_adresse)
+                conn = connexion_db()
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE materiel SET 
+                    detenteur=?, adresse=?, lat=?, lon=?, date_debut=?, date_fin=?, statut=?
+                    WHERE id=?
+                ''', (nouveau_gars, nouvelle_adresse, lat, lon, str(d_debut), str(d_fin), nouveau_statut, appareil_choisi))
+                conn.commit()
+                conn.close()
+                st.success("✔️ Mouvement enregistré avec succès ! La carte et le tableau sont à jour.")
+                # On efface le paramètre QR code pour nettoyer
+                st.query_parameters.clear()
+                st.rerun()
+
+    st.write("---")
+    st.write("### 📋 Historique actuel du matériel")
     st.dataframe(df_mat, use_container_width=True)
 
 # --- ONGLET 3 : GESTION DES CONSOMMABLES ---
@@ -202,7 +234,7 @@ with onglet4:
                 st.download_button(label="💾 Télécharger", data=byte_im, file_name=f"QR_{row['nom']}.png", mime="image/png", key=f"dl_{row['id']}")
                 st.write("---")
 
-# --- ONGLET 5 : AJOUT MATÉRIEL PRÉCIS ---
+# --- ONGLET 5 : AJOUT MATÉRIEL ---
 with onglet5:
     st.subheader("Enregistrer un nouvel équipement")
     with st.form("form_ajout_mat"):

@@ -7,20 +7,16 @@ import sqlite3
 import qrcode
 from io import BytesIO
 from geopy.geocoders import Nominatim
-from streamlit.web.server.server import Server
 
 # Configuration de la page
 st.set_page_config(page_title="SOC Industrie - Gestion Pro", layout="wide")
 
+# --- PARAMÈTRE DE L'URL DE TON APPLICATION ---
+# REMPLACE ICI par ton adresse finale exacte (ex: https://soc-industrie-app.streamlit.app)
+URL_APPLICATION_EN_LIGNE = "https://soc-industrie-app.streamlit.app"
+
 ADRESSE_SIEGE = "70 route de brissac - ZA la Jailletière - 49380 TERRANJOU"
 COORD_SIEGE = (47.2662, -0.4355)
-
-# --- DÉTECTION AUTOMATIQUE DE L'URL DE L'APPLI ---
-def obtenir_url_application():
-    # Détecte si on est en ligne ou en local pour adapter le QR Code
-    query_params = st.query_parameters
-    # URL par défaut (sera surchargée proprement par les requêtes du navigateur)
-    return "https://soc-industrie-app.streamlit.app" 
 
 # --- GESTION BASE DE DONNÉES ---
 def connexion_db():
@@ -65,47 +61,61 @@ def charger_materiel():
     conn.close()
     return df
 
-df_mat = charger_materiel()
+def charger_stocks():
+    conn = connexion_db()
+    df = pd.read_sql_query("SELECT * FROM stocks", conn)
+    conn.close()
+    return df
 
-# Récupération d'un éventuel scan QR Code (?mat_id=X dans l'URL)
-id_scanne = st.query_parameters.get("mat_id", None)
+df_mat = charger_materiel()
+df_stock = charger_stocks()
+
+# --- GESTION DES SCANS QR CODE (CORRIGÉE) ---
+id_scanne = None
+if "mat_id" in st.query_parameters:
+    id_scanne = st.query_parameters["mat_id"]
 
 st.title("🛠️ SOC Industrie : Suivi Expert du Matériel")
 
-# --- SI UN QR CODE EST SCANNÉ ---
+# Si un QR code est flashé
 if id_scanne:
-    id_scanne = int(id_scanne)
-    materiel_selectionne = df_mat[df_mat['id'] == id_scanne]
-    
-    if not materiel_selectionne.empty:
-        mat = materiel_selectionne.iloc[0]
-        st.warning(f"📢 **QR Code Scanné** : Vous agissez sur l'appareil **{mat['nom']}** (S/N: {mat['num_serie']})")
+    try:
+        id_scanne_int = int(id_scanne)
+        materiel_selectionne = df_mat[df_mat['id'] == id_scanne_int]
         
-        with st.expander("👉 Ouvrir la fiche d'affectation rapide", expanded=True):
-            with st.form("form_flash"):
-                st.write(f"**Modèle :** {mat['modele']} | **Contrôle requis avant le :** {mat['prochain_controle']}")
-                nouveau_gars = st.text_input("Technicien qui prend le matériel", value=mat['detenteur'])
-                chantier = st.text_input("Adresse du chantier affecté", value=mat['adresse'])
-                d_fin = st.date_input("Date de fin prévue", date.today() + timedelta(days=7))
-                
-                if st.form_submit_button("Valider la prise de possession sur le terrain"):
-                    lat, lon = geocoder_adresse(chantier)
-                    conn = connexion_db()
-                    cursor = conn.cursor()
-                    cursor.execute('''
-                        UPDATE materiel SET detenteur=?, adresse=?, lat=?, lon=?, date_debut=?, date_fin=?, statut='En Service'
-                        WHERE id=?
-                    ''', (nouveau_gars, chantier, lat, lon, str(date.today()), str(d_fin), id_scanne))
-                    conn.commit()
-                    conn.close()
-                    st.success("Fiche mise à jour ! Bon chantier.")
-                    st.query_parameters.clear() # Reset le scan
-                    st.rerun()
+        if not materiel_selectionne.empty:
+            mat = materiel_selectionne.iloc[0]
+            st.warning(f"📢 **QR Code Scanné** : Appareil **{mat['nom']}** (S/N: {mat['num_serie']})")
+            
+            with st.expander("👉 Ouvrir la fiche d'affectation rapide", expanded=True):
+                with st.form("form_flash"):
+                    st.write(f"**Modèle :** {mat['modele']} | **Contrôle requis avant le :** {mat['prochain_controle']}")
+                    nouveau_gars = st.text_input("Technicien qui prend le matériel", value=mat['detenteur'])
+                    chantier = st.text_input("Adresse du chantier affecté", value=mat['adresse'])
+                    d_fin = st.date_input("Date de fin prévue", date.today() + timedelta(days=7))
+                    
+                    if st.form_submit_button("Valider la prise de possession"):
+                        lat, lon = geocoder_adresse(chantier)
+                        conn = connexion_db()
+                        cursor = conn.cursor()
+                        cursor.execute('''
+                            UPDATE materiel SET detenteur=?, adresse=?, lat=?, lon=?, date_debut=?, date_fin=?, statut='En Service'
+                            WHERE id=?
+                        ''', (nouveau_gars, chantier, lat, lon, str(date.today()), str(d_fin), id_scanne_int))
+                        conn.commit()
+                        conn.close()
+                        st.success("Fiche mise à jour ! Bon chantier.")
+                        # Nettoyer l'URL
+                        st.query_parameters.clear()
+                        st.rerun()
+    except Exception as e:
+        st.error(f"Erreur lors de la lecture du QR Code : {e}")
 
 # --- ONGLETS PRINCIPAUX ---
-onglet1, onglet2, onglet3, onglet4 = st.tabs([
+onglet1, onglet2, onglet3, onglet4, onglet5 = st.tabs([
     "🗺️ Carte & Statuts", 
     "📅 Mouvements & Affectations", 
+    "📦 Gestion des Consommables",
     "📱 Générer QR Codes",
     "➕ Ajouter du Matériel"
 ])
@@ -116,7 +126,7 @@ with onglet1:
     m = folium.Map(location=[47.3, -0.4], zoom_start=9)
     for _, row in df_mat.iterrows():
         color = "green" if row['adresse'] == ADRESSE_SIEGE else "blue"
-        popup = f"<b>{row['nom']}</b> ({row['modele']})<br>S/N: {row['num_serie']}<br>Affecktation: {row['detenteur']}"
+        popup = f"<b>{row['nom']}</b> ({row['modele']})<br>S/N: {row['num_serie']}<br>Affectation: {row['detenteur']}"
         folium.Marker([row['lat'], row['lon']], popup=popup, tooltip=row['nom'], icon=folium.Icon(color=color)).add_to(m)
     st_folium(m, width=1200, height=450)
 
@@ -125,36 +135,80 @@ with onglet2:
     st.subheader("Historique et modification manuelle")
     st.dataframe(df_mat[["id", "nom", "modele", "num_serie", "detenteur", "adresse", "prochain_controle", "statut"]], use_container_width=True)
 
-# --- ONGLET 3 : GÉNÉRATION QR CODES ---
+# --- ONGLET 3 : GESTION DES CONSOMMABLES ---
 with onglet3:
-    st.subheader("Impression des QR Codes Industriels")
-    base_url = obtenir_url_application()
-    
-    col1, col2 = st.columns(2)
-    for index, row in df_mat.iterrows():
-        # Construction du lien absolu obligatoire pour les smartphones
-        lien_qr = f"{base_url}/?mat_id={row['id']}"
-        
-        # Génération visuelle du QR
-        qr = qrcode.QRCode(version=1, box_size=10, border=4)
-        qr.add_data(lien_qr)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-        byte_im = buf.getvalue()
-        
-        with col1 if index % 2 == 0 else col2:
-            st.write(f"**{row['nom']}** - {row['modele']} (S/N: {row['num_serie']})")
-            st.image(byte_im, width=150)
-            st.caption(f"Lien encodé : `{lien_qr}`")
-            st.download_button(label="💾 Télécharger l'étiquette", data=byte_im, file_name=f"QR_{row['nom']}.png", mime="image/png")
-            st.write("---")
+    st.subheader("État des stocks consommables")
+    if not df_stock.empty:
+        cols = st.columns(len(df_stock))
+        for i, (_, item) in enumerate(df_stock.iterrows()):
+            if item['quantite'] <= item['seuil_mini']: color = "red"
+            elif item['quantite'] >= item['seuil_maxi']: color = "green"
+            else: color = "orange"
+            
+            with cols[i]:
+                st.metric(label=item['nom'], value=item['quantite'], delta=f"Mini: {item['seuil_mini']}")
+                st.markdown(f"<div style='height:10px; background-color:{color}; border-radius:5px;'></div>", unsafe_allow_html=True)
 
-# --- ONGLET 4 : AJOUT MATÉRIEL ULTRA-PRÉCIS ---
+    st.write("---")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.write("### 🔄 Sortie / Réappro")
+        if not df_stock.empty:
+            item_id = st.selectbox("Choisir le composant", df_stock['id'].tolist(), format_func=lambda x: df_stock[df_stock['id']==x]['nom'].values[0])
+            mouvement_qte = st.number_input("Quantité (+ pour réappro, - pour sortie)", value=0, key="qte_mvmt")
+            if st.button("Mettre à jour le stock"):
+                conn = connexion_db()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE stocks SET quantite = quantite + ? WHERE id = ?", (mouvement_qte, item_id))
+                conn.commit()
+                conn.close()
+                st.rerun()
+    with col_b:
+        st.write("### ✨ Créer un nouveau composant")
+        with st.form("nouveau_stock"):
+            n_nom = st.text_input("Nom du consommable")
+            n_qte = st.number_input("Quantité initiale", 0)
+            n_mini = st.number_input("Seuil Alerte (Mini)", 0)
+            n_maxi = st.number_input("Seuil Optimal (Maxi)", 0)
+            if st.form_submit_button("Ajouter au stock"):
+                conn = connexion_db()
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO stocks (nom, quantite, seuil_mini, seuil_maxi) VALUES (?,?,?,?)", (n_nom, n_qte, n_mini, n_maxi))
+                conn.commit()
+                conn.close()
+                st.rerun()
+
+# --- ONGLET 4 : GÉNÉRATION QR CODES ---
 with onglet4:
-    st.subheader("Enregistrer un nouvel équipement dans le système")
+    st.subheader("Impression des QR Codes Industriels")
+    
+    if df_mat.empty:
+        st.info("Ajoutez du matériel dans l'onglet suivant pour générer des QR Codes.")
+    else:
+        col1, col2 = st.columns(2)
+        for index, row in df_mat.iterrows():
+            # Création du lien parfait pour le smartphone
+            lien_qr = f"{URL_APPLICATION_EN_LIGNE}/?mat_id={row['id']}"
+            
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr.add_data(lien_qr)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            byte_im = buf.getvalue()
+            
+            with col1 if index % 2 == 0 else col2:
+                st.write(f"**ID {row['id']} : {row['nom']}** - {row['modele']} (S/N: {row['num_serie']})")
+                st.image(byte_im, width=150)
+                st.caption(f"Lien : `{lien_qr}`")
+                st.download_button(label="💾 Télécharger l'étiquette", data=byte_im, file_name=f"QR_{row['nom']}.png", mime="image/png", key=f"dl_{row['id']}")
+                st.write("---")
+
+# --- ONGLET 5 : AJOUT MATÉRIEL PRÉCIS ---
+with onglet5:
+    st.subheader("Enregistrer un nouvel équipement")
     with st.form("form_ajout_mat"):
         c1, c2 = st.columns(2)
         with c1:
@@ -167,7 +221,6 @@ with onglet4:
             affectation_initiale = st.text_input("Assigné à (par défaut : Entreprise)", value="Entreprise")
             
         if st.form_submit_button("Créer l'équipement et générer son profil"):
-            # Calcul de la prochaine date de contrôle réglementaire
             prochain_ctrl = dernier_ctrl + timedelta(days=int(intervalle * 30.5))
             lat, lon = COORD_SIEGE
             
@@ -179,5 +232,5 @@ with onglet4:
             ''', (nom_n, modele_n, num_serie_n, "Disponible", affectation_initiale, ADRESSE_SIEGE, lat, lon, "-", "-", str(dernier_ctrl), intervalle, str(prochain_ctrl)))
             conn.commit()
             conn.close()
-            st.success(f"✔️ {nom_n} enregistré avec succès ! Prochain contrôle le {prochain_ctrl}")
+            st.success(f"✔️ {nom_n} enregistré ! Prochain contrôle : {prochain_ctrl}")
             st.rerun()

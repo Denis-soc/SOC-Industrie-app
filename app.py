@@ -15,7 +15,7 @@ URL_APPLICATION_EN_LIGNE = "https://soc-industrie-app-z5wnlx3n2pmnbcn5uvy.stream
 ADRESSE_SIEGE = "70 route de brissac - ZA la Jailletière - 49380 TERRANJOU"
 COORD_SIEGE = (47.2662, -0.4355)
 MAIL_OLIVIER = "owasse@soc.fr"
-PHOTO_DEFAUT = "https://cdn-icons-png.flaticon.com/512/4054/4054615.png" # Icône par défaut si pas de photo
+PHOTO_DEFAUT = "https://cdn-icons-png.flaticon.com/512/4054/4054615.png"
 
 # --- INITIALISATION DE LA BASE DE DONNÉES ---
 def connexion_db():
@@ -24,8 +24,6 @@ def connexion_db():
 def initialiser_db():
     conn = connexion_db()
     cursor = conn.cursor()
-    
-    # Table Matériel avec Photo
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS materiel (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,8 +32,6 @@ def initialiser_db():
             dernier_controle TEXT, intervalle_mois INTEGER, prochain_controle TEXT
         )
     ''')
-    
-    # Table Historique / Réservations
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS mouvements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,8 +41,6 @@ def initialiser_db():
             date_retrait_reel TEXT, date_retour_reel TEXT
         )
     ''')
-    
-    # Table Stocks avec Photo
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS stocks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,8 +49,6 @@ def initialiser_db():
             type_article TEXT DEFAULT 'Consommable', photo_url TEXT
         )
     ''')
-    
-    # Table Sorties de Stocks
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sorties_stocks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,8 +94,6 @@ if id_scanne and not df_mat.empty:
     if not mat_scanne.empty:
         row_mat = mat_scanne.iloc[0]
         st.warning(f"📱 **QR Code Flashé** : **{row_mat['nom']}** ({row_mat['modele']})")
-        
-        # Affichage visuel de la machine scannée
         p_url = row_mat['photo_url'] if row_mat['photo_url'] else PHOTO_DEFAUT
         st.image(p_url, width=150)
         
@@ -148,7 +138,6 @@ with tab1:
     
     st.write("### 📋 Statut Visuel du Parc Machine")
     if not df_mat.empty:
-        # Affichage sous forme de "Cartes" visuelles
         cols_m = st.columns(4)
         for idx, row in df_mat.iterrows():
             with cols_m[idx % 4]:
@@ -186,14 +175,13 @@ with tab3:
     st.subheader("📦 Stock Consommables Atelier")
     df_conso = df_stock_total[df_stock_total['type_article'] == 'Consommable'] if not df_stock_total.empty else pd.DataFrame()
     if not df_conso.empty:
-        # Affichage en grille avec Photos !
         c_index = st.columns(4)
         for idx, row in df_conso.iterrows():
             with c_index[idx % 4]:
                 img_url = row['photo_url'] if row['photo_url'] else PHOTO_DEFAUT
                 st.image(img_url, width=100)
                 st.markdown(f"**{row['nom']}**")
-                st.caption(f"Réf: {row['reference']} | Qté : **{row['quantite']}**")
+                st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}\n\nQté en stock : **{row['quantite']}**")
         
         st.write("---")
         with st.form("form_sort_c"):
@@ -220,7 +208,7 @@ with tab4:
                 img_url = row['photo_url'] if row['photo_url'] else PHOTO_DEFAUT
                 st.image(img_url, width=100)
                 st.markdown(f"**{row['nom']}**")
-                st.caption(f"Marque: {row['marque']} | En stock: {row['quantite']}")
+                st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}\n\nEn stock: **{row['quantite']}**")
         
         st.write("---")
         with st.form("f_epi"):
@@ -249,39 +237,101 @@ with tab5:
             st.image(buf.getvalue())
             st.write("---")
 
-# --- TAB 6 : ADMINISTRATION (AJOUT AVEC PHOTOS) ---
+# --- TAB 6 : ADMINISTRATION (AJOUT, MODIFICATION & SUPPRESSION) ---
 with tab6:
     st.subheader("⚙️ Panneau d'Administration")
-    colA, colB = st.columns(2)
-    with colA:
-        st.write("### ➕ Ajouter une Machine")
-        with st.form("f_add_m"):
-            n = st.text_input("Nom de la machine")
-            m = st.text_input("Marque / Modèle")
-            s = st.text_input("N° de Série")
-            p = st.text_input("Lien URL de la Photo (Optionnel)", value="")
-            if st.form_submit_button("Enregistrer Machine"):
+    
+    # Création de sous-onglets dans l'administration pour séparer Création et Modification
+    subtab_creer, subtab_modifier = st.tabs(["➕ Créer des Articles / Machines", "✏️ Modifier ou Supprimer un Article existant"])
+    
+    with subtab_creer:
+        colA, colB = st.columns(2)
+        with colA:
+            st.write("### ➕ Ajouter une Machine")
+            with st.form("f_add_m"):
+                n = st.text_input("Nom de la machine")
+                m = st.text_input("Marque / Modèle")
+                s = st.text_input("N° de Série")
+                p = st.text_input("Lien URL de la Photo (Optionnel)", value="")
+                if st.form_submit_button("Enregistrer Machine"):
+                    conn = connexion_db()
+                    conn.execute("INSERT INTO materiel (nom, modele, num_serie, statut, photo_url) VALUES (?,?,?,'A l''agence',?)", (n, m, s, p))
+                    conn.commit()
+                    conn.close()
+                    st.success("Ajouté !")
+                    st.rerun()
+                    
+        with colB:
+            st.write("### ➕ Ajouter un Consommable / EPI")
+            with st.form("f_add_s"):
+                n_s = st.text_input("Désignation")
+                t_s = st.selectbox("Type", ["Consommable", "EPI"])
+                m_s = st.text_input("Marque")
+                r_s = st.text_input("Référence")
+                f_s = st.text_input("Fournisseur")
+                p_s = st.text_input("Lien URL de la Photo (Optionnel)", value="")
+                q_i = st.number_input("Stock initial", min_value=0, value=5)
+                if st.form_submit_button("Enregistrer l'Article"):
+                    conn = connexion_db()
+                    conn.execute("INSERT INTO stocks (nom, marque, reference, fournisseur, quantite, seuil_mini, seuil_maxi, type_article, photo_url) VALUES (?,?,?,?,?,5,100,?,?)", (n_s, m_s, r_s, f_s, q_i, t_s, p_s))
+                    conn.commit()
+                    conn.close()
+                    st.success("Article enregistré !")
+                    st.rerun()
+
+    with subtab_modifier:
+        st.write("### ✏️ Éditer un Consommable ou un EPI")
+        if df_stock_total.empty:
+            st.info("Aucun article en stock à modifier pour le moment.")
+        else:
+            # Étape 1 : Choisir l'article à modifier
+            id_article_choisi = st.selectbox(
+                "Sélectionner l'article à modifier ou à supprimer",
+                options=df_stock_total['id'].tolist(),
+                format_func=lambda x: f"[{df_stock_total[df_stock_total['id']==x]['type_article'].values[0]}] {df_stock_total[df_stock_total['id']==x]['nom'].values[0]} (Réf: {df_stock_total[df_stock_total['id']==x]['reference'].values[0]})"
+            )
+            
+            # Récupérer les données actuelles de la ligne sélectionnée
+            art_actuel = df_stock_total[df_stock_total['id'] == id_article_choisi].iloc[0]
+            
+            # Étape 2 : Formulaire pré-rempli avec les anciennes valeurs
+            with st.form("form_modification_article"):
+                col_mod1, col_mod2 = st.columns(2)
+                
+                with col_mod1:
+                    edit_nom = st.text_input("Désignation de l'article", value=art_actuel['nom'])
+                    edit_type = st.selectbox("Catégorie / Type", ["Consommable", "EPI"], index=0 if art_actuel['type_article'] == "Consommable" else 1)
+                    edit_marque = st.text_input("Marque", value=art_actuel['marque'])
+                    edit_ref = st.text_input("Référence Fabricant", value=art_actuel['reference'])
+                
+                with col_mod2:
+                    edit_fourn = st.text_input("Fournisseur", value=art_actuel['fournisseur'])
+                    edit_qte = st.number_input("Quantité exacte actuellement en Stock", min_value=0, value=int(art_actuel['quantite']))
+                    edit_photo = st.text_input("Lien URL de la Photo", value=art_actuel['photo_url'])
+                
+                btn_col1, btn_col2 = st.columns([1, 4])
+                with btn_col1:
+                    sauvegarder_changement = st.form_submit_button("💾 Enregistrer")
+                with btn_col2:
+                    supprimer_definitivement = st.form_submit_button("🗑️ Supprimer cet article")
+
+            # Actions SQL suite à la validation du formulaire
+            if sauvegarder_changement:
                 conn = connexion_db()
-                conn.execute("INSERT INTO materiel (nom, modele, num_serie, statut, photo_url) VALUES (?,?,?,'A l''agence',?)", (n, m, s, p))
+                conn.execute('''
+                    UPDATE stocks SET 
+                    nom=?, type_article=?, marque=?, reference=?, fournisseur=?, quantite=?, photo_url=?
+                    WHERE id=?
+                ''', (edit_nom, edit_type, edit_marque, edit_ref, edit_fourn, edit_qte, edit_photo, id_article_choisi))
                 conn.commit()
                 conn.close()
-                st.success("Ajouté !")
+                st.success(f"✔️ L'article '{edit_nom}' a été correctement mis à jour !")
                 st.rerun()
                 
-    with colB:
-        st.write("### ➕ Ajouter un Consommable / EPI")
-        with st.form("f_add_s"):
-            n_s = st.text_input("Désignation")
-            t_s = st.selectbox("Type", ["Consommable", "EPI"])
-            m_s = st.text_input("Marque")
-            r_s = st.text_input("Référence")
-            f_s = st.text_input("Fournisseur")
-            p_s = st.text_input("Lien URL de la Photo (Optionnel)", value="")
-            q_i = st.number_input("Stock initial", min_value=0, value=5)
-            if st.form_submit_button("Enregistrer l'Article"):
+            if supprimer_definitivement:
                 conn = connexion_db()
-                conn.execute("INSERT INTO stocks (nom, marque, reference, fournisseur, quantite, seuil_mini, seuil_maxi, type_article, photo_url) VALUES (?,?,?,?,?,5,100,?,?)", (n_s, m_s, r_s, f_s, q_i, t_s, p_s))
+                conn.execute("DELETE FROM stocks WHERE id=?", (id_scanne,))
                 conn.commit()
                 conn.close()
-                st.success("Article enregistré !")
+                st.warning(f"💥 L'article a été définitivement retiré du catalogue.")
                 st.rerun()

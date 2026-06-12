@@ -29,7 +29,7 @@ def convertir_image_en_base64(fichier_image):
             return None
     return None
 
-# Affichage ultra-sécurisé (règle le problème de la ligne 34)
+# Affichage sécurisé des images
 def afficher_image_securisee(image_source, width=120):
     if isinstance(image_source, str) and (image_source.startswith("http") or image_source.startswith("data:image")):
         try:
@@ -95,11 +95,10 @@ df_mat = pd.read_sql_query("SELECT * FROM materiel", conn)
 df_stock_total = pd.read_sql_query("SELECT * FROM stocks", conn)
 conn.close()
 
-# --- LECTURE SÉCURISÉE DES PARAMÈTRES (règle le problème des lignes 71, 75, 113) ---
+# --- LECTURE SÉCURISÉE DES PARAMÈTRES ---
 id_scanne = None
 try:
     parametres = st.query_parameters
-    # Utilisation d'une méthode de lecture dict-safe
     if "mat_id" in parametres:
         id_scanne = int(parametres["mat_id"])
 except Exception:
@@ -214,7 +213,7 @@ with tab3:
                 st.success("Stock mis à jour !")
                 st.rerun()
 
-# --- TAB 4 : EPI ---
+# --- TAB 4 : EPI (MODIFIÉ POUR RAJOUTER LA QTE ET LA TAILLE) ---
 with tab4:
     st.subheader("🦺 Équipements de Sécurité (EPI)")
     df_epi = df_stock_total[df_stock_total['type_article'] == 'EPI'] if not df_stock_total.empty else pd.DataFrame()
@@ -227,15 +226,35 @@ with tab4:
                 st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}\n\nEn stock: **{row['quantite']}**")
         
         st.write("---")
+        st.markdown("### 📢 Formulaire de demande de dotation (Mail Olivier)")
         with st.form("f_epi"):
-            epi_id = st.selectbox("EPI demandé", df_epi['id'].tolist(), format_func=lambda x: df_epi[df_epi['id']==x]['nom'].values[0])
-            sal = st.text_input("Salarié demandeur")
-            motif = st.text_input("Affaire / Motif")
-            if st.form_submit_button("Générer le Mail pour Olivier"):
+            col_epi1, col_epi2 = st.columns(2)
+            with col_epi1:
+                epi_id = st.selectbox("EPI demandé", df_epi['id'].tolist(), format_func=lambda x: df_epi[df_epi['id']==x]['nom'].values[0])
+                sal = st.text_input("Salarié demandeur / Technicien")
+                motif = st.text_input("Affaire de destination / Motif")
+            with col_epi2:
+                qte_demandee = st.number_input("Quantité souhaitée", min_value=1, value=1, step=1)
+                taille_demandee = st.text_input("Taille ou Pointure (ex: XL, 43, M...)", value="-")
+            
+            if st.form_submit_button("📩 Préparer le Mail pour Olivier"):
                 n_epi = df_epi[df_epi['id']==epi_id]['nom'].values[0]
-                s_mail = f"[EPI] Demande de {sal}"
-                c_mail = f"Bonjour Olivier,\n\n{sal} demande l'EPI suivant : {n_epi}.\nMotif: {motif}."
-                st.markdown(f'<a href="{generer_lien_mail(s_mail, c_mail)}" target="_blank" style="padding:10px; background-color:#FF4B4B; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">📢 Envoyer à owasse@soc.fr</a>', unsafe_allow_html=True)
+                ref_epi = df_epi[df_epi['id']==epi_id]['reference'].values[0]
+                
+                s_mail = f"[EPI] Demande de matériel - {sal}"
+                c_mail = (
+                    f"Bonjour Olivier,\n\n"
+                    f"Une nouvelle demande d'Équipement de Protection Individuelle vient d'être complétée :\n\n"
+                    f"• Salarié : {sal}\n"
+                    f"• Équipement : {n_epi} (Réf : {ref_epi})\n"
+                    f"• Quantité demandée : {qte_demandee}\n"
+                    f"• Taille / Pointure : {taille_demandee}\n"
+                    f"• Motif / N° Affaire : {motif}\n\n"
+                    f"Merci d'avance.\nCordialement."
+                )
+                
+                # Lien d'envoi visuel et cliquable
+                st.markdown(f'<a href="{generer_lien_mail(s_mail, c_mail)}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #2e7d32; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 10px;">🚀 Cliquer ici pour Envoyer le mail à owasse@soc.fr</a>', unsafe_allow_html=True)
 
 # --- TAB 5 : QR CODES ---
 with tab5:

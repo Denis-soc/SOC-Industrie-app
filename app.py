@@ -47,7 +47,7 @@ initialiser_db()
 # --- FONCTIONS REQUÊTES ---
 def geocoder_adresse(adresse):
     try:
-        geolocator = Nominatim(user_agent="soc_industrie_final_pro")
+        geolocator = Nominatim(user_agent="soc_industrie_final_pro_v3")
         location = geolocator.geocode(adresse)
         if location: return location.latitude, location.longitude
         return COORD_SIEGE
@@ -109,14 +109,13 @@ with onglet1:
         folium.Marker([row['lat'], row['lon']], popup=popup, tooltip=row['nom'], icon=folium.Icon(color=color)).add_to(m)
     st_folium(m, width=1200, height=450)
 
-# --- ONGLET 2 : MOUVEMENTS (CORRIGÉ & FIXÉ) ---
+# --- ONGLET 2 : MOUVEMENTS ---
 with onglet2:
     st.subheader("Enregistrer un nouveau mouvement (Réservation / Chantier)")
     
     if df_mat.empty:
         st.info("Veuillez d'abord ajouter un équipement dans le dernier onglet.")
     else:
-        # Si un QR code a été scanné, on pré-sélectionne l'appareil dans la liste déroulante
         index_defaut = 0
         if id_scanne:
             try:
@@ -131,7 +130,6 @@ with onglet2:
             col1, col2 = st.columns(2)
             
             with col1:
-                # Liste déroulante avec tous les appareils créés
                 appareil_choisi = st.selectbox(
                     "Sélectionner le matériel concerné", 
                     options=df_mat['id'].tolist(), 
@@ -157,10 +155,15 @@ with onglet2:
                 ''', (nouveau_gars, nouvelle_adresse, lat, lon, str(d_debut), str(d_fin), nouveau_statut, appareil_choisi))
                 conn.commit()
                 conn.close()
-                st.success("✔️ Mouvement enregistré avec succès ! La carte et le tableau sont à jour.")
-                # On efface le paramètre QR code pour nettoyer
-                st.query_parameters.clear()
+                
+                # Sauvegarde du message de succès dans la session
+                st.session_state["message_succes"] = "Mouvement enregistré avec succès ! La carte et le tableau sont à jour."
                 st.rerun()
+
+    # Affichage du message de succès après le rechargement s'il existe
+    if "message_succes" in st.session_state:
+        st.success(st.session_state["message_succes"])
+        del st.session_state["message_succes"]
 
     st.write("---")
     st.write("### 📋 Historique actuel du matériel")

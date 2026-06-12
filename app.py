@@ -18,7 +18,7 @@ COORD_SIEGE = (47.2662, -0.4355)
 MAIL_OLIVIER = "owasse@soc.fr"
 PHOTO_DEFAUT = "https://cdn-icons-png.flaticon.com/512/4054/4054615.png"
 
-# --- ENCODAGE / DÉCODAGE DES IMAGES EN BASE64 ---
+# --- ENCODAGE DES IMAGES ---
 def convertir_image_en_base64(fichier_image):
     if fichier_image is not None:
         try:
@@ -29,9 +29,9 @@ def convertir_image_en_base64(fichier_image):
             return None
     return None
 
-# Affichage sécurisé des images (évite les plantages si la chaîne base64 ou l'URL est corrompue)
+# Affichage ultra-sécurisé (règle le problème de la ligne 34)
 def afficher_image_securisee(image_source, width=120):
-    if image_source and (image_source.startswith("http") or image_source.startswith("data:image")):
+    if isinstance(image_source, str) and (image_source.startswith("http") or image_source.startswith("data:image")):
         try:
             st.image(image_source, width=width)
         except Exception:
@@ -92,19 +92,14 @@ def generer_lien_mail(sujet, corps):
 # --- CHARGEMENT DES DONNÉES ---
 conn = connexion_db()
 df_mat = pd.read_sql_query("SELECT * FROM materiel", conn)
-df_mouvements_tous = pd.read_sql_query("""
-    SELECT m.*, mat.nom, mat.modele, mat.num_serie, mat.photo_data 
-    FROM mouvements m 
-    JOIN materiel mat ON m.materiel_id = mat.id
-""", conn) if not df_mat.empty else pd.DataFrame()
 df_stock_total = pd.read_sql_query("SELECT * FROM stocks", conn)
 conn.close()
 
-# --- CORRECTION COMPATIBILITÉ PARAMÈTRES DE REQUÊTE ST.QUERY_PARAMETERS ---
+# --- LECTURE SÉCURISÉE DES PARAMÈTRES (règle le problème des lignes 71, 75, 113) ---
 id_scanne = None
 try:
-    # Utilisation de la nouvelle syntaxe dict-like approuvée par Streamlit
     parametres = st.query_parameters
+    # Utilisation d'une méthode de lecture dict-safe
     if "mat_id" in parametres:
         id_scanne = int(parametres["mat_id"])
 except Exception:
@@ -118,8 +113,7 @@ if id_scanne and not df_mat.empty:
     if not mat_scanne.empty:
         row_mat = mat_scanne.iloc[0]
         st.warning(f"📱 **QR Code Flashé** : **{row_mat['nom']}** ({row_mat['modele']})")
-        p_data = row_mat['photo_data'] if row_mat['photo_data'] else PHOTO_DEFAUT
-        afficher_image_securisee(p_data, width=200)
+        afficher_image_securisee(row_mat['photo_data'], width=200)
         
         conn = connexion_db()
         res_attente = pd.read_sql_query("SELECT * FROM mouvements WHERE materiel_id=? AND statut_mouvement='Réservé' ORDER BY date_debut ASC LIMIT 1", conn)
@@ -134,9 +128,6 @@ if id_scanne and not df_mat.empty:
                 conn.execute("UPDATE mouvements SET statut_mouvement='Sorti (En Cours)', date_retrait_reel=? WHERE id=?", (date.today().strftime('%Y-%m-%d'), res['id']))
                 conn.commit()
                 conn.close()
-                
-                # Nettoyage de l'URL propre à Streamlit v1.30+
-                st.query_parameters.clear()
                 st.success("Sortie validée ! Bon chantier.")
                 st.rerun()
                 
@@ -147,8 +138,6 @@ if id_scanne and not df_mat.empty:
                 conn.execute("UPDATE mouvements SET statut_mouvement='Retourné', date_retour_reel=? WHERE materiel_id=? AND statut_mouvement='Sorti (En Cours)'", (date.today().strftime('%Y-%m-%d'), id_scanne))
                 conn.commit()
                 conn.close()
-                
-                st.query_parameters.clear()
                 st.success("Matériel de retour au dépôt !")
                 st.rerun()
 
@@ -170,40 +159,33 @@ with tab1:
         cols_m = st.columns(4)
         for idx, row in df_mat.iterrows():
             with cols_m[idx % 4]:
-                img_data = row['photo_data'] if row['photo_data'] else PHOTO_DEFAUT
-                afficher_image_securisee(img_data, width=140)
+                afficher_image_securisee(row['photo_data'], width=140)
                 st.markdown(f"**{row['nom']}** ({row['modele']})")
                 st.caption(f"S/N: {row['num_serie']} | Statut: `{row['statut']}`")
                 st.write("---")
     else:
         st.info("Aucune machine enregistrée.")
 
-# --- TAB 2 : CRÉER UNE RÉSERVATION / MOUVEMENT ---
+# --- TAB 2 : PLANIFIER UNE RÉSERVATION ---
 with tab2:
-    st.subheader("🗓️ Planifier une Réservation")
+    st.subheader("🗓️ Enregistrer un nouveau mouvement")
     if df_mat.empty: 
         st.info("Aucune machine disponible.")
     else:
         with st.form("form_res"):
-            mat_id = st.selectbox("Équipement", df_mat['id'].tolist(), format_func=lambda x: f"{df_mat[df_mat['id']==x]['nom'].values[0]}")
-            tech = st.text_input("Technicien")
+            mat_id = st.selectbox("Sélectionner le matériel concerné", df_mat['id'].tolist(), format_func=lambda x: f"ID {x} : {df_mat[df_mat['id']==x]['nom'].values[0]} (S/N: {df_mat[df_mat['id']==x]['num_serie'].values[0]})")
+            tech = st.text_input("Technicien / Détenteur du matériel")
             n_affaire = st.text_input("N° d'Affaire")
-            adresse = st.text_input("Adresse chantier", value=ADRESSE_SIEGE)
-            d_deb = st.date_input("Début", date.today())
-            d_fi = st.date_input("Fin", date.today() + timedelta(days=5))
+            adresse = st.text_area("Lieu du chantier (Adresse précise pour la carte)", value=ADRESSE_SIEGE)
+            d_deb = st.date_input("Date de début de réservation", date.today())
+            d_fi = st.date_input("Date de fin prévue", date.today() + timedelta(days=7))
             
-            if st.form_submit_button("Enregistrer la réservation"):
+            if st.form_submit_button("🔥 Valider l'affectation et le mouvement"):
                 conn = connexion_db()
                 conn.execute("INSERT INTO mouvements (materiel_id, technicien, num_affaire, adresse_chantier, lat, lon, date_demande, date_debut, date_fin, statut_mouvement) VALUES (?,?,?,?,?,?,?,?,?,'Réservé')", (mat_id, tech, n_affaire, adresse, COORD_SIEGE[0], COORD_SIEGE[1], date.today().strftime('%Y-%m-%d'), str(d_deb), str(d_fi)))
                 conn.commit()
                 conn.close()
-                
-                # Nettoyage sécurisé
-                try:
-                    st.query_parameters.clear()
-                except Exception:
-                    pass
-                st.success("Mouvement enregistré avec succès !")
+                st.success("Mouvement enregistré avec succès ! La carte et le tableau sont à jour.")
                 st.rerun()
 
 # --- TAB 3 : STOCKS CONSOMMABLES ---
@@ -214,8 +196,7 @@ with tab3:
         c_index = st.columns(4)
         for idx, row in df_conso.iterrows():
             with c_index[idx % 4]:
-                img_data = row['photo_data'] if row['photo_data'] else PHOTO_DEFAUT
-                afficher_image_securisee(img_data, width=120)
+                afficher_image_securisee(row['photo_data'], width=120)
                 st.markdown(f"**{row['nom']}**")
                 st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}\n\nQté en stock : **{row['quantite']}**")
         
@@ -241,8 +222,7 @@ with tab4:
         c_epi = st.columns(4)
         for idx, row in df_epi.iterrows():
             with c_epi[idx % 4]:
-                img_data = row['photo_data'] if row['photo_data'] else PHOTO_DEFAUT
-                afficher_image_securisee(img_data, width=120)
+                afficher_image_securisee(row['photo_data'], width=120)
                 st.markdown(f"**{row['nom']}**")
                 st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}\n\nEn stock: **{row['quantite']}**")
         
@@ -276,7 +256,6 @@ with tab5:
 # --- TAB 6 : ADMINISTRATION ---
 with tab6:
     st.subheader("⚙️ Panneau d'Administration")
-    
     subtab_creer, subtab_modifier = st.tabs(["➕ Créer des Articles / Machines", "✏️ Modifier ou Supprimer un Article existant"])
     
     with subtab_creer:
@@ -296,7 +275,7 @@ with tab6:
                 conn.execute("INSERT INTO materiel (nom, modele, num_serie, statut, photo_data) VALUES (?,?,?,'A l''agence',?)", (n, m, s, p_base64))
                 conn.commit()
                 conn.close()
-                st.success("Machine ajoutée au parc avec sa photo !")
+                st.success("Machine ajoutée au parc !")
                 st.rerun()
                     
         st.write("---")
@@ -319,59 +298,47 @@ with tab6:
                 conn.execute("INSERT INTO stocks (nom, marque, reference, fournisseur, quantite, seuil_mini, seuil_maxi, type_article, photo_data) VALUES (?,?,?,?,?,5,100,?,?)", (n_s, m_s, r_s, f_s, q_i, t_s, p_base64_s))
                 conn.commit()
                 conn.close()
-                st.success("Article enregistré au catalogue !")
+                st.success("Article enregistré !")
                 st.rerun()
 
     with subtab_modifier:
         st.write("### ✏️ Éditer un Consommable ou un EPI")
         if df_stock_total.empty:
-            st.info("Aucun article en stock à modifier pour le moment.")
+            st.info("Aucun article en stock à modifier.")
         else:
             id_article_choisi = st.selectbox(
                 "Sélectionner l'article à modifier ou à supprimer",
                 options=df_stock_total['id'].tolist(),
-                format_func=lambda x: f"[{df_stock_total[df_stock_total['id']==x]['type_article'].values[0]}] {df_stock_total[df_stock_total['id']==x]['nom'].values[0]} (Réf: {df_stock_total[df_stock_total['id']==x]['reference'].values[0]})"
+                format_func=lambda x: f"[{df_stock_total[df_stock_total['id']==x]['type_article'].values[0]}] {df_stock_total[df_stock_total['id']==x]['nom'].values[0]}"
             )
             
             art_actuel = df_stock_total[df_stock_total['id'] == id_article_choisi].iloc[0]
             
             with st.form("form_modification_article"):
                 col_mod1, col_mod2 = st.columns(2)
-                
                 with col_mod1:
                     edit_nom = st.text_input("Désignation de l'article", value=art_actuel['nom'])
-                    edit_type = st.selectbox("Catégorie / Type", ["Consommable", "EPI"], index=0 if art_actuel['type_article'] == "Consommable" else 1)
+                    edit_type = st.selectbox("Catégorie", ["Consommable", "EPI"], index=0 if art_actuel['type_article'] == "Consommable" else 1)
                     edit_marque = st.text_input("Marque", value=art_actuel['marque'])
-                    edit_ref = st.text_input("Référence Fabricant", value=art_actuel['reference'])
-                
+                    edit_ref = st.text_input("Référence", value=art_actuel['reference'])
                 with col_mod2:
                     edit_fourn = st.text_input("Fournisseur", value=art_actuel['fournisseur'])
-                    edit_qte = st.number_input("Quantité exacte actuellement en Stock", min_value=0, value=int(art_actuel['quantite']))
-                    
-                    st.caption("📷 Remplacer la photo existante (laisser vide pour la conserver) :")
-                    fichier_photo_edit = st.file_uploader("Glisser une nouvelle capture d'écran", type=["jpg", "jpeg", "png"], key="edit_photo")
+                    edit_qte = st.number_input("Quantité en Stock", min_value=0, value=int(art_actuel['quantite']))
+                    fichier_photo_edit = st.file_uploader("Remplacer la photo", type=["jpg", "jpeg", "png"], key="edit_photo")
                 
                 btn_col1, btn_col2 = st.columns([1, 4])
                 with btn_col1:
                     sauvegarder_changement = st.form_submit_button("💾 Enregistrer")
                 with btn_col2:
-                    supprimer_definitivement = st.form_submit_button("🗑️ Supprimer cet article")
+                    supprimer_definitivement = st.form_submit_button("🗑️ Supprimer l'article")
 
             if sauvegarder_changement:
-                if fichier_photo_edit is not None:
-                    nouveau_b64 = convertir_image_en_base64(fichier_photo_edit)
-                else:
-                    nouveau_b64 = art_actuel['photo_data']
-                    
+                nouveau_b64 = convertir_image_en_base64(fichier_photo_edit) if fichier_photo_edit is not None else art_actuel['photo_data']
                 conn = connexion_db()
-                conn.execute('''
-                    UPDATE stocks SET 
-                    nom=?, type_article=?, marque=?, reference=?, fournisseur=?, quantite=?, photo_data=?
-                    WHERE id=?
-                ''', (edit_nom, edit_type, edit_marque, edit_ref, edit_fourn, edit_qte, nouveau_b64, id_article_choisi))
+                conn.execute('UPDATE stocks SET nom=?, type_article=?, marque=?, reference=?, fournisseur=?, quantite=?, photo_data=? WHERE id=?', (edit_nom, edit_type, edit_marque, edit_ref, edit_fourn, edit_qte, nouveau_b64, id_article_choisi))
                 conn.commit()
                 conn.close()
-                st.success(f"✔️ L'article '{edit_nom}' a été mis à jour !")
+                st.success("Mis à jour avec succès !")
                 st.rerun()
                 
             if supprimer_definitivement:
@@ -379,5 +346,5 @@ with tab6:
                 conn.execute("DELETE FROM stocks WHERE id=?", (id_article_choisi,))
                 conn.commit()
                 conn.close()
-                st.warning(f"L'article a été retiré du catalogue.")
+                st.warning("Article supprimé.")
                 st.rerun()

@@ -21,10 +21,23 @@ PHOTO_DEFAUT = "https://cdn-icons-png.flaticon.com/512/4054/4054615.png"
 # --- ENCODAGE / DÉCODAGE DES IMAGES EN BASE64 ---
 def convertir_image_en_base64(fichier_image):
     if fichier_image is not None:
-        bytes_data = fichier_image.read()
-        base64_encoded = base64.b64encode(bytes_data).decode('utf-8')
-        return f"data:image/jpeg;base64,{base64_encoded}"
+        try:
+            bytes_data = fichier_image.read()
+            base64_encoded = base64.b64encode(bytes_data).decode('utf-8')
+            return f"data:image/jpeg;base64,{base64_encoded}"
+        except Exception:
+            return None
     return None
+
+# Affichage sécurisé des images (évite les plantages si la chaîne base64 ou l'URL est corrompue)
+def afficher_image_securisee(image_source, width=120):
+    if image_source and (image_source.startswith("http") or image_source.startswith("data:image")):
+        try:
+            st.image(image_source, width=width)
+        except Exception:
+            st.image(PHOTO_DEFAUT, width=width)
+    else:
+        st.image(PHOTO_DEFAUT, width=width)
 
 # --- INITIALISATION DE LA BASE DE DONNÉES ---
 def connexion_db():
@@ -87,12 +100,14 @@ df_mouvements_tous = pd.read_sql_query("""
 df_stock_total = pd.read_sql_query("SELECT * FROM stocks", conn)
 conn.close()
 
-# --- PARAMÈTRE DE RETRAIT SCAN QR CODE ---
+# --- CORRECTION COMPATIBILITÉ PARAMÈTRES DE REQUÊTE ST.QUERY_PARAMETERS ---
 id_scanne = None
 try:
-    if "mat_id" in st.query_parameters:
-        id_scanne = int(st.query_parameters["mat_id"])
-except:
+    # Utilisation de la nouvelle syntaxe dict-like approuvée par Streamlit
+    parametres = st.query_parameters
+    if "mat_id" in parametres:
+        id_scanne = int(parametres["mat_id"])
+except Exception:
     pass
 
 st.title("🛠️ SOC Industrie : Logistique, Matériel & Visuels")
@@ -104,7 +119,7 @@ if id_scanne and not df_mat.empty:
         row_mat = mat_scanne.iloc[0]
         st.warning(f"📱 **QR Code Flashé** : **{row_mat['nom']}** ({row_mat['modele']})")
         p_data = row_mat['photo_data'] if row_mat['photo_data'] else PHOTO_DEFAUT
-        st.image(p_data, width=200)
+        afficher_image_securisee(p_data, width=200)
         
         conn = connexion_db()
         res_attente = pd.read_sql_query("SELECT * FROM mouvements WHERE materiel_id=? AND statut_mouvement='Réservé' ORDER BY date_debut ASC LIMIT 1", conn)
@@ -119,6 +134,9 @@ if id_scanne and not df_mat.empty:
                 conn.execute("UPDATE mouvements SET statut_mouvement='Sorti (En Cours)', date_retrait_reel=? WHERE id=?", (date.today().strftime('%Y-%m-%d'), res['id']))
                 conn.commit()
                 conn.close()
+                
+                # Nettoyage de l'URL propre à Streamlit v1.30+
+                st.query_parameters.clear()
                 st.success("Sortie validée ! Bon chantier.")
                 st.rerun()
                 
@@ -129,6 +147,8 @@ if id_scanne and not df_mat.empty:
                 conn.execute("UPDATE mouvements SET statut_mouvement='Retourné', date_retour_reel=? WHERE materiel_id=? AND statut_mouvement='Sorti (En Cours)'", (date.today().strftime('%Y-%m-%d'), id_scanne))
                 conn.commit()
                 conn.close()
+                
+                st.query_parameters.clear()
                 st.success("Matériel de retour au dépôt !")
                 st.rerun()
 
@@ -151,17 +171,18 @@ with tab1:
         for idx, row in df_mat.iterrows():
             with cols_m[idx % 4]:
                 img_data = row['photo_data'] if row['photo_data'] else PHOTO_DEFAUT
-                st.image(img_data, width=140)
+                afficher_image_securisee(img_data, width=140)
                 st.markdown(f"**{row['nom']}** ({row['modele']})")
                 st.caption(f"S/N: {row['num_serie']} | Statut: `{row['statut']}`")
                 st.write("---")
     else:
         st.info("Aucune machine enregistrée.")
 
-# --- TAB 2 : CRÉER UNE RÉSERVATION ---
+# --- TAB 2 : CRÉER UNE RÉSERVATION / MOUVEMENT ---
 with tab2:
     st.subheader("🗓️ Planifier une Réservation")
-    if df_mat.empty: st.info("Aucune machine disponible.")
+    if df_mat.empty: 
+        st.info("Aucune machine disponible.")
     else:
         with st.form("form_res"):
             mat_id = st.selectbox("Équipement", df_mat['id'].tolist(), format_func=lambda x: f"{df_mat[df_mat['id']==x]['nom'].values[0]}")
@@ -176,7 +197,13 @@ with tab2:
                 conn.execute("INSERT INTO mouvements (materiel_id, technicien, num_affaire, adresse_chantier, lat, lon, date_demande, date_debut, date_fin, statut_mouvement) VALUES (?,?,?,?,?,?,?,?,?,'Réservé')", (mat_id, tech, n_affaire, adresse, COORD_SIEGE[0], COORD_SIEGE[1], date.today().strftime('%Y-%m-%d'), str(d_deb), str(d_fi)))
                 conn.commit()
                 conn.close()
-                st.success("Réservé !")
+                
+                # Nettoyage sécurisé
+                try:
+                    st.query_parameters.clear()
+                except Exception:
+                    pass
+                st.success("Mouvement enregistré avec succès !")
                 st.rerun()
 
 # --- TAB 3 : STOCKS CONSOMMABLES ---
@@ -188,7 +215,7 @@ with tab3:
         for idx, row in df_conso.iterrows():
             with c_index[idx % 4]:
                 img_data = row['photo_data'] if row['photo_data'] else PHOTO_DEFAUT
-                st.image(img_data, width=120)
+                afficher_image_securisee(img_data, width=120)
                 st.markdown(f"**{row['nom']}**")
                 st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}\n\nQté en stock : **{row['quantite']}**")
         
@@ -215,7 +242,7 @@ with tab4:
         for idx, row in df_epi.iterrows():
             with c_epi[idx % 4]:
                 img_data = row['photo_data'] if row['photo_data'] else PHOTO_DEFAUT
-                st.image(img_data, width=120)
+                afficher_image_securisee(img_data, width=120)
                 st.markdown(f"**{row['nom']}**")
                 st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}\n\nEn stock: **{row['quantite']}**")
         
@@ -246,7 +273,7 @@ with tab5:
             st.image(buf.getvalue())
             st.write("---")
 
-# --- TAB 6 : ADMINISTRATION (AJOUT, MODIFICATION AVEC GLISSER-DÉPOSER) ---
+# --- TAB 6 : ADMINISTRATION ---
 with tab6:
     st.subheader("⚙️ Panneau d'Administration")
     
@@ -254,7 +281,6 @@ with tab6:
     
     with subtab_creer:
         st.write("### ➕ Ajouter une Machine")
-        # Utilisation de colonnes différentes pour ne pas bloquer l'upload dans un mini-formulaire étroit
         with st.form("f_add_m"):
             c1, c2 = st.columns(2)
             with c1:
@@ -332,7 +358,6 @@ with tab6:
                     supprimer_definitivement = st.form_submit_button("🗑️ Supprimer cet article")
 
             if sauvegarder_changement:
-                # Si l'utilisateur a mis une nouvelle image, on la convertit, sinon on garde l'ancienne
                 if fichier_photo_edit is not None:
                     nouveau_b64 = convertir_image_en_base64(fichier_photo_edit)
                 else:

@@ -39,13 +39,13 @@ def charger_demandes():
 df_materiel_reel = charger_materiel()
 df_demandes_reel = charger_demandes()
 
-# 6. CRÉATION DES ONGLETS
+# --- 6. CRÉATION DES ONGLETS (Noms validés) ---
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
-    "👑 ESPACE OLIVIER : Centralisation & Logistique",
-    "🛒 CATALOGUE MAGASIN (EPI / Consommables)",
-    "🛠️ CATALOGUE VISUEL & REGISTRE MATÉRIEL", 
-    "📅 Sorties & Mouvements Terrain", 
-    "📍 Carte des Chantiers"
+    "👑 Tableau de Bord Olivier", 
+    "🛒 Catalogues EPI/Consommables/Outillage", 
+    "📦 Matériels Commun", 
+    "📅 Réservation matériel",
+    "📍 Carte de localisation du matériel"
 ])
 # 5. Contenu des onglets
 with tab0:

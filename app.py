@@ -18,6 +18,7 @@ MAIL_OLIVIER = "owasse@soc.fr"
 PHOTO_DEFAUT = "https://cdn-icons-png.flaticon.com/512/4054/4054615.png"
 
 # --- CONNEXION GLOBALE SUPABASE ---
+# Connexion standard Streamlit SQL
 conn = st.connection("postgresql", type="sql")
 
 # --- ENCODAGE DES IMAGES ---

@@ -38,19 +38,25 @@ st.write("Connexion établie avec succès à la base de données Supabase.")
 # ==========================================
 # 3. EXEMPLE DE LECTURE DE DONNÉES
 # ==========================================
-st.subheader("Données de l'application")
-
+# ==========================================
+# LECTURE DES DONNÉES (SANS BLOCAGE)
+# ==========================================
 try:
-    # Utilisation de Pandas pour lire directement via la connexion SQLAlchemy
-    query = "SELECT * FROM materiel LIMIT 10;"  # Remplacez par le nom de vos vraies tables
+    query = "SELECT * FROM materiel LIMIT 10;"
     df = pd.read_sql(query, conn)
     
     if df.empty:
-        st.info("La table est connectée mais ne contient aucune donnée pour le moment.")
+        st.info("La table 'materiel' est connectée mais ne contient aucune donnée pour le moment.")
+        # La ligne st.stop() a été retirée d'ici pour laisser l'application s'afficher entièrement !
     else:
         st.dataframe(df)
 except Exception as e:
-    st.warning(f"Impossible de lire la table de test (elle n'existe peut-être pas encore) : {e}")
+    st.warning(f"Note : Impossible de lire la table 'materiel' : {e}")
+
+# ==========================================
+# ICI COMMENCE TOUT VOTRE CODE SUIVANT :
+# (Votre carte de localisation, suivi des EPI, etc.)
+# ==========================================
 
 # ==========================================
 # 4. LE RESTE DE VOTRE CODE (Cartes, QR Codes, Chantiers...)

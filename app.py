@@ -57,6 +57,7 @@ with tab5:
                 ref = st.text_input("Référence")
                 num_serie = st.text_input("N° de Série")
             
+            # --- GESTION PHOTO CORRECTEMENT INDENTÉE ---
             st.subheader("📸 Photo du matériel")
             source_photo = st.radio("Source :", ["Aucune", "Fichier"], horizontal=True)
             

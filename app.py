@@ -2,52 +2,42 @@ import streamlit as st
 import pandas as pd
 import sqlalchemy
 import numpy as np
-from datetime import datetime, timedelta
-import urllib.parse
-import base64
 
-# --- 1. CONFIGURATION ---
+# Configuration de la page
 st.set_page_config(page_title="SOC Industrie", layout="wide")
 st.title("🏗️ SOC Industrie — Gestion Interne")
 
-# --- 2. CONNEXION BDD ---
+# Connexion BDD
 @st.cache_resource
 def init_connection():
-    # Utilisez votre URL de connexion ici
-    return sqlalchemy.create_engine(st.secrets["DB_URL"])
+    try:
+        return sqlalchemy.create_engine(st.secrets["DB_URL"])
+    except:
+        return None
 
 engine = init_connection()
 
-# --- 3. CHARGEMENT DONNEES ---
-# (Ajoutez ici vos fonctions charger_materiel et charger_demandes)
-
-# --- 4. NAVIGATION ---
-tab0, tab1, tab2, tab3, tab4 = st.tabs([
-    "👑 Admin", 
-    "🛒 Catalogue", 
-    "🛠️ Matériel", 
-    "📅 Sorties", 
-    "📍 Carte"
+# Création des 4 onglets
+tab0, tab1, tab2, tab3 = st.tabs([
+    "👑 Tableau de Bord Olivier", 
+    "🛒 Catalogues EPI/Consommables/Outillage", 
+    "📦 Matériels Commun", 
+    "📅 Réservation matériel"
 ])
 
-# --- 5. CONTENU DES ONGLETS ---
-
+# Structure de base
 with tab0:
-    st.header("👑 Tableau de Bord Logistique")
-    st.write("Bienvenue dans l'espace d'administration.")
+    st.header("👑 Tableau de Bord Olivier")
+    st.write("Espace centralisé de suivi.")
 
 with tab1:
-    st.header("🛒 Catalogue Magasin")
-    st.write("Espace en cours de construction.")
+    st.header("🛒 Catalogues EPI/Consommables/Outillage")
+    st.write("Gestion des commandes.")
 
 with tab2:
-    st.header("🛠️ Catalogue Matériel")
-    st.write("Espace en cours de construction.")
+    st.header("📦 Matériels Commun")
+    st.write("Gestion du matériel partagé.")
 
 with tab3:
-    st.header("📅 Sorties")
-    st.write("Suivi des mouvements.")
-
-with tab4:
-    st.header("📍 Carte")
-    st.write("Localisation des chantiers.")
+    st.header("📅 Réservation matériel")
+    st.write("Suivi des réservations terrain.")

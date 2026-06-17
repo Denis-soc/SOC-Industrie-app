@@ -41,7 +41,6 @@ try:
 except Exception as e:
     st.warning(f"Note : Impossible de lire la table 'materiel' (Vérifiez si elle contient des lignes ou si le RLS est désactivé) : {e}")
 
----
 
 # 4. MODULE : GÉOLOCALISATION DU MATÉRIEL (CARTE)
 st.header("📍 Localisation du Matériel de Chantier")
@@ -62,7 +61,6 @@ st.map(map_data, zoom=10)
 st.subheader("📋 Liste des équipements géolocalisés")
 st.table(map_data[['Nom', 'lat', 'lon']])
 
----
 
 # 5. MODULE : SUIVI DES EPI (ÉQUIPEMENTS DE PROTECTION INDIVIDUELLE)
 st.header("🦺 Suivi et Attribution des EPI")

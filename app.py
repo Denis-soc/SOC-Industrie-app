@@ -50,14 +50,33 @@ if "materiel_id" in query_params:
 # ... Onglet N°5...
 with tab5:
     st.header("⚙️ Administration Matériel")
-    
-    # Clé unique pour éviter les doublons d'éléments
-    admin_action = st.radio(
-        "Action :", 
-        ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], 
-        key="admin_radio_main"
-    )
-    
+    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="main_radio")
+
+    # Fonction qui dessine le formulaire (vide ou rempli)
+    def afficher_formulaire(donnees=None):
+        with st.form("form_partage"):
+            col1, col2 = st.columns(2)
+            # Si 'donnees' existe, on pré-remplit les champs
+            id_val = donnees['id'] if donnees else ""
+            nom_val = donnees['nom'] if donnees else ""
+            # ... (idem pour les autres champs)
+            
+            num_interne = col1.text_input("Numéro interne", value=id_val, disabled=(donnees is not None))
+            nom = col1.text_input("Nom de l'article", value=nom_val)
+            # ... le reste des champs
+            
+            btn_label = "Mettre à jour" if donnees else "Enregistrer"
+            if st.form_submit_button(btn_label):
+                # Logique INSERT ou UPDATE ici
+                pass
+
+    if admin_action == "Créer une fiche":
+        afficher_formulaire() # Appelé sans données = mode création
+        
+    elif admin_action == "Modifier une fiche":
+        id_select = st.selectbox("Choisir l'ID :", ...)
+        data = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_select}'", engine).iloc[0]
+        afficher_formulaire(donnees=data) # Appelé avec données = mode modification
     # --- BLOC CRÉATION ---
     if admin_action == "Créer une fiche":
         with st.form("form_creation_admin"):

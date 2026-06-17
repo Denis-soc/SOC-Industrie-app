@@ -48,6 +48,29 @@ if "materiel_id" in query_params:
     # Ici, vous pourriez ajouter une logique pour ouvrir automatiquement 
     # une fenêtre modale ou filtrer le catalogue sur cet ID
 # ... Onglet N°1...
+C'est noté. Puisque votre onglet principal s'appelle tab1 et qu'il porte le nom "🛒 Catalogues EPI/Consommables/Outillage", nous allons adapter la structure pour qu'elle s'intègre parfaitement à votre interface existante.
+
+
+with tab1:
+    st.header("🛒 Catalogues Matériel")
+    
+    # Création des sous-onglets pour filtrer les catégories
+    sub_epi, sub_cons, sub_outil, sub_commun = st.tabs([
+        "EPI", "Consommables", "Outillage", "Matériel Commun"
+    ])
+    
+    # Utilisation de la fonction afficher_catalogue pour chaque sous-onglet
+    with sub_epi:
+        afficher_catalogue("Catalogue EPI")
+        
+    with sub_cons:
+        afficher_catalogue("Catalogue Consommables")
+        
+    with sub_outil:
+        afficher_catalogue("Catalogue Outillage")
+        
+    with sub_commun:
+        afficher_catalogue("Catalogue Matériel Commun")
 # ... Onglet N°5...
 with tab5:
     st.header("⚙️ Administration Matériel")

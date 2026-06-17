@@ -129,32 +129,35 @@ with tab1:
             with st.form("form_creation"):
                 col1, col2 = st.columns(2)
                 with col1:
-                    num_interne = st.text_input("Numéro interne")
+                    num_interne = st.text_input("Numéro interne (ex: SOC-001)")
                     nom = st.text_input("Nom de l'article")
+                    ref = st.text_input("Référence interne")
                 with col2:
                     fournisseur = st.text_input("Fournisseur")
                     ref_fournisseur = st.text_input("Référence fournisseur")
+                    num_serie = st.text_input("N° de Série")
                 
-                # --- NOUVEAU BLOC : SUIVI MAINTENANCE ---
-                st.subheader("📋 Informations de Suivi & Maintenance")
+                st.subheader("📋 Suivi & Maintenance")
                 soumis_verif = st.checkbox("Matériel soumis à vérification/étalonnage ?")
+                periodicite, date_depart = 0, None
                 if soumis_verif:
-                    col_v1, col_v2 = st.columns(2)
-                    with col_v1:
-                        periodicite = st.number_input("Périodicité (en mois)", min_value=1, value=12)
-                    with col_v2:
-                        date_depart = st.date_input("Date de départ (ou dernier contrôle)")
+                    c1, c2 = st.columns(2)
+                    periodicite = c1.number_input("Périodicité (en mois)", min_value=1, value=12)
+                    date_depart = c2.date_input("Date de départ (ou dernier contrôle)")
                 
-                # Gestion photo : Upload ou Caméra
-                photo_option = st.radio("Photo :", ["Uploader un fichier", "Prendre en direct"], horizontal=True)
-                if photo_option == "Uploader un fichier":
-                    photo = st.file_uploader("Choisir une image", type=['png', 'jpg', 'jpeg'])
-                else:
-                    photo = st.camera_input("Prendre une photo")
+                photo = st.camera_input("Prendre une photo")
                 
-                if st.form_submit_button("Enregistrer la fiche"):
-                    # Logique d'insertion SQL à prévoir ici
-                    st.success(f"Fiche {nom} créée !")
+                if st.form_submit_button("Enregistrer et générer le QR Code"):
+                    # 1. Logique d'enregistrement SQL (à venir)
+                    st.success(f"Fiche {nom} enregistrée !")
+                    
+                    # 2. Génération du QR Code
+                    info_suivi = f"Périodicité: {periodicite}m | Départ: {date_depart}" if soumis_verif else "Non soumis"
+                    data_qr = f"SOC: {num_interne} | {nom} | Série: {num_serie} | {info_suivi}"
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(data_qr)}"
+                    
+                    st.image(qr_url, caption=f"QR Code - {num_interne}")
+                    st.info("Faites un clic droit sur l'image pour enregistrer votre QR Code.")
         
         elif action == "Modifier une fiche":
             st.warning("Fonctionnalité de modification à venir.")

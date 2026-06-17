@@ -43,23 +43,8 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # ... Onglet N°5...
 with tab5:
     st.header("⚙️ Administration Matériel")
-    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
-    
-    if admin_action == "Créer une fiche":
-        with st.form("form_creation_admin"):
-            col1, col2 = st.columns(2)
-            with col1:
-                num_interne = st.text_input("Numéro interne (ex: MAT-001)")
-                nom = st.text_input("Nom de l'article")
-                fournisseur = st.text_input("Fournisseur")
-            with col2:
-                categorie = st.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"])
-                ref = st.text_input("Référence")
-                num_serie = st.text_input("N° de Série")
-            
-with tab5:
-    st.header("⚙️ Administration Matériel")
-    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
+    # Ajout d'une clé unique pour éviter le DuplicateElementId
+    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="admin_radio")
     
     if admin_action == "Créer une fiche":
         with st.form("form_creation_admin"):
@@ -73,49 +58,33 @@ with tab5:
                 ref = st.text_input("Référence")
                 num_serie = st.text_input("N° de Série")
             
-            st.subheader("📸 Photo du matériel")
-            source_photo = st.radio("Source :", ["Aucune", "Fichier"], horizontal=True)
+            st.subheader("📸 Photo")
+            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True, key="photo_source")
             
-            # Gestion sécurisée du fichier
-            uploaded_file = None
+            photo_data = None
             if source_photo == "Fichier":
-                uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'])
+                photo_data = st.file_uploader("Déposer une image", type=['png', 'jpg'])
+            elif source_photo == "Caméra":
+                photo_data = st.camera_input("Prendre une photo")
             
             soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?")
             
             if st.form_submit_button("Enregistrer et générer QR Code"):
-                # On utilise try/except pour capturer les erreurs proprement sans planter
                 try:
-                    query = sqlalchemy.text("""
-                        INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur)
-                        VALUES (:id, :nom, :cat, :ref, :serie, :fourn)
-                    """)
-                    
-                    with engine.begin() as conn:
-                        conn.execute(query, {
-                            "id": num_interne, "nom": nom, "cat": categorie, 
-                            "ref": ref, "serie": num_serie, "fourn": fournisseur
-                        })
-                    st.success("Matériel enregistré avec succès !")
-                    
-                    # Génération du QR Code
-                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(num_interne)}"
-                    st.image(qr_url, caption="QR Code")
-                    
-                except Exception as e:
-                    st.error(f"Erreur lors de l'enregistrement : {e}")
+                    # Insertion dans la base
+                    query = """
+                    INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur)
+                    VALUES (:id, :nom, :cat, :ref, :serie, :fourn)
+                    """
                     with engine.begin() as conn:
                         conn.execute(sqlalchemy.text(query), {
                             "id": num_interne, "nom": nom, "cat": categorie, 
                             "ref": ref, "serie": num_serie, "fourn": fournisseur
                         })
+                    st.success("Matériel enregistré !")
                     
-                    st.success(f"Fiche {nom} enregistrée !")
-                    
-                    # Génération du QR Code
-                    qr_data = f"ID: {num_interne} | Nom: {nom} | Série: {num_serie}"
-                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}"
-                    st.image(qr_url, caption="QR Code généré")
-                    
+                    # Génération QR Code
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(num_interne)}"
+                    st.image(qr_url)
                 except Exception as e:
                     st.error(f"Erreur technique : {e}")

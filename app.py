@@ -1,20 +1,23 @@
 import streamlit as st
 import pandas as pd
 import sqlalchemy
-from datetime import datetime  # <--- C'est cette ligne qui manque
-# Configuration
+from datetime import datetime # Correction pour l'erreur datetime
+
 st.set_page_config(page_title="SOC Industrie", layout="wide")
 
-# --- DÉFINITION GLOBALE DES LISTES (DOIT ÊTRE ICI) ---
-# Assurez-vous que ces listes contiennent tous les champs nécessaires
-CATALOGUE_MAGASIN = [...] # Votre liste existante
-CATALOGUE_OUTILLAGE = [...] # Votre liste existante
-CATALOGUE_COMPLET = CATALOGUE_MAGASIN + CATALOGUE_OUTILLAGE
+# --- DÉFINITIONS GLOBALES ---
+CATALOGUE_MAGASIN = [...] 
+CATALOGUE_OUTILLAGE = [...]
+CATALOGUE_TOTAL = CATALOGUE_MAGASIN + CATALOGUE_OUTILLAGE
 
-# --- CONNEXION BASE DE DONNÉES ---
+# --- CONNEXION ---
 @st.cache_resource
 def init_connection():
     return sqlalchemy.create_engine(st.secrets["DB_URL"])
+engine = init_connection()
+
+# --- DÉBUT DES ONGLETS ---
+tab0, tab1, tab2, tab3, tab4 = st.tabs([...])
 
 try:
     engine = init_connection()

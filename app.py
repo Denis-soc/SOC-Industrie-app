@@ -50,100 +50,61 @@ if "materiel_id" in query_params:
 # ... Onglet N°5...
 with tab5:
     st.header("⚙️ Administration Matériel")
-    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="main_radio")
-
-    # Fonction qui dessine le formulaire (vide ou rempli)
-    def afficher_formulaire(donnees=None):
-        with st.form("form_partage"):
-            col1, col2 = st.columns(2)
-            # Si 'donnees' existe, on pré-remplit les champs
-            id_val = donnees['id'] if donnees else ""
-            nom_val = donnees['nom'] if donnees else ""
-            # ... (idem pour les autres champs)
-            
-            num_interne = col1.text_input("Numéro interne", value=id_val, disabled=(donnees is not None))
-            nom = col1.text_input("Nom de l'article", value=nom_val)
-            # ... le reste des champs
-            
-            btn_label = "Mettre à jour" if donnees else "Enregistrer"
-            if st.form_submit_button(btn_label):
-                # Logique INSERT ou UPDATE ici
-                pass
-
-    if admin_action == "Créer une fiche":
-        afficher_formulaire() # Appelé sans données = mode création
-        
-    elif admin_action == "Modifier une fiche":
-        id_select = st.selectbox("Choisir l'ID :", ...)
-        data = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_select}'", engine).iloc[0]
-        afficher_formulaire(donnees=data) # Appelé avec données = mode modification
-    # --- BLOC CRÉATION ---
+    
+    # Clé unique 'admin_action' pour éviter les erreurs de duplication
+    admin_action = st.radio(
+        "Action :", 
+        ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], 
+        key="admin_action_radio"
+    )
+    
     if admin_action == "Créer une fiche":
         with st.form("form_creation_admin"):
             col1, col2 = st.columns(2)
             with col1:
                 num_interne = st.text_input("Numéro interne", key="in_id")
                 nom = st.text_input("Nom de l'article", key="in_nom")
-                fournisseur = st.text_input("Fournisseur", key="in_fourn")
             with col2:
-                categorie = st.selectbox(
-                    "Catégorie :", 
-                    ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"], 
-                    key="in_cat"
-                )
-                ref = st.text_input("Référence", key="in_ref")
+                categorie = st.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"], key="in_cat")
                 num_serie = st.text_input("N° de Série", key="in_serie")
             
-            # --- maintenance ---
+            # Maintenance
             st.subheader("📅 Suivi et Maintenance")
-            soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?", key="check_ctrl")
+            soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?", key="check_maint")
             date_c, perio = None, 0
             if soumis_verif:
                 c1, c2 = st.columns(2)
                 date_c = c1.date_input("Date du dernier contrôle")
                 perio = c2.number_input("Périodicité (mois)", value=12)
 
-            # --- photo ---
+            # Photo
             st.subheader("📸 Photo du matériel")
-            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True, key="photo_source_admin")
+            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True, key="photo_source")
             if source_photo == "Fichier":
-                st.file_uploader("Déposer une image", type=['png', 'jpg'], key="file_upload_admin")
+                st.file_uploader("Déposer une image", type=['png', 'jpg'], key="file_up")
             elif source_photo == "Caméra":
-                st.camera_input("Prendre une photo", key="camera_admin")
+                st.camera_input("Prendre une photo", key="cam_up")
 
-            # --- soumission ---
+            # Bouton de soumission unique
             if st.form_submit_button("Enregistrer"):
                 try:
+                    # Requête sécurisée
                     query = sqlalchemy.text("""
-                        INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur, date_controle, intervalle_mois)
-                        VALUES (:id, :nom, :cat, :ref, :serie, :fourn, :date_c, :perio)
+                        INSERT INTO materiel (id, nom, categorie, num_serie, date_controle, intervalle_mois)
+                        VALUES (:id, :nom, :cat, :serie, :date_c, :perio)
                     """)
                     with engine.begin() as conn:
                         conn.execute(query, {
                             "id": num_interne, "nom": nom, "cat": categorie, 
-                            "ref": ref, "serie": num_serie, "fourn": fournisseur,
-                            "date_c": date_c, "perio": perio
+                            "serie": num_serie, "date_c": date_c, "perio": perio
                         })
-                    st.success("Fiche créée avec succès !")
+                    st.success("Matériel enregistré !")
                 except Exception as e:
                     st.error(f"Erreur technique : {e}")
 
-
+    elif admin_action == "Modifier une fiche":
+        st.info("Sélectionnez le matériel dans la liste...")
+        # Logique de modification à ajouter ensuite
 
     elif admin_action == "Supprimer une fiche":
-        st.subheader("⚠️ Supprimer un matériel")
-        
-        # 1. On récupère la liste des IDs pour choisir ce qu'on supprime
-        df_list = pd.read_sql("SELECT id FROM materiel", engine)
-        id_a_supprimer = st.selectbox("Sélectionner l'ID à supprimer :", df_list['id'].tolist(), key="select_del")
-        
-        # 2. Bouton de confirmation (sécurité indispensable pour éviter les erreurs)
-        if st.button("Confirmer la suppression définitive"):
-            try:
-                query_del = sqlalchemy.text("DELETE FROM materiel WHERE id = :id")
-                with engine.begin() as conn:
-                    conn.execute(query_del, {"id": id_a_supprimer})
-                st.success(f"Le matériel {id_a_supprimer} a été supprimé.")
-                st.rerun() # Recharge pour mettre à jour la liste
-            except Exception as e:
-                st.error(f"Erreur lors de la suppression : {e}")
+        st.warning("Sélectionnez le matériel à supprimer...")

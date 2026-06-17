@@ -153,11 +153,28 @@ with tab1:
                     date_depart = c2.date_input("Date de départ (ou dernier contrôle)")
                 
                 if st.form_submit_button("Enregistrer et générer le QR Code"):
-                    # 1. Logique d'insertion SQL (incluant les colonnes de suivi)
-                    # L'insertion ici envoie automatiquement les données dans votre base
-                    # ce qui permettra à la page d'Olivier de détecter les alertes
+                    # --- LOGIQUE D'INSERTION SQL ---
+                    # Nous utilisons une requête SQL pour envoyer les données dans votre table
+                    query = """
+                    INSERT INTO materiel (id, nom, reference, fournisseur, ref_fournisseur, num_serie, 
+                                          soumis_verif, periodicite, date_depart)
+                    VALUES (:id, :nom, :ref, :fourn, :ref_f, :serie, :verif, :perio, :date_d)
+                    """
                     
-                    st.success(f"Fiche {nom} créée et synchronisée pour le suivi !")
+                    with engine.begin() as conn:
+                        conn.execute(sqlalchemy.text(query), {
+                            "id": num_interne, 
+                            "nom": nom, 
+                            "ref": ref, 
+                            "fourn": fournisseur, 
+                            "ref_f": ref_fournisseur, 
+                            "serie": num_serie, 
+                            "verif": soumis_verif, 
+                            "perio": periodicite, 
+                            "date_d": date_depart
+                        })
+                    
+                    st.success(f"Fiche {nom} enregistrée et synchronisée !")
                     
                     # 2. Génération du QR Code
                     info_suivi = f"Périodicité: {periodicite}m | Départ: {date_depart}" if soumis_verif else "Non soumis"

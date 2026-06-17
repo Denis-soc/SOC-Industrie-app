@@ -16,13 +16,11 @@ st.title("🏗️ SOC Industrie — Gestion Interne")
 # 2. CONNEXION À LA BASE DE DONNÉES (POOLER)
 @st.cache_resource
 def init_connection():
-    # Pensez à remplacer 'VotreMotDePasse' par le vrai mot de passe de votre base de données Supabase
     db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
     return sqlalchemy.create_engine(db_url)
 
 try:
     engine = init_connection()
-    # Test de connexion rapide
     with engine.connect() as conn:
         pass
     st.success("Connexion établie avec succès à la base de données Supabase !")
@@ -42,11 +40,11 @@ def charger_demandes():
 df_materiel_reel = charger_materiel()
 df_demandes_reel = charger_demandes()
 
-# INITIALISATION DU PANIER COLLABORATEUR EN SESSION STATE (TEMPORAIRE)
+# INITIALISATION DU PANIER COLLABORATEUR
 if 'panier' not in st.session_state:
     st.session_state.panier = []
 
-# DEFINITION DU CATALOGUE EPI & CONSOMMABLES
+# DEFINITION DU CATALOGUE ENRICHI (EPI, CONSOMMABLES & OUTILLAGE)
 CATALOGUE = [
     {
         "id": "EPI-01", "type": "🦺 EPI", "nom": "Gants de soudure Haute Protection", "marque": "Singer Safety",
@@ -59,11 +57,6 @@ CATALOGUE = [
         "desc": "Coque composite sans métal, semelle anti-perforation, imperméable."
     },
     {
-        "id": "EPI-03", "type": "🦺 EPI", "nom": "Casque de chantier avec Visière", "marque": "Petzl",
-        "ref": "VERTEX-BEST", "tailles": ["Taille Unique"], "photo": "https://images.unsplash.com/photo-1508962914676-134849a727f0?w=150&q=80",
-        "desc": "Protection optimale pour les travaux en hauteur et l'industrie."
-    },
-    {
         "id": "CON-01", "type": "🪵 Consommable", "nom": "Électrodes de Soudage Inox Ø2.5", "marque": "Gys",
         "ref": "E308L-16", "tailles": ["Étui de 50 pièces", "Blister de 10 pièces"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80",
         "desc": "Électrodes enrobées rutiles pour le soudage des aciers inoxydables."
@@ -72,24 +65,34 @@ CATALOGUE = [
         "id": "CON-02", "type": "🪵 Consommable", "nom": "Disque à tronçonner Acier/Inox Ø125", "marque": "Norton Abrasifs",
         "ref": "NOR-125-1", "tailles": ["Lot de 5 disques", "Boîte de 25 disques"], "photo": "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=150&q=80",
         "desc": "Épaisseur 1mm pour une coupe ultra-rapide et précise sans bavure."
+    },
+    {
+        "id": "OUT-01", "type": "🛠️ Outillage", "nom": "Meuleuse d'angle filaire 125mm", "marque": "Bosch Professional",
+        "ref": "GWS 7-125", "tailles": ["Standard (Mallette)", "Version nue"], "photo": "https://images.unsplash.com/photo-1534224039826-c7a0dea0e66a?w=150&q=80",
+        "desc": "Meuleuse compacte de 720W, protection contre le redémarrage intempestif."
+    },
+    {
+        "id": "OUT-02", "type": "🛠️ Outillage", "nom": "Perceuse Visseuse à percussion 18V", "marque": "Makita",
+        "ref": "DHP482Z", "tailles": ["Avec 2 batteries 5.0Ah", "Outil Nu"], "photo": "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=150&q=80",
+        "desc": "Perceuse robuste et rapide pour les perçages et vissages intensifs sur chantier."
     }
 ]
 
 # Répartition des modules par Onglets
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "👑 ESPACE OLIVIER : Centralisation & Logistique",
-    "🛒 CATALOGUE & MAGASIN (EPI / Consommables)",
+    "🛒 CATALOGUE & MAGASIN (EPI / Consommables / Outillage)",
     "🛠️ Registre & Gestion du Matériel", 
     "📅 Sorties & Mouvements Terrain", 
     "📍 Carte des Chantiers"
 ])
 
 # ==========================================
-# ONGLET 0 : ESPACE OLIVIER (RECEPTION DES COMMANDES)
+# ONGLET 0 : ESPACE OLIVIER
 # ==========================================
 with tab0:
     st.header("👑 Tableau de Bord Logistique d'Olivier")
-    st.write("Retrouvez ici les étalonnages prioritaires ainsi que les bons de commande complets générés par le catalogue.")
+    st.write("Retrouvez ici les obligations réglementaires ainsi que les bons de commande complets générés par le catalogue.")
     
     st.subheader("📥 Bons de commande et demandes reçus")
     if not df_demandes_reel.empty:
@@ -130,7 +133,6 @@ with tab0:
     lignes_alertes = []
     
     for idx, row in df_materiel_reel.iterrows():
-        # Conversion de la date sql en date python si nécessaire
         date_prox = row["Prochain Contrôle"]
         if isinstance(date_prox, str):
             date_prox = datetime.strptime(date_prox, "%Y-%m-%d").date()
@@ -152,17 +154,18 @@ with tab0:
 
 
 # ==========================================
-# ONGLET 1 : CATALOGUE INTERACTIF & PANIER
+# ONGLET 1 : CATALOGUE INTERACTIF & PANIER MULTI-CATEGORIES
 # ==========================================
 with tab1:
     st.header("🛒 Catalogue Officiel SOC Industrie")
-    st.write("Sélectionnez vos EPI et consommables de marque, ajustez vos tailles et valisez votre panier global.")
+    st.write("Sélectionnez vos EPI, consommables et outillages, ajustez vos choix et validez le panier de chantier.")
 
     col_cat, col_panier = st.columns([3, 2])
 
     with col_cat:
         st.subheader("📦 Articles disponibles au stock")
-        filtre_type = st.radio("Filtrer par type :", ["Tous", "🦺 EPI", "🪵 Consommable"], horizontal=True)
+        # Extension du filtre pour inclure l'outillage
+        filtre_type = st.radio("Filtrer par type :", ["Tous", "🦺 EPI", "🪵 Consommable", "🛠️ Outillage"], horizontal=True)
 
         for prod in CATALOGUE:
             if filtre_type != "Tous" and prod["type"] != filtre_type:
@@ -177,7 +180,7 @@ with tab1:
                     st.markdown(f"**Marque :** {prod['marque']} | **Réf :** `{prod['ref']}`")
                     st.caption(prod["desc"])
                 with c_form:
-                    taille_choisie = st.selectbox("Taille / Conditionnement", prod["tailles"], key=f"taille_{prod['id']}")
+                    taille_choisie = st.selectbox("Option / Configuration", prod["tailles"], key=f"taille_{prod['id']}")
                     qte_choisie = st.number_input("Quantité", min_value=1, max_value=50, value=1, key=f"qte_{prod['id']}")
                     
                     if st.button("➕ Ajouter au panier", key=f"btn_{prod['id']}", use_container_width=True):
@@ -194,7 +197,7 @@ with tab1:
     with col_panier:
         st.subheader("🛒 Mon Panier en cours")
         if len(st.session_state.panier) == 0:
-            st.info("Votre panier est vide. Clicquez sur 'Ajouter' à gauche pour le remplir.")
+            st.info("Votre panier est vide. Cliquez sur 'Ajouter' à gauche pour le remplir.")
         else:
             df_p = pd.DataFrame(st.session_state.panier)
             st.dataframe(df_p[["type", "designation", "taille", "qte"]], use_container_width=True, hide_index=True)
@@ -219,7 +222,7 @@ with tab1:
                     else:
                         with engine.begin() as conn_tx:
                             for article in st.session_state.panier:
-                                details_str = f"Taille: {article['taille']} | Qté: {article['qte']} | {commentaires}"
+                                details_str = f"Option: {article['taille']} | Qté: {article['qte']} | {commentaires}"
                                 conn_tx.execute(
                                     sqlalchemy.text("""
                                         INSERT INTO demandes_collaborateurs (date_demande, collaborateur, type_demande, designation, code_imputation, details, statut)
@@ -240,7 +243,7 @@ with tab1:
 
 
 # ==========================================
-# ONGLET 2 : REGISTRE GENERAL MATÉRIEL (REEL)
+# ONGLET 2 : REGISTRE GENERAL MATÉRIEL
 # ==========================================
 with tab2:
     st.header("🛠️ Registre Général du Parc Matériel")
@@ -275,18 +278,18 @@ with tab2:
 
 
 # ==========================================
-# ONGLET 3 ET 4 : MOUVEMENTS & CARTOGRAPHIE
+# ONGLETS COMPLÉMENTAIRES
 # ==========================================
 with tab3:
     st.header("📅 Sorties Opérationnelles Directes")
-    st.info("Espace de transit de matériel lourd d'artisan à artisan.")
+    st.info("Espace de transfert de matériel lourd d'artisan à artisan.")
 
 with tab4:
     st.header("📍 Cartographie des Chantiers")
     map_data = pd.DataFrame(np.random.randn(3, 2) / [50, 50] + [47.33, -0.40], columns=['lat', 'lon'])
     st.map(map_data, zoom=10)
 
-# Barre latérale (Correction de la parenthèse jamais fermée ligne 255)
+# Barre latérale
 st.sidebar.image("https://img.icons8.com/clouds/100/000000/crane.png", width=60)
 st.sidebar.title("Navigation")
-st.sidebar.info("Application Interne v2.0 — SOC Industrie. Connectée en temps réel.")
+st.sidebar.info("Application Interne v2.1 — SOC Industrie. Catalogue complet actif.")

@@ -128,49 +128,7 @@ with tab5:
                 except Exception as e:
                     st.error(f"Erreur technique : {e}")
 
-    # --- BLOC MODIFICATION (Bien aligné avec le IF précédent) ---
-    elif admin_action == "Modifier une fiche":
-        st.subheader("Sélectionner le matériel à modifier")
-        
-        # 1. Sélection
-        df_list = pd.read_sql("SELECT id FROM materiel", engine)
-        id_selectionne = st.selectbox("Choisir l'ID :", df_list['id'].tolist(), key="select_mod")
-        
-        # 2. Récupération des données
-        donnees = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_selectionne}'", engine).iloc[0]
-        
-        # 3. Formulaire
-        with st.form("form_mod_admin"):
-            # On utilise les données récupérées en 'value'
-            nouveau_nom = st.text_input("Nom", value=donnees['nom'])
-            nouvelle_ref = st.text_input("Référence", value=donnees.get('reference') or "")
-            nouveau_fourn = st.text_input("Fournisseur", value=donnees.get('fournisseur') or "")
-            
-            # Bouton de soumission
-            if st.form_submit_button("Enregistrer les modifications"):
-                try:
-                    # Requête de mise à jour
-                    query_upd = sqlalchemy.text("""
-                        UPDATE materiel 
-                        SET nom = :nom, reference = :ref, fournisseur = :fourn 
-                        WHERE id = :id
-                    """)
-                    
-                    with engine.begin() as conn:
-                        conn.execute(query_upd, {
-                            "nom": nouveau_nom, 
-                            "ref": nouvelle_ref, 
-                            "fourn": nouveau_fourn, 
-                            "id": id_selectionne
-                        })
-                    
-                    st.success(f"Matériel {id_selectionne} mis à jour avec succès !")
-                    # Rerun pour rafraîchir l'interface
-                    st.rerun() 
-                    
-                except Exception as e:
-                    st.error(f"Erreur SQL lors de la mise à jour : {e}")
-        # La logique de modification sera insérée ici une fois la structure validée
+
 
     elif admin_action == "Supprimer une fiche":
         st.subheader("⚠️ Supprimer un matériel")

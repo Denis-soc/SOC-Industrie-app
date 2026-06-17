@@ -46,13 +46,31 @@ with tab5:
     admin_action = st.radio("Que souhaitez-vous faire ?", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
     
     if admin_action == "Créer une fiche":
-        # Le formulaire de création que nous avons validé
-        pass 
-    elif admin_action == "Modifier une fiche":
-        # Formulaire avec recherche par ID pour charger les données actuelles
-        st.info("Sélectionnez un matériel pour modifier ses informations.")
-    elif admin_action == "Supprimer une fiche":
-        # Confirmation avant suppression
-        st.warning("Attention : cette action est irréversible.")
-
-
+        with st.form("form_creation_admin"):
+            # 1. Sélection de la destination (le catalogue cible)
+            destination = st.selectbox("Destination de la fiche :", 
+                                       ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"])
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                num_interne = st.text_input("Numéro interne (ex: MAT-001)")
+                nom = st.text_input("Nom de l'article")
+            with col2:
+                ref = st.text_input("Référence")
+                num_serie = st.text_input("N° de Série")
+            
+            # Gestion photo
+            photo = st.camera_input("Prendre une photo")
+            
+            if st.form_submit_button("Enregistrer dans " + destination):
+                # Dans SQL, on enregistre la destination dans la colonne 'categorie'
+                query = """
+                INSERT INTO materiel (id, nom, categorie, reference, num_serie)
+                VALUES (:id, :nom, :cat, :ref, :serie)
+                """
+                with engine.begin() as conn:
+                    conn.execute(sqlalchemy.text(query), {
+                        "id": num_interne, "nom": nom, "cat": destination, 
+                        "ref": ref, "serie": num_serie
+                    })
+                st.success(f"Fiche enregistrée dans {destination} !")

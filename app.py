@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import sqlalchemy
-
+from datetime import datetime  # <--- C'est cette ligne qui manque
 # Configuration
 st.set_page_config(page_title="SOC Industrie", layout="wide")
 

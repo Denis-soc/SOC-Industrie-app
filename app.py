@@ -38,7 +38,32 @@ tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "📅 Réservation matériel",
     "📍 Carte de localisation du matériel"
 ])
+# ... après la définition de tab0, tab1...
 
+# --- CONTENU TAB0 : TABLEAU DE BORD OLIVIER ---
+with tab0:
+    st.header("👑 Tableau de Bord Olivier")
+    
+    st.subheader("📋 Demandes en attente")
+    if not df_demandes_reel.empty:
+        st.dataframe(df_demandes_reel, use_container_width=True)
+    else:
+        st.success("✅ Aucune demande en attente.")
+
+    st.markdown("---")
+    
+    st.subheader("🚨 Alertes Étalonnages (< 90 jours)")
+    # Calcul simple des alertes basé sur la colonne 'prochain_controle'
+    aujourdhui = datetime.now().date()
+    
+    # On convertit en datetime pour comparer
+    df_materiel_reel['prochain_controle'] = pd.to_datetime(df_materiel_reel['prochain_controle']).dt.date
+    alertes = df_materiel_reel[df_materiel_reel['prochain_controle'] <= (aujourdhui + pd.Timedelta(days=90))]
+    
+    if not alertes.empty:
+        st.dataframe(alertes[['id', 'nom', 'prochain_controle']], use_container_width=True)
+    else:
+        st.success("✅ Aucun étalonnage critique à prévoir.")
 # 5. CONTENU TAB1 (Administration)
 with tab1:
     mode = st.radio("Mode d'affichage :", ["Catalogue", "Administration"], horizontal=True)

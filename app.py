@@ -1,23 +1,29 @@
 import streamlit as st
 import sqlalchemy
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-import urllib.parse
-import base64
+# ... (vos autres imports)
 
-# 1. CONFIGURATION DE LA PAGE
-st.set_page_config(
-    page_title="SOC Industrie — Gestion Interne",
-    page_icon="🏗️",
-    layout="wide"
-)
+st.set_page_config(page_title="SOC Industrie", layout="wide")
 
-st.title("🏗️ SOC Industrie — Gestion Interne")
+# --- 1. DÉFINITIONS GLOBALES (À METTRE TOUT EN HAUT) ---
+CATALOGUE_MAGASIN = [
+    {"id": "EPI-01", "type": "🦺 EPI", "nom": "Gants de soudure", "marque": "Singer", "ref": "TIG-500", "tailles": ["M", "L"], "photo": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150", "desc": "Cuir."},
+    {"id": "CON-01", "type": "🪵 Consommable", "nom": "Électrodes Inox", "marque": "Gys", "ref": "E308L", "tailles": ["Étui"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150", "desc": "Électrodes."}
+]
 
-# 2. CONNEXION À LA BASE DE DONNÉES (POOLER)
+CATALOGUE_OUTILLAGE = [
+    {"id": "OUT-01", "type": "🛠️ Outillage", "nom": "Perceuse Bosch", "marque": "Bosch", "ref": "GBH 2-28", "tailles": ["Nue"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150", "desc": "Puissante."}
+]
+
+# Fusionner ici pour être sûr que la variable existe partout
+CATALOGUE_TOTAL = CATALOGUE_MAGASIN + CATALOGUE_OUTILLAGE
+
+# --- 2. CONNEXION ---
 @st.cache_resource
 def init_connection():
+    return sqlalchemy.create_engine(st.secrets["DB_URL"])
+
+engine = init_connection()
     # REMPLACEZ "VotreMotDePasse" PAR VOTRE VRAI MOT DE PASSE SUPABASE
     db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
     return sqlalchemy.create_engine(db_url)

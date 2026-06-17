@@ -29,7 +29,20 @@ def charger_demandes():
 df_materiel_reel = charger_materiel()
 df_demandes_reel = charger_demandes()
 
-# 4. INTERFACE
+# 4. DEFINITION DES FONCTIONS (En haut du fichier !) ---
+
+def afficher_catalogue(categorie_nom):
+    query = f"SELECT * FROM materiel WHERE categorie = '{categorie_nom}'"
+    df = pd.read_sql(query, engine)
+    
+    if df.empty:
+        st.info(f"Aucun matériel dans : {categorie_nom}")
+    else:
+        for _, row in df.iterrows():
+            with st.container(border=True):
+                # ... (votre code d'affichage des cartes)
+                st.write(row['nom']) # Test simple pour commencer
+# 5. INTERFACE
 st.title("🏗️ SOC Industrie — Gestion Interne")
 
 tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([

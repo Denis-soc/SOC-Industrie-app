@@ -63,13 +63,10 @@ if "materiel_id" in query_params:
 # ... Onglet N°1...
 with tab1:
     st.header("🛒 Catalogues Matériel")
-    
-    # Création des sous-onglets pour filtrer les catégories
     sub_epi, sub_cons, sub_outil, sub_commun = st.tabs([
         "EPI", "Consommables", "Outillage", "Matériel Commun"
     ])
     
-    # Utilisation de la fonction afficher_catalogue pour chaque sous-onglet
     with sub_epi:
         afficher_catalogue("Catalogue EPI")
         

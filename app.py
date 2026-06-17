@@ -48,3 +48,54 @@ if "materiel_id" in query_params:
     # une fenêtre modale ou filtrer le catalogue sur cet ID
 # ... Onglet N°1...
 # ... Onglet N°5...
+with tab5:
+    st.header("⚙️ Administration Matériel")
+    
+    # 1. Utilisation d'une clé unique 'admin_radio_main' pour éviter le conflit d'ID
+    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="admin_radio_main")
+    
+    # --- BLOC CRÉATION ---
+    if admin_action == "Créer une fiche":
+        with st.form("form_creation_admin"):
+            col1, col2 = st.columns(2)
+            with col1:
+                num_interne = st.text_input("Numéro interne", key="in_id")
+                nom = st.text_input("Nom de l'article", key="in_nom")
+                fournisseur = st.text_input("Fournisseur", key="in_fourn")
+            with col2:
+                categorie = st.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"], key="in_cat")
+                ref = st.text_input("Référence", key="in_ref")
+                num_serie = st.text_input("N° de Série", key="in_serie")
+            
+            st.subheader("📸 Photo du matériel")
+            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True, key="photo_source_admin")
+            
+            # Gestion de la photo
+            if source_photo == "Fichier":
+                st.file_uploader("Déposer une image", type=['png', 'jpg'], key="file_upload_admin")
+            elif source_photo == "Caméra":
+                st.camera_input("Prendre une photo", key="camera_admin")
+
+            if st.form_submit_button("Enregistrer"):
+                try:
+                    # Requête SQL sécurisée
+                    query = sqlalchemy.text("""
+                        INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur)
+                        VALUES (:id, :nom, :cat, :ref, :serie, :fourn)
+                    """)
+                    with engine.begin() as conn:
+                        conn.execute(query, {
+                            "id": num_interne, "nom": nom, "cat": categorie, 
+                            "ref": ref, "serie": num_serie, "fourn": fournisseur
+                        })
+                    st.success("Fiche créée avec succès !")
+                except Exception as e:
+                    st.error(f"Erreur technique : {e}")
+
+    # --- BLOC MODIFICATION (Aligné avec le if précédent) ---
+    elif admin_action == "Modifier une fiche":
+        st.write("Section modification en cours...")
+
+    # --- BLOC SUPPRESSION ---
+    elif admin_action == "Supprimer une fiche":
+        st.write("Section suppression en cours...")

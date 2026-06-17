@@ -3,5 +3,4 @@ folium
 streamlit-folium
 qrcode
 geopy
-st-postgresql-connection
 psycopg2-binary

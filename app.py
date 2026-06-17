@@ -1,38 +1,53 @@
-# --- ONGLET 0 : TABLEAU DE BORD ---
+import streamlit as st
+import pandas as pd
+import sqlalchemy
+import numpy as np
+from datetime import datetime, timedelta
+import urllib.parse
+import base64
+
+# --- 1. CONFIGURATION ---
+st.set_page_config(page_title="SOC Industrie", layout="wide")
+st.title("🏗️ SOC Industrie — Gestion Interne")
+
+# --- 2. CONNEXION BDD ---
+@st.cache_resource
+def init_connection():
+    # Utilisez votre URL de connexion ici
+    return sqlalchemy.create_engine(st.secrets["DB_URL"])
+
+engine = init_connection()
+
+# --- 3. CHARGEMENT DONNEES ---
+# (Ajoutez ici vos fonctions charger_materiel et charger_demandes)
+
+# --- 4. NAVIGATION ---
+tab0, tab1, tab2, tab3, tab4 = st.tabs([
+    "👑 Admin", 
+    "🛒 Catalogue", 
+    "🛠️ Matériel", 
+    "📅 Sorties", 
+    "📍 Carte"
+])
+
+# --- 5. CONTENU DES ONGLETS ---
+
 with tab0:
     st.header("👑 Tableau de Bord Logistique")
-    
-    # 1. Gestion des demandes
-    st.subheader("📋 Demandes en attente")
-    if not df_demandes_reel.empty:
-        st.dataframe(df_demandes_reel, use_container_width=True, hide_index=True)
-    else:
-        st.success("✅ Aucune demande en attente.")
-    
-    st.markdown("---")
-    
-    # 2. Alertes étalonnage
-    st.subheader("🚨 Alertes Étalonnages (< 90 jours)")
-    aujourdhui = datetime.now().date()
-    lignes_alertes = []
-    
-    for idx, row in df_materiel_reel.iterrows():
-        # Conversion sécurisée de la date
-        date_prox = row["Prochain Contrôle"]
-        if isinstance(date_prox, str): 
-            date_prox = datetime.strptime(date_prox, "%Y-%m-%d").date()
-        elif isinstance(date_prox, datetime): 
-            date_prox = date_prox.date()
-            
-        if (date_prox - aujourdhui).days <= 90:
-            lignes_alertes.append({
-                "ID": row["ID"], 
-                "Matériel": row["Nom"], 
-                "Détenteur": row["Détenteur"], 
-                "Prochain Contrôle": date_prox
-            })
-            
-    if lignes_alertes:
-        st.dataframe(pd.DataFrame(lignes_alertes), use_container_width=True, hide_index=True)
-    else:
-        st.success("✅ Aucun étalonnage critique à prévoir.")
+    st.write("Bienvenue dans l'espace d'administration.")
+
+with tab1:
+    st.header("🛒 Catalogue Magasin")
+    st.write("Espace en cours de construction.")
+
+with tab2:
+    st.header("🛠️ Catalogue Matériel")
+    st.write("Espace en cours de construction.")
+
+with tab3:
+    st.header("📅 Sorties")
+    st.write("Suivi des mouvements.")
+
+with tab4:
+    st.header("📍 Carte")
+    st.write("Localisation des chantiers.")

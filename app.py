@@ -165,8 +165,7 @@ with tab1:
                         st.session_state.panier = []
                         st.success("Commande transmise à Olivier !")
                         st.rerun()
-                    else: st.error("Champs obligatoires manquants.")
-
+                 
 # ==========================================
 # ONGLET 2 : CATALOGUE VISUEL & REGISTRE
 # ==========================================

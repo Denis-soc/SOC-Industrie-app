@@ -18,14 +18,11 @@ MAIL_OLIVIER = "owasse@soc.fr"
 PHOTO_DEFAUT = "https://cdn-icons-png.flaticon.com/512/4054/4054615.png"
 
 # --- CONNEXION GLOBALE SUPABASE ---
-conn = st.connection(
-    "postgresql",
-    type="sql",
-    host="spxrxmzeaybndgpmoslo.supabase.co",
-    user="postgres",
-    password="VotreMotDePasseSupabase",
-    database="postgres",
-    port=5432
+import sqlalchemy
+
+# Connexion directe via SQLAlchemy (contourne le gestionnaire Streamlit)
+engine = sqlalchemy.create_engine("postgresql://postgres:@Les Gaulois2026@spxrxmzeaybndgpmoslo.supabase.co:5432/postgres")
+conn = engine.connect()
 )
 
 # --- ENCODAGE DES IMAGES ---

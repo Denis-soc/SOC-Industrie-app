@@ -118,9 +118,12 @@ with tab1:
     st.header("🛒 Catalogue Magasin SOC Industrie")
     col_cat, col_panier = st.columns([3, 2])
     with col_cat:
-        filtre_type = st.radio("Filtrer par type :", ["Tous", "🦺 EPI", "🪵 Consommable"], horizontal=True)
-        for prod in CATALOGUE:
-            if filtre_type != "Tous" and prod["type"] != filtre_type: continue
+        filtre_type = st.radio("Filtrer par type :", ["Tous", "🦺 EPI", "🪵 Consommable", "🛠️ Outillage"], horizontal=True)
+        CATALOGUE_TOTAL = CATALOGUE + CATALOGUE_OUTILLAGE
+
+for prod in CATALOGUE_TOTAL:
+    if filtre_type != "Tous" and prod["type"] != filtre_type: 
+     continue
             with st.container(border=True):
                 c_img, c_txt, c_form = st.columns([1, 2, 1.5])
                 with c_img: st.image(prod["photo"], width=100)

@@ -65,6 +65,10 @@ CATALOGUE = [
     {"id": "CON-01", "type": "🪵 Consommable", "nom": "Électrodes de Soudage Inox Ø2.5", "marque": "Gys", "ref": "E308L-16", "tailles": ["Étui de 50 pièces", "Blister de 10 pièces"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80", "desc": "Électrodes enrobées rutiles pour le soudage des aciers inoxydables."},
     {"id": "CON-02", "type": "🪵 Consommable", "nom": "Disque à tronçonner Acier/Inox Ø125", "marque": "Norton Abrasifs", "ref": "NOR-125-1", "tailles": ["Lot de 5 disques", "Boîte de 25 disques"], "photo": "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=150&q=80", "desc": "Épaisseur 1mm pour une coupe ultra-rapide et précise sans bavure."}
 ]
+CATALOGUE_OUTILLAGE = [
+    {"id": "OUT-01", "type": "🛠️ Outillage", "nom": "Perceuse à percussion Bosch", "marque": "Bosch", "ref": "GBH 2-28", "tailles": ["Nue"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150", "desc": "Puissante, pour béton et métal."},
+    {"id": "OUT-02", "type": "🛠️ Outillage", "nom": "Meuleuse d'angle Ø125", "marque": "Makita", "ref": "GA5030", "tailles": ["Nue"], "photo": "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=150", "desc": "Compacte et maniable."},
+]
 
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "👑 ESPACE OLIVIER : Centralisation & Logistique",

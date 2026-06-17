@@ -57,17 +57,14 @@ with tab5:
                 ref = st.text_input("Référence")
                 num_serie = st.text_input("N° de Série")
             
-            # Gestion photo compacte
             st.subheader("📸 Photo du matériel")
             source_photo = st.radio("Source :", ["Aucune", "Fichier"], horizontal=True)
-            uploaded_file = None
-            if source_photo == "Fichier":
-                uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'], label_visibility="collapsed")
-
+            uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg']) if source_photo == "Fichier" else None
+            
             soumis_verif = st.checkbox("Soumis à contrôle/étalonnage ?")
             
             if st.form_submit_button("Enregistrer"):
-                # Conversion simple pour éviter les erreurs SQL complexes pour le moment
+                # Requête SQL correspondant aux colonnes créées par le ALTER TABLE
                 query = """
                 INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur)
                 VALUES (:id, :nom, :cat, :ref, :serie, :fourn)
@@ -75,9 +72,13 @@ with tab5:
                 try:
                     with engine.begin() as conn:
                         conn.execute(sqlalchemy.text(query), {
-                            "id": num_interne, "nom": nom, "cat": categorie, 
-                            "ref": ref, "serie": num_serie, "fourn": fournisseur
+                            "id": num_interne, 
+                            "nom": nom, 
+                            "cat": categorie, 
+                            "ref": ref, 
+                            "serie": num_serie, 
+                            "fourn": fournisseur
                         })
-                    st.success(f"Fiche {nom} enregistrée !")
+                    st.success(f"Fiche {nom} enregistrée avec succès !")
                 except Exception as e:
                     st.error(f"Erreur technique : {e}")

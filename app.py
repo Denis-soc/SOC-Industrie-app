@@ -64,7 +64,7 @@ with tab5:
             soumis_verif = st.checkbox("Soumis à contrôle/étalonnage ?")
             
             if st.form_submit_button("Enregistrer"):
-                # Requête SQL correspondant aux colonnes créées par le ALTER TABLE
+                # Requête SQL utilisant uniquement les colonnes existantes
                 query = """
                 INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur)
                 VALUES (:id, :nom, :cat, :ref, :serie, :fourn)

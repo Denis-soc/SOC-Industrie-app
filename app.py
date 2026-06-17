@@ -83,12 +83,12 @@ with tab5:
     st.header("⚙️ Administration Matériel")
     admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="admin_radio")
 
-    # --- FONCTION FORMULAIRE ---
+    # --- FONCTION FORMULAIRE PARTAGÉ ---
     def afficher_formulaire(donnees=None):
         with st.form("form_partage"):
             col1, col2 = st.columns(2)
             
-            # Valeurs par défaut
+            # Récupération des valeurs existantes si mode modification
             id_v = donnees['id'] if donnees is not None else ""
             nom_v = donnees['nom'] if donnees is not None else ""
             fourn_v = donnees['fournisseur'] if donnees is not None else ""
@@ -99,38 +99,37 @@ with tab5:
             nom = col1.text_input("Nom de l'article", value=nom_v)
             fournisseur = col1.text_input("Fournisseur", value=fourn_v)
             
-            categorie = col2.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"], index=0)
             ref = col2.text_input("Référence / Modèle", value=ref_v)
             num_serie = col2.text_input("N° de Série", value=serie_v)
             
+            # Maintenance (optionnel dans le formulaire)
             st.subheader("📅 Suivi et Maintenance")
-            soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?", key="maint_check")
-            date_c, perio = None, 12
+            soumis_verif = st.checkbox("Soumis à contrôle ?", key="maint_check")
+            date_c = None
+            perio = 0
             if soumis_verif:
                 c_m1, c_m2 = st.columns(2)
                 date_c = c_m1.date_input("Date dernier contrôle")
                 perio = c_m2.number_input("Périodicité (mois)", value=12)
 
-            # --- BOUTON DE SOUMISSION OBLIGATOIRE ---
             btn_label = "Mettre à jour" if donnees is not None else "Enregistrer"
-            submitted = st.form_submit_button(btn_label)
             
-            if submitted:
+            if st.form_submit_button(btn_label):
                 try:
                     with engine.begin() as conn:
                         if donnees is None: # CRÉATION
                             query = sqlalchemy.text("""
-                                INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, date_controle, intervalle_mois) 
-                                VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :date_c, :perio)
+                                INSERT INTO materiel (id, nom, fournisseur, reference, num_serie, date_controle, intervalle_mois) 
+                                VALUES (:id, :nom, :fourn, :ref, :serie, :date_c, :perio)
                             """)
-                            conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio})
+                            conn.execute(query, {"id": num_interne, "nom": nom, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio})
                             st.success("Matériel créé avec succès !")
                         else: # MODIFICATION
                             query = sqlalchemy.text("""
-                                UPDATE materiel SET nom=:nom, categorie=:cat, fournisseur=:fourn, reference=:ref, num_serie=:serie, date_controle=:date_c, intervalle_mois=:perio 
-                                WHERE id=:id
+                                UPDATE materiel SET nom = :nom, fournisseur = :fourn, reference = :ref, num_serie = :serie, date_controle = :date_c, intervalle_mois = :perio
+                                WHERE id = :id
                             """)
-                            conn.execute(query, {"nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne})
+                            conn.execute(query, {"nom": nom, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne})
                             st.success("Matériel mis à jour !")
                     st.rerun()
                 except Exception as e:
@@ -144,9 +143,8 @@ with tab5:
         df_list = pd.read_sql("SELECT id FROM materiel", engine)
         if not df_list.empty:
             id_select = st.selectbox("Choisir l'ID à modifier :", df_list['id'].tolist())
-            # On récupère les données
-            data_row = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_select}'", engine).iloc[0]
-            afficher_formulaire(donnees=data_row)
+            data = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_select}'", engine).iloc[0]
+            afficher_formulaire(donnees=data)
         else:
             st.warning("Aucun matériel en base.")
             

@@ -114,7 +114,7 @@ with tab1:
     st.header("🛒 Catalogue Magasin SOC Industrie")
     col_cat, col_panier = st.columns([3, 2])
     with col_cat:
-        filtre_type = st.radio("Filtrer par type :", ["Tous", "🦺 EPI", "🪵 Consommable"], horizontal=True)
+        filtre_type = st.radio("Filtrer par type :", ["Tous", "𦺺 EPI", "🪵 Consommable"], horizontal=True)
         for prod in CATALOGUE:
             if filtre_type != "Tous" and prod["type"] != filtre_type: continue
             with st.container(border=True):
@@ -153,7 +153,7 @@ with tab1:
                     else: st.error("Champs obligatoires manquants.")
 
 # ==========================================
-# ONGLET 2 : CATALOGUE VISUEL AVEC ENRICHISSEMENT MARQUE / REF / SÉRIE
+# ONGLET 2 : CATALOGUE VISUEL & ADMINISTRATION
 # ==========================================
 with tab2:
     st.header("🛠️ Catalogue Commun du Parc Matériel")
@@ -162,7 +162,6 @@ with tab2:
     st.subheader("📦 Fiches Équipements & Disponibilités")
     df_filtre = df_materiel_reel.copy()
     if recherche:
-        # Recherche étendue aux colonnes Marque, Référence et Série
         df_filtre = df_filtre[
             df_filtre["Nom"].str.lower().str.contains(recherche) | 
             df_filtre["ID"].str.lower().str.contains(recherche) |
@@ -191,7 +190,6 @@ with tab2:
                     st.markdown(f"### {row['Nom']}")
                     st.markdown(f"**Code Unique :** `{row['ID']}`")
                     
-                    # AFFICHAGE DES INFOS TECHNIQUES SUPPLEMENTAIRES
                     m_aff = row["Marque"] if pd.notna(row["Marque"]) and row["Marque"] else "Non renseignée"
                     r_aff = row["Référence"] if pd.notna(row["Référence"]) and row["Référence"] else "Non renseignée"
                     s_aff = row["N° de Série"] if pd.notna(row["N° de Série"]) and row["N° de Série"] else "Non renseigné"
@@ -206,7 +204,6 @@ with tab2:
                         
                     st.caption(f"📅 Prochain contrôle obligatoire : {row['Prochain Contrôle']}")
                     
-                    # QR Code enrichi
                     texte_qr = f"SOC Industrie\nID: {row['ID']}\nNom: {row['Nom']}\nMarque: {m_aff}\nSérie: {s_aff}\nStatut: {statut}"
                     qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={urllib.parse.quote(texte_qr)}"
                     with st.expander("📱 Afficher le QR Code de l'appareil"):
@@ -224,9 +221,77 @@ with tab2:
                                     st.success("Demande envoyée !")
                                     st.rerun()
 
-    # SECTION ENREGISTREMENT ENRICHI
+    # ==========================================
+    # SECTION LOGICIELLE : MODIFIER & SUPPRIMER
+    # ==========================================
     st.markdown("---")
-    st.subheader("⚙️ Administration : Enregistrer un nouveau matériel commun")
+    st.subheader("✏️ Administration : Modifier ou Supprimer un matériel existant")
+    
+    if df_materiel_reel.empty:
+        st.info("Aucun matériel disponible pour modification.")
+    else:
+        # Sélection de l'élément à modifier
+        liste_choix = df_materiel_reel["ID"] + " - " + df_materiel_reel["Nom"]
+        materiel_selectionne = st.selectbox("Choisir le matériel à éditer ou supprimer :", liste_choix)
+        
+        # Récupération de la ligne sélectionnée
+        id_selectionne = materiel_selectionne.split(" - ")[0]
+        row_actuelle = df_materiel_reel[df_materiel_reel["ID"] == id_selectionne].iloc[0]
+        
+        with st.form("form_modification"):
+            col_mod_1, col_mod_2 = st.columns(2)
+            with col_mod_1:
+                mod_nom = st.text_input("Nom de l'équipement", value=str(row_actuelle["Nom"]))
+                mod_cat = st.selectbox("Catégorie", ["Outillage Électroportatif", "Manutention", "Soudage", "Mesure"], index=["Outillage Électroportatif", "Manutention", "Soudage", "Mesure"].index(row_actuelle["Catégorie"]))
+                mod_marque = st.text_input("Marque / Fabricant", value=str(row_actuelle["Marque"]) if pd.notna(row_actuelle["Marque"]) else "")
+            with col_mod_2:
+                mod_ref = st.text_input("Référence Modèle", value=str(row_actuelle["Référence"]) if pd.notna(row_actuelle["Référence"]) else "")
+                mod_serie = st.text_input("Numéro de Série usine", value=str(row_actuelle["N° de Série"]) if pd.notna(row_actuelle["N° de Série"]) else "")
+                mod_intervalle = st.number_input("Intervalle de contrôle (mois)", min_value=1, value=int(row_actuelle["Intervalle (mois)"]))
+            
+            st.markdown("**📸 Remplacer la photo (Optionnel — laisser vide pour conserver la photo actuelle) :**")
+            nouvelle_photo = st.camera_input("Prendre une nouvelle photo si besoin", key="cam_mod")
+            
+            col_btn_1, col_btn_2 = st.columns(2)
+            with col_btn_1:
+                if st.form_submit_button("💾 Enregistrer les modifications", use_container_width=True):
+                    with engine.begin() as conn_tx:
+                        # Modification de base
+                        conn_tx.execute(
+                            sqlalchemy.text("""
+                                UPDATE materiel 
+                                SET nom = :nom, categorie = :cat, marque = :marque, reference = :ref, num_serie = :serie, intervalle_mois = :inv
+                                WHERE id = :id;
+                            """),
+                            {"nom": mod_nom.strip(), "cat": mod_cat, "marque": mod_marque.strip(), "ref": mod_ref.strip(), "serie": mod_serie.strip(), "inv": int(mod_intervalle), "id": id_selectionne}
+                        )
+                        # Si une nouvelle photo a été prise, on met à jour le champ photo
+                        if nouvelle_photo is not None:
+                            bytes_data = nouvelle_photo.getvalue()
+                            image_b64_str = base64.b64encode(bytes_data).decode('utf-8')
+                            conn_tx.execute(
+                                sqlalchemy.text("UPDATE materiel SET photo_base64 = :img WHERE id = :id;"),
+                                {"img": image_b64_str, "id": id_selectionne}
+                            )
+                    st.success(f"⚡ {mod_nom} mis à jour avec succès !")
+                    st.rerun()
+                    
+            with col_btn_2:
+                # Ajout d'une case à cocher de sécurité pour la suppression
+                st.markdown("<p style='text-align: center; color: red; font-weight: bold;'>⚠️ Zone Dangereuse</p>", unsafe_allow_html=True)
+                confirmer_suppression = st.checkbox("Je confirme vouloir détruire cette fiche matériel")
+                if st.form_submit_button("🗑️ SUPPRIMER DÉFINITIVEMENT", use_container_width=True):
+                    if confirmer_suppression:
+                        with engine.begin() as conn_tx:
+                            conn_tx.execute(sqlalchemy.text("DELETE FROM materiel WHERE id = :id;"), {"id": id_selectionne})
+                        st.warning(f"🔴 Le matériel [{id_selectionne}] a été retiré du parc.")
+                        st.rerun()
+                    else:
+                        st.error("Veuillez cocher la case de confirmation avant de supprimer.")
+
+    # SECTION CRÉATION (RESTE INCHANGÉE)
+    st.markdown("---")
+    st.subheader("✨ Administration : Enregistrer un nouveau matériel commun")
     
     with st.form("form_ajout_complet"):
         col_form_1, col_form_2 = st.columns(2)
@@ -284,4 +349,4 @@ with tab4:
 
 st.sidebar.image("https://img.icons8.com/clouds/100/000000/crane.png", width=60)
 st.sidebar.title("Navigation")
-st.sidebar.info("Application Interne v3.1 — SOC Industrie. Données techniques étendues.")
+st.sidebar.info("Application Interne v3.2 — SOC Industrie. Module Édition & Suppression complet.")

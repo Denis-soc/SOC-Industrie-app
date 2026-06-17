@@ -124,22 +124,19 @@ with tab1:
             if filtre_type != "Tous" and prod["type"] != filtre_type: 
                 continue
           with st.container(border=True):
-            c_img, c_txt, c_form = st.columns([1, 2, 1.5]
-               photo_url = prod.get("photo")
-    if photo_url:
-        c_img.image(photo_url, width=100)
-    else:
-        c_img.write("Pas d'image")
+                c_img, c_txt, c_form = st.columns([1, 2, 1.5])
+                
+                # Gestion image
+                photo_url = prod.get("photo")
+                if photo_url:
+                    c_img.image(photo_url, width=100)
+                else:
+                    c_img.write("Pas d'image")
+                
+                # Texte
                 with c_txt:
                     st.markdown(f"### {prod['nom']}")
                     st.caption(f"**Marque :** {prod['marque']} | **Ref :** {prod['ref']}\n\n{prod['desc']}")
-               with c_txt:
-        st.markdown(f"### {prod['nom']}")
-        st.caption(f"**Marque :** {prod['marque']} | **Ref :** {prod['ref']}\n\n{prod['desc']}")
-    with c_form:
-                    if st.button("➕ Ajouter", key=f"b_{prod['id']}", use_container_width=True):
-                        st.session_state.panier.append({"type": prod["type"], "designation": f"{prod['nom']} ({prod['marque']})", "taille": t_choisie, "qte": q_choisie})
-                        st.rerun()
     with col_panier:
         st.subheader("🛒 Mon Panier")
         if not st.session_state.panier: st.info("Panier vide.")

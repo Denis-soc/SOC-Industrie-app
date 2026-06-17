@@ -7,12 +7,10 @@ import sqlalchemy
 # ==========================================
 import streamlit as st
 import sqlalchemy
-import pandas as pd
 
-# Connexion via l'IP directe IPv4 pour contourner le problème réseau
-# REMPLACEZ 'VotreMotDePasse' par votre vrai mot de passe Supabase
+# Connexion via le Pooler (Port 6543) et son URL dédiée
 engine = sqlalchemy.create_engine(
-    "postgresql://postgres:LesGaulois2026@104.18.38.10:5432/postgres"
+    "postgresql://postgres:VotreMotDePasse@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
 )
 
 try:
@@ -20,10 +18,6 @@ try:
 except Exception as e:
     st.error(f"Erreur de connexion à la base de données : {e}")
     st.stop()
-
-# --- RESTE DE VOTRE INTERFACE ---
-st.title("🏗️ SOC Industrie — Gestion Interne")
-st.write("Connexion établie avec succès.")
 
 # ==========================================
 # 2. CONFIGURATION DE LA PAGE

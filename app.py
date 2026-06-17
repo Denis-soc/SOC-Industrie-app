@@ -47,44 +47,37 @@ with tab5:
     
     if admin_action == "Créer une fiche":
         with st.form("form_creation_admin"):
-            destination = st.selectbox("Destination :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"])
-            
             col1, col2 = st.columns(2)
             with col1:
-                num_interne = st.text_input("Numéro interne")
+                num_interne = st.text_input("Numéro interne (ex: MAT-001)")
                 nom = st.text_input("Nom de l'article")
                 fournisseur = st.text_input("Fournisseur")
             with col2:
+                categorie = st.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"])
                 ref = st.text_input("Référence")
                 num_serie = st.text_input("N° de Série")
-                
-            st.subheader("📸 Photo du matériel")
-            source_photo = st.radio("Source :", ["Prendre une photo", "Déposer un fichier"], horizontal=True)
             
-            image_a_traiter = None
-            if source_photo == "Prendre une photo":
-                image_a_traiter = st.camera_input("Prendre une photo maintenant", label_visibility="collapsed")
-            else:
-                image_a_traiter = st.file_uploader("Glisser ou sélectionner un fichier", type=['png', 'jpg', 'jpeg'], label_visibility="collapsed")
+            # Gestion photo compacte
+            st.subheader("📸 Photo du matériel")
+            source_photo = st.radio("Source :", ["Aucune", "Fichier"], horizontal=True)
+            uploaded_file = None
+            if source_photo == "Fichier":
+                uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'], label_visibility="collapsed")
 
-            # Suivi Maintenance (on utilise les colonnes réelles de votre table)
-            soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?")
-            periodicite = st.number_input("Périodicité (mois)", value=12) if soumis_verif else 0
-            date_c = st.date_input("Date du dernier contrôle") if soumis_verif else None
-
+            soumis_verif = st.checkbox("Soumis à contrôle/étalonnage ?")
+            
             if st.form_submit_button("Enregistrer"):
-                # REQUÊTE SQL CORRIGÉE
-                # On utilise UNIQUEMENT les colonnes qui existent réellement dans votre base
+                # Conversion simple pour éviter les erreurs SQL complexes pour le moment
                 query = """
-                INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur, date_controle, intervalle_mois)
-                VALUES (:id, :nom, :cat, :ref, :serie, :fourn, :date_c, :perio)
+                INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur)
+                VALUES (:id, :nom, :cat, :ref, :serie, :fourn)
                 """
                 try:
                     with engine.begin() as conn:
                         conn.execute(sqlalchemy.text(query), {
-                            "id": num_interne, "nom": nom, "cat": destination, "ref": ref, 
-                            "serie": num_serie, "fourn": fournisseur, "date_c": date_c, "perio": periodicite
+                            "id": num_interne, "nom": nom, "cat": categorie, 
+                            "ref": ref, "serie": num_serie, "fourn": fournisseur
                         })
-                    st.success("Fiche enregistrée !")
+                    st.success(f"Fiche {nom} enregistrée !")
                 except Exception as e:
-                    st.error(f"Erreur SQL : {e}")
+                    st.error(f"Erreur technique : {e}")

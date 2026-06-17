@@ -221,37 +221,24 @@ with tab2:
                                     st.success("Demande envoyée !")
                                     st.rerun()
 
-    # ========================================================
+
+# ========================================================
     # ⚙️ PANNEAU UNIQUE : CRÉER / MODIFIER / SUPPRIMER
     # ========================================================
-st.markdown("---")
-st.subheader("⚙️ Administration Unique du Parc Matériel")
-
-action_choisie = st.radio(
-    "Quelle action souhaitez-vous réaliser ?",
-    ["➕ Enregistrer un nouveau matériel", "✏️ Modifier un matériel existant", "🗑️ Supprimer un matériel du parc"],
-    horizontal=True
-)
-
-# ... (gardez votre logique de chargement de val_id, val_nom, etc.)
-
-# Liste des catégories mises à jour
-LISTE_CATEGORIES = ["Outillage Électroportatif", "🛠️ Outillage", "Manutention", "Soudage", "Mesure"]
-
-# Dans le formulaire (dans le bloc `else` pour création/modification) :
-with st.form("form_gestion_unique"):
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        new_id = st.text_input("Identifiant Unique SOC", value=val_id, disabled=desactiver_id)
-        new_nom = st.text_input("Nom de l'équipement", value=val_nom)
-        
-        # Sélection de la catégorie avec la nouvelle option
-        cat_index = LISTE_CATEGORIES.index(val_cat) if val_cat in LISTE_CATEGORIES else 0
-        new_cat = st.selectbox("Catégorie", LISTE_CATEGORIES, index=cat_index)
-        
-        new_marque = st.text_input("Marque / Fabricant", value=val_marque)
-    with col_f2:
-        # ... (reste de vos champs : ref, serie, etc.)
+    st.markdown("---")
+    st.subheader("⚙️ Administration Unique du Parc Matériel")
+    
+    action_choisie = st.radio(
+        "Quelle action souhaitez-vous réaliser ?",
+        ["➕ Enregistrer un nouveau matériel", "✏️ Modifier un matériel existant", "🗑️ Supprimer un matériel du parc"],
+        horizontal=True
+    )
+    
+    # Rétablissement des catégories originales
+    # (Sans la catégorie "🛠️ Outillage" ajoutée tout à l'heure)
+    CATEGORIES_ORIGINALES = ["Outillage Électroportatif", "Manutention", "Soudage", "Mesure"]
+    
+    # ... (le reste du code doit utiliser CATEGORIES_ORIGINALES dans le st.selectbox)
     
     # Initialisation des variables par défaut
     val_id = ""

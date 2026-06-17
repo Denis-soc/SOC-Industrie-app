@@ -40,5 +40,19 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "⚙️ Administration Matériel" # Nouvel onglet
 ])
 # ... Onglet N°1...
+# ... Onglet N°5...
+with tab5:
+    st.header("⚙️ Administration Matériel")
+    admin_action = st.radio("Que souhaitez-vous faire ?", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
+    
+    if admin_action == "Créer une fiche":
+        # Le formulaire de création que nous avons validé
+        pass 
+    elif admin_action == "Modifier une fiche":
+        # Formulaire avec recherche par ID pour charger les données actuelles
+        st.info("Sélectionnez un matériel pour modifier ses informations.")
+    elif admin_action == "Supprimer une fiche":
+        # Confirmation avant suppression
+        st.warning("Attention : cette action est irréversible.")
 
 

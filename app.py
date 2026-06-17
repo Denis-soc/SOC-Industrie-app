@@ -21,9 +21,20 @@ CATALOGUE_OUTILLAGE = [
 
 CATALOGUE_COMPLET = CATALOGUE + CATALOGUE_OUTILLAGE
 
-# --- 2. CONFIGURATION ET CONNEXION ---
-st.set_page_config(page_title="SOC Industrie — Gestion Interne", page_icon="🏗️", layout="wide")
-st.title("🏗️ SOC Industrie — Gestion Interne")
+# 2. CONNEXION À LA BASE DE DONNÉES
+@st.cache_resource
+def init_connection():
+    # On appelle la clé définie dans les Secrets
+    db_url = st.secrets["DB_URL"]
+    return sqlalchemy.create_engine(db_url)
+
+try:
+    engine = init_connection()
+    with engine.connect() as conn:
+        pass
+except Exception as e:
+    st.error(f"Erreur de connexion : {e}")
+    st.stop()
 
 # IMPORTANT : Utilisez st.secrets pour la sécurité (à configurer dans l'interface Cloud)
 try:

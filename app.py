@@ -50,45 +50,59 @@ if "materiel_id" in query_params:
 # ... Onglet N°5...
 with tab5:
     st.header("⚙️ Administration Matériel")
+    # Utilisation d'une clé unique pour éviter l'erreur de duplication
+    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="admin_radio")
     
-    # 1. Utilisation d'une clé unique 'admin_radio_main' pour éviter le conflit d'ID
-    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="admin_radio_main")
-    
-    # --- BLOC CRÉATION ---
     if admin_action == "Créer une fiche":
         with st.form("form_creation_admin"):
             col1, col2 = st.columns(2)
             with col1:
-                num_interne = st.text_input("Numéro interne", key="in_id")
-                nom = st.text_input("Nom de l'article", key="in_nom")
-                fournisseur = st.text_input("Fournisseur", key="in_fourn")
+                num_interne = st.text_input("Numéro interne")
+                nom = st.text_input("Nom de l'article")
+                fournisseur = st.text_input("Fournisseur")
             with col2:
-                categorie = st.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"], key="in_cat")
-                ref = st.text_input("Référence", key="in_ref")
-                num_serie = st.text_input("N° de Série", key="in_serie")
+                categorie = st.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"])
+                ref = st.text_input("Référence")
+                num_serie = st.text_input("N° de Série")
             
-            st.subheader("📸 Photo du matériel")
-            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True, key="photo_source_admin")
-            
-            # Gestion de la photo
-            if source_photo == "Fichier":
-                st.file_uploader("Déposer une image", type=['png', 'jpg'], key="file_upload_admin")
-            elif source_photo == "Caméra":
-                st.camera_input("Prendre une photo", key="camera_admin")
+            st.subheader("📅 Suivi et Maintenance")
+            soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?")
+            date_c, perio = None, 0
+            if soumis_verif:
+                c1, c2 = st.columns(2)
+                date_c = c1.date_input("Date du dernier contrôle")
+                perio = c2.number_input("Périodicité (mois)", value=12)
 
-            if st.form_submit_button("Enregistrer"):
+            st.subheader("📸 Photo du matériel")
+            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True, key="photo_source")
+            if source_photo == "Fichier":
+                uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'])
+            elif source_photo == "Caméra":
+                uploaded_file = st.camera_input("Prendre une photo")
+
+            if st.form_submit_button("Enregistrer et générer QR Code"):
                 try:
-                    # Requête SQL sécurisée
+                    # Requête SQL
                     query = sqlalchemy.text("""
-                        INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur)
-                        VALUES (:id, :nom, :cat, :ref, :serie, :fourn)
+                        INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur, date_controle, intervalle_mois)
+                        VALUES (:id, :nom, :cat, :ref, :serie, :fourn, :date_c, :perio)
                     """)
+                    
                     with engine.begin() as conn:
                         conn.execute(query, {
                             "id": num_interne, "nom": nom, "cat": categorie, 
-                            "ref": ref, "serie": num_serie, "fourn": fournisseur
+                            "ref": ref, "serie": num_serie, "fourn": fournisseur,
+                            "date_c": date_c, "perio": perio
                         })
-                    st.success("Fiche créée avec succès !")
+                    st.success(f"Fiche {num_interne} enregistrée !")
+                    
+                    # Génération URL pour QR Code
+                    # Remplacez par votre lien réel
+                    base_url = "https://votre-url-app.streamlit.app" 
+                    lien_fiche = f"{base_url}/?materiel_id={num_interne}"
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(lien_fiche)}"
+                    st.image(qr_url, caption="QR Code : Scannez pour accéder à la fiche")
+                    
                 except Exception as e:
                     st.error(f"Erreur technique : {e}")
 

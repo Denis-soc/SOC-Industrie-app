@@ -179,7 +179,7 @@ with tab1:
                     else: st.error("Champs obligatoires manquants.")
 
 # ==========================================
-# ONGLET 2 : CATALOGUE VISUEL DU MATÉRIEL & QR CODES
+# ONGLET 2 : CATALOGUE VISUEL DU MATÉRIEL & QR CODES (CORRIGÉ)
 # ==========================================
 with tab2:
     st.header("🛠️ Catalogue Commun du Parc Matériel")
@@ -235,12 +235,13 @@ with tab2:
                     texte_encode = urllib.parse.quote(texte_qr)
                     qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={texte_encode}"
                     
-                    # Expanders interactifs pour ne pas surcharger la vue globale
+                    # Expanders interactifs
                     with st.expander("📱 Afficher le QR Code de l'appareil"):
                         st.image(qr_api_url, caption="À coller sur l'appareil pour scan terrain", width=130)
                         st.caption("Flashez ce code avec un téléphone pour extraire instantanément le statut complet de la machine.")
 
-                    with St.expander("📅 Faire une demande de réservation"):
+                    # LIGNE 243 CORRIGÉE : Changement de 'St.expander' par 'st.expander'
+                    with st.expander("📅 Faire une demande de réservation"):
                         with st.form(key=f"reserve_{row['ID']}"):
                             nom_demandeur = st.text_input("Votre Prénom/Nom", key=f"u_{row['ID']}")
                             code_imput = st.text_input("Code Imputation Chantier cible", key=f"i_{row['ID']}")
@@ -265,6 +266,7 @@ with tab2:
                                         )
                                     st.success("Demande de réservation envoyée à Olivier !")
                                     st.toast("Demande enregistrée !", icon="⚙️")
+                                    st.rerun()
                                 else:
                                     st.error("Le nom et le code imputation sont obligatoires.")
 
@@ -310,4 +312,4 @@ with tab4:
 # Barre latérale
 st.sidebar.image("https://img.icons8.com/clouds/100/000000/crane.png", width=60)
 st.sidebar.title("Navigation")
-st.sidebar.info("Application Interne v2.2 — SOC Industrie. Catalogue Visuel & QR Codes Actifs.")
+st.sidebar.info("Application Interne v2.3 — SOC Industrie. Catalogue Visuel & QR Codes Actifs.")

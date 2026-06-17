@@ -18,6 +18,7 @@ st.title("🏗️ SOC Industrie — Gestion Interne")
 # 2. CONNEXION À LA BASE DE DONNÉES (POOLER)
 @st.cache_resource
 def init_connection():
+    # REMPLACEZ "VotreMotDePasse" PAR VOTRE VRAI MOT DE PASSE SUPABASE
     db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
     return sqlalchemy.create_engine(db_url)
 
@@ -31,12 +32,12 @@ except Exception as e:
 
 # 3. RECUPERATION DES DONNEES REELLES (SUPABASE)
 def charger_materiel():
-    # Ajout de la colonne photo_base64 dans la requête
     query = """
         SELECT id AS "ID", nom AS "Nom", categorie AS "Catégorie", statut AS "Statut", 
                detenteur AS "Détenteur", date_controle AS "Date Contrôle", 
                intervalle_mois AS "Intervalle (mois)", prochain_controle AS "Prochain Contrôle",
-               photo_base64 AS "Photo"
+               photo_base64 AS "Photo", 
+               marque AS "Marque", reference AS "Référence", num_serie AS "N° de Série"
         FROM materiel;
     """
     return pd.read_sql(query, engine)
@@ -51,7 +52,6 @@ df_demandes_reel = charger_demandes()
 if 'panier' not in st.session_state:
     st.session_state.panier = []
 
-# Photos génériques de secours si aucune photo terrain n'est prise
 PHOTOS_SECOURS = {
     "Soudage": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=300&q=80",
     "Outillage Électroportatif": "https://images.unsplash.com/photo-1534224039826-c7a0dea0e66a?w=300&q=80",
@@ -153,16 +153,23 @@ with tab1:
                     else: st.error("Champs obligatoires manquants.")
 
 # ==========================================
-# ONGLET 2 : CATALOGUE VISUEL AVEC VRAIES PHOTOS & CAMÉRA ATELIER
+# ONGLET 2 : CATALOGUE VISUEL AVEC ENRICHISSEMENT MARQUE / REF / SÉRIE
 # ==========================================
 with tab2:
     st.header("🛠️ Catalogue Commun du Parc Matériel")
-    recherche = st.text_input("🔍 Rechercher un matériel (ex: Meuleuse, TIG, MAT-001...)", "").strip().lower()
+    recherche = st.text_input("🔍 Rechercher un matériel (ex: Meuleuse, TIG, Bosch, N° Série...)", "").strip().lower()
 
     st.subheader("📦 Fiches Équipements & Disponibilités")
     df_filtre = df_materiel_reel.copy()
     if recherche:
-        df_filtre = df_filtre[df_filtre["Nom"].str.lower().str.contains(recherche) | df_filtre["ID"].str.lower().str.contains(recherche)]
+        # Recherche étendue aux colonnes Marque, Référence et Série
+        df_filtre = df_filtre[
+            df_filtre["Nom"].str.lower().str.contains(recherche) | 
+            df_filtre["ID"].str.lower().str.contains(recherche) |
+            df_filtre["Marque"].fillna("").str.lower().str.contains(recherche) |
+            df_filtre["Référence"].fillna("").str.lower().str.contains(recherche) |
+            df_filtre["N° de Série"].fillna("").str.lower().str.contains(recherche)
+        ]
 
     if df_filtre.empty:
         st.info("Aucun matériel trouvé.")
@@ -172,10 +179,8 @@ with tab2:
             col_case = cols_grid[idx % 3]
             with col_case:
                 with st.container(border=True):
-                    # AFFICHAGE DE LA PHOTO CAPTURÉE OU DE SECOURS
                     if row["Photo"] is not None and str(row["Photo"]).strip() != "":
                         try:
-                            # Décodage et affichage de l'image stockée en base
                             bytes_image = base64.b64decode(row["Photo"])
                             st.image(bytes_image, use_container_width=True)
                         except Exception:
@@ -186,6 +191,14 @@ with tab2:
                     st.markdown(f"### {row['Nom']}")
                     st.markdown(f"**Code Unique :** `{row['ID']}`")
                     
+                    # AFFICHAGE DES INFOS TECHNIQUES SUPPLEMENTAIRES
+                    m_aff = row["Marque"] if pd.notna(row["Marque"]) and row["Marque"] else "Non renseignée"
+                    r_aff = row["Référence"] if pd.notna(row["Référence"]) and row["Référence"] else "Non renseignée"
+                    s_aff = row["N° de Série"] if pd.notna(row["N° de Série"]) and row["N° de Série"] else "Non renseigné"
+                    
+                    st.markdown(f"**🔧 Constructeur :** {m_aff} | **Ref :** `{r_aff}`")
+                    st.markdown(f"**🔢 N° Série :** `{s_aff}`")
+                    
                     statut = row["Statut"]
                     if statut == "Disponible": st.success(f"📍 {statut} (Stock Atelier)")
                     elif statut == "En Chantier": st.warning(f"🏗️ {statut} chez **{row['Détenteur']}**")
@@ -193,8 +206,8 @@ with tab2:
                         
                     st.caption(f"📅 Prochain contrôle obligatoire : {row['Prochain Contrôle']}")
                     
-                    # QR Code
-                    texte_qr = f"SOC Industrie\nID: {row['ID']}\nNom: {row['Nom']}\nStatut: {statut}\nResponsable: {row['Détenteur']}"
+                    # QR Code enrichi
+                    texte_qr = f"SOC Industrie\nID: {row['ID']}\nNom: {row['Nom']}\nMarque: {m_aff}\nSérie: {s_aff}\nStatut: {statut}"
                     qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={urllib.parse.quote(texte_qr)}"
                     with st.expander("📱 Afficher le QR Code de l'appareil"):
                         st.image(qr_api_url, caption="À coller sur l'appareil", width=130)
@@ -207,31 +220,32 @@ with tab2:
                                 if nom_d.strip() and code_imp.strip():
                                     with engine.begin() as conn_tx:
                                         conn_tx.execute(sqlalchemy.text("INSERT INTO demandes_collaborateurs (date_demande, collaborateur, type_demande, designation, code_imputation, details, statut) VALUES (:dt, :col, '⚙️ Réservation', :des, :cod, :det, 'En attente');"),
-                                                        {"dt": datetime.now().strftime("%d/%m/%Y"), "col": nom_d.strip(), "des": f"Réservation {row['Nom']} [{row['ID']}]", "cod": code_imp.upper().strip(), "det": "Réservation via catalogue visuel"})
+                                                        {"dt": datetime.now().strftime("%d/%m/%Y"), "col": nom_d.strip(), "des": f"Réservation {row['Nom']} [{row['ID']}]", "cod": code_imp.upper().strip(), "det": f"Marque: {m_aff} | SN: {s_aff}"})
                                     st.success("Demande envoyée !")
                                     st.rerun()
 
-    # SECTION AJOUT AVEC APPAREIL PHOTO EN DIRECT
+    # SECTION ENREGISTREMENT ENRICHI
     st.markdown("---")
-    st.subheader("⚙️ Administration : Enregistrer un nouveau matériel avec Photo Terrain")
+    st.subheader("⚙️ Administration : Enregistrer un nouveau matériel commun")
     
-    with st.form("form_ajout_avec_photo"):
+    with st.form("form_ajout_complet"):
         col_form_1, col_form_2 = st.columns(2)
         with col_form_1:
-            new_id = st.text_input("Identifiant Unique (ex: MAT-010)")
-            new_nom = st.text_input("Nom de l'équipement")
+            new_id = st.text_input("Identifiant Unique SOC (ex: MAT-010)")
+            new_nom = st.text_input("Nom de l'équipement (ex: Poste à souder TIG)")
             new_cat = st.selectbox("Catégorie", ["Outillage Électroportatif", "Manutention", "Soudage", "Mesure"])
+            new_marque = st.text_input("Marque / Fabricant (ex: Fronius, Bosch)")
         with col_form_2:
+            new_ref = st.text_input("Référence Modèle (ex: TransTig 2300)")
+            new_serie = st.text_input("Numéro de Série usine (N° de série)")
             new_date = st.date_input("Date du dernier contrôle", aujourdhui)
             new_intervalle = st.number_input("Intervalle de contrôle (en mois)", min_value=1, value=12)
         
-        # BLOC CAMERA DIRECT DANS LE FORMULAIRE
         st.markdown("**📸 Prise de vue de la machine (Webcam ou Smartphone) :**")
-        photo_capturee = st.camera_input("Prendre la photo de la machine")
+        photo_capturee = st.camera_input("Prendre la photo du matériel")
 
-        if st.form_submit_button("Ajouter définitivement au parc avec sa photo"):
+        if st.form_submit_button("Ajouter définitivement au parc"):
             if new_id.strip() and new_nom.strip():
-                # Encodage de la photo en texte Base64 pour enregistrement Postgres
                 image_b64_str = ""
                 if photo_capturee is not None:
                     bytes_data = photo_capturee.getvalue()
@@ -242,12 +256,16 @@ with tab2:
                 with engine.begin() as conn_tx:
                     conn_tx.execute(
                         sqlalchemy.text("""
-                            INSERT INTO materiel (id, nom, categorie, statut, detenteur, date_controle, intervalle_mois, prochain_controle, photo_base64)
-                            VALUES (:id, :nom, :cat, 'Disponible', 'Atelier / Agence', :dt, :inv, :prox, :img);
+                            INSERT INTO materiel (id, nom, categorie, statut, detenteur, date_controle, intervalle_mois, prochain_controle, photo_base64, marque, reference, num_serie)
+                            VALUES (:id, :nom, :cat, 'Disponible', 'Atelier / Agence', :dt, :inv, :prox, :img, :marque, :ref, :serie);
                         """),
-                        {"id": new_id.strip(), "nom": new_nom.strip(), "cat": new_cat, "dt": new_date, "inv": int(new_intervalle), "prox": prochain_calcul, "img": image_b64_str}
+                        {
+                            "id": new_id.strip(), "nom": new_nom.strip(), "cat": new_cat, 
+                            "dt": new_date, "inv": int(new_intervalle), "prox": prochain_calcul, 
+                            "img": image_b64_str, "marque": new_marque.strip(), "ref": new_ref.strip(), "serie": new_serie.strip()
+                        }
                     )
-                st.success(f"🎉 {new_nom} enregistré avec succès avec sa vraie photo !")
+                st.success(f"🎉 Matériel {new_nom} ({new_marque}) enregistré au registre !")
                 st.rerun()
             else:
                 st.error("L'ID et le Nom sont obligatoires.")
@@ -266,4 +284,4 @@ with tab4:
 
 st.sidebar.image("https://img.icons8.com/clouds/100/000000/crane.png", width=60)
 st.sidebar.title("Navigation")
-st.sidebar.info("Application Interne v3.0 — SOC Industrie. Module Photo Live Actif.")
+st.sidebar.info("Application Interne v3.1 — SOC Industrie. Données techniques étendues.")

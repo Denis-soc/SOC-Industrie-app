@@ -105,3 +105,39 @@ with tab5:
                     
                 except Exception as e:
                     st.error(f"Erreur technique : {e}")
+elif admin_action == "Modifier une fiche":
+        st.subheader("Choisir le matériel à modifier")
+        
+        # 1. On récupère la liste des IDs existants pour le menu déroulant
+        try:
+            liste_materiel = pd.read_sql("SELECT id FROM materiel", engine)['id'].tolist()
+            id_selectionne = st.selectbox("Sélectionner un Numéro interne :", liste_materiel)
+            
+            # 2. On récupère les infos actuelles de ce matériel
+            donnees_actuelles = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_selectionne}'", engine).iloc[0]
+            
+            # 3. Formulaire pré-rempli avec les données de la base
+            with st.form("form_modification"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    nouveau_nom = st.text_input("Nom", value=donnees_actuelles['nom'])
+                    nouveau_fourn = st.text_input("Fournisseur", value=donnees_actuelles['fournisseur'] or "")
+                with col2:
+                    nouvelle_ref = st.text_input("Référence", value=donnees_actuelles['reference'] or "")
+                    nouvelle_serie = st.text_input("N° de Série", value=donnees_actuelles['num_serie'] or "")
+                
+                if st.form_submit_button("Enregistrer les modifications"):
+                    query_update = sqlalchemy.text("""
+                        UPDATE materiel 
+                        SET nom = :nom, fournisseur = :fourn, reference = :ref, num_serie = :serie 
+                        WHERE id = :id
+                    """)
+                    with engine.begin() as conn:
+                        conn.execute(query_update, {
+                            "nom": nouveau_nom, "fourn": nouveau_fourn, 
+                            "ref": nouvelle_ref, "serie": nouvelle_serie, "id": id_selectionne
+                        })
+                    st.success(f"Matériel {id_selectionne} mis à jour !")
+                    st.rerun() # Recharge la page pour voir les changements
+        except Exception as e:
+            st.warning("Aucun matériel trouvé pour modifier.")

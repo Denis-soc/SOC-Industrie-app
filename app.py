@@ -50,61 +50,50 @@ if "materiel_id" in query_params:
 # ... Onglet N°5...
 with tab5:
     st.header("⚙️ Administration Matériel")
-    
-    # Clé unique 'admin_action' pour éviter les erreurs de duplication
-    admin_action = st.radio(
-        "Action :", 
-        ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], 
-        key="admin_action_radio"
-    )
-    
-    if admin_action == "Créer une fiche":
-        with st.form("form_creation_admin"):
+    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="main_radio")
+
+    # --- FONCTION FORMULAIRE PARTAGÉ ---
+    def afficher_formulaire(donnees=None):
+        with st.form("form_partage"):
             col1, col2 = st.columns(2)
-            with col1:
-                num_interne = st.text_input("Numéro interne", key="in_id")
-                nom = st.text_input("Nom de l'article", key="in_nom")
-            with col2:
-                categorie = st.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"], key="in_cat")
-                num_serie = st.text_input("N° de Série", key="in_serie")
             
-            # Maintenance
-            st.subheader("📅 Suivi et Maintenance")
-            soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?", key="check_maint")
-            date_c, perio = None, 0
-            if soumis_verif:
-                c1, c2 = st.columns(2)
-                date_c = c1.date_input("Date du dernier contrôle")
-                perio = c2.number_input("Périodicité (mois)", value=12)
-
-            # Photo
-            st.subheader("📸 Photo du matériel")
-            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True, key="photo_source")
-            if source_photo == "Fichier":
-                st.file_uploader("Déposer une image", type=['png', 'jpg'], key="file_up")
-            elif source_photo == "Caméra":
-                st.camera_input("Prendre une photo", key="cam_up")
-
-            # Bouton de soumission unique
-            if st.form_submit_button("Enregistrer"):
+            # Pré-remplissage si 'donnees' existe
+            id_val = donnees['id'] if donnees is not None else ""
+            nom_val = donnees['nom'] if donnees is not None else ""
+            ref_val = donnees['reference'] if donnees is not None else ""
+            
+            num_interne = col1.text_input("Numéro interne", value=id_val, disabled=(donnees is not None))
+            nom = col1.text_input("Nom de l'article", value=nom_val)
+            ref = col2.text_input("Référence", value=ref_val)
+            
+            btn_label = "Mettre à jour" if donnees is not None else "Enregistrer"
+            
+            if st.form_submit_button(btn_label):
                 try:
-                    # Requête sécurisée
-                    query = sqlalchemy.text("""
-                        INSERT INTO materiel (id, nom, categorie, num_serie, date_controle, intervalle_mois)
-                        VALUES (:id, :nom, :cat, :serie, :date_c, :perio)
-                    """)
                     with engine.begin() as conn:
-                        conn.execute(query, {
-                            "id": num_interne, "nom": nom, "cat": categorie, 
-                            "serie": num_serie, "date_c": date_c, "perio": perio
-                        })
-                    st.success("Matériel enregistré !")
+                        if donnees is None: # Mode CRÉATION
+                            query = sqlalchemy.text("INSERT INTO materiel (id, nom, reference) VALUES (:id, :nom, :ref)")
+                            conn.execute(query, {"id": num_interne, "nom": nom, "ref": ref})
+                            st.success("Matériel créé !")
+                        else: # Mode MODIFICATION
+                            query = sqlalchemy.text("UPDATE materiel SET nom = :nom, reference = :ref WHERE id = :id")
+                            conn.execute(query, {"nom": nom, "ref": ref, "id": num_interne})
+                            st.success("Matériel mis à jour !")
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"Erreur technique : {e}")
+                    st.error(f"Erreur : {e}")
 
+    # --- LOGIQUE D'ACTION ---
+    if admin_action == "Créer une fiche":
+        afficher_formulaire()
+        
     elif admin_action == "Modifier une fiche":
-        st.info("Sélectionnez le matériel dans la liste...")
-        # Logique de modification à ajouter ensuite
-
-    elif admin_action == "Supprimer une fiche":
-        st.warning("Sélectionnez le matériel à supprimer...")
+        # 1. Sélectionner le matériel
+        df_list = pd.read_sql("SELECT id FROM materiel", engine)
+        id_select = st.selectbox("Choisir l'ID :", df_list['id'].tolist())
+        
+        # 2. Charger les données
+        data = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_select}'", engine).iloc[0]
+        
+        # 3. Afficher le formulaire rempli
+        afficher_formulaire(donnees=data)

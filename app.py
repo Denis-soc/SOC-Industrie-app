@@ -129,12 +129,21 @@ with tab1:
             with st.form("form_creation"):
                 col1, col2 = st.columns(2)
                 with col1:
-                    num_interne = st.text_input("Numéro interne (ex: SOC-001)")
+                    num_interne = st.text_input("Numéro interne")
                     nom = st.text_input("Nom de l'article")
-                    ref = st.text_input("Référence interne")
                 with col2:
                     fournisseur = st.text_input("Fournisseur")
                     ref_fournisseur = st.text_input("Référence fournisseur")
+                
+                # --- NOUVEAU BLOC : SUIVI MAINTENANCE ---
+                st.subheader("📋 Informations de Suivi & Maintenance")
+                soumis_verif = st.checkbox("Matériel soumis à vérification/étalonnage ?")
+                if soumis_verif:
+                    col_v1, col_v2 = st.columns(2)
+                    with col_v1:
+                        periodicite = st.number_input("Périodicité (en mois)", min_value=1, value=12)
+                    with col_v2:
+                        date_depart = st.date_input("Date de départ (ou dernier contrôle)")
                 
                 # Gestion photo : Upload ou Caméra
                 photo_option = st.radio("Photo :", ["Uploader un fichier", "Prendre en direct"], horizontal=True)

@@ -8,10 +8,10 @@ import sqlalchemy
 import streamlit as st
 import sqlalchemy
 
-# Connexion via le pooler officiel de Supabase (Port 6543)
-# Remplacez "VotreMotDePasse" par le vrai mot de passe de votre base
+# Connexion sécurisée via le Pooler IPv4 (Port 6543)
+# REMPLACEZ VotreMotDePasse par le vrai mot de passe de votre base (sans crochets)
 engine = sqlalchemy.create_engine(
-    "postgresql://postgres:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
+    "postgresql://postgres.spxrxmzeaybndgpmoslo:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
 )
 
 try:

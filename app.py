@@ -122,7 +122,10 @@ with tab1:
                 continue
             with st.container(border=True):
                 c_img, c_txt, c_form = st.columns([1, 2, 1.5])
-                c_img.image(prod["photo"], width=100)
+               if prod.get("photo"): 
+    c_img.image(prod["photo"], width=100)
+else:
+    c_img.write("Pas d'image")
                 with c_txt:
                     st.markdown(f"### {prod['nom']}")
                     st.caption(f"**Marque :** {prod['marque']} | **Ref :** {prod['ref']}\n\n{prod['desc']}")

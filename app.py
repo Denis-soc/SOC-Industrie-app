@@ -154,7 +154,7 @@ with tab1:
             with st.form("form_panier"):
                 nom_c = st.text_input("Votre Nom")
                 code_i = st.text_input("Code Imputation Obligatoire")
-                if st.form_submit_button("🚀 Envoyer la commande", use_container_width=True):
+if st.form_submit_button("🚀 Envoyer la commande", use_container_width=True):
                     # ... (votre code d'insertion en base reste ici)
 # ==========================================
 # ONGLET 2 : CATALOGUE VISUEL & REGISTRE

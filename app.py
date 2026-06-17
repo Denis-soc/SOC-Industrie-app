@@ -4,7 +4,7 @@ import pandas as pd
 
 # 1. CONFIGURATION
 st.set_page_config(page_title="SOC Industrie", layout="wide")
-db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:LEsGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
+db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
 engine = sqlalchemy.create_engine(db_url)
 
 # 2. LOGIQUE MÉTIER (Facile à modifier)

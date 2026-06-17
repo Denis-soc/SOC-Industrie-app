@@ -19,7 +19,7 @@ st.title("🏗️ SOC Industrie — Gestion Interne")
 @st.cache_resource
 def init_connection():
     # REMPLACEZ "VotreMotDePasse" PAR VOTRE VRAI MOT DE PASSE SUPABASE
-    db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:VotreMotDePasse@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
+    db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
     return sqlalchemy.create_engine(db_url)
 
 try:

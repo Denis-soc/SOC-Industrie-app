@@ -43,34 +43,53 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # ... Onglet N°5...
 with tab5:
     st.header("⚙️ Administration Matériel")
-    admin_action = st.radio("Que souhaitez-vous faire ?", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
+    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
     
     if admin_action == "Créer une fiche":
         with st.form("form_creation_admin"):
-            # 1. Sélection de la destination (le catalogue cible)
-            destination = st.selectbox("Destination de la fiche :", 
-                                       ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"])
+            destination = st.selectbox("Destination :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"])
             
             col1, col2 = st.columns(2)
             with col1:
-                num_interne = st.text_input("Numéro interne (ex: MAT-001)")
+                num_interne = st.text_input("Numéro interne")
                 nom = st.text_input("Nom de l'article")
+                fournisseur = st.text_input("Fournisseur")
             with col2:
                 ref = st.text_input("Référence")
                 num_serie = st.text_input("N° de Série")
-            
-            # Gestion photo
-            photo = st.camera_input("Prendre une photo")
-            
-            if st.form_submit_button("Enregistrer dans " + destination):
-                # Dans SQL, on enregistre la destination dans la colonne 'categorie'
+                
+            # Gestion Photo
+            photo_methode = st.radio("Photo :", ["Prendre en photo", "Importer une image"], horizontal=True)
+            if photo_methode == "Importer une image":
+                photo_file = st.file_uploader("Glisser l'image ici", type=['png', 'jpg', 'jpeg'])
+            else:
+                photo_file = st.camera_input("Prendre une photo")
+
+            # Suivi Maintenance
+            soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?")
+            if soumis_verif:
+                c1, c2 = st.columns(2)
+                periodicite = c1.number_input("Périodicité (mois)", min_value=1, value=12)
+                date_controle = c2.date_input("Date du dernier contrôle")
+                # Calcul échéance : date + périodicité
+                # L'alerte sera gérée côté Olivier par une requête filtrant prochain_controle <= date.today() + 90 jours
+            else:
+                periodicite, date_controle = None, None
+
+            if st.form_submit_button("Enregistrer et générer QR Code"):
+                # 1. Enregistrement SQL
                 query = """
-                INSERT INTO materiel (id, nom, categorie, reference, num_serie)
-                VALUES (:id, :nom, :cat, :ref, :serie)
+                INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur, date_controle, intervalle_mois)
+                VALUES (:id, :nom, :cat, :ref, :serie, :fourn, :date_c, :perio)
                 """
                 with engine.begin() as conn:
                     conn.execute(sqlalchemy.text(query), {
-                        "id": num_interne, "nom": nom, "cat": destination, 
-                        "ref": ref, "serie": num_serie
+                        "id": num_interne, "nom": nom, "cat": destination, "ref": ref, 
+                        "serie": num_serie, "fourn": fournisseur, "date_c": date_controle, "perio": periodicite
                     })
-                st.success(f"Fiche enregistrée dans {destination} !")
+                
+                # 2. Génération QR Code
+                data_qr = f"SOC: {num_interne} | {nom} | Série: {num_serie} | Fourn: {fournisseur}"
+                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(data_qr)}"
+                st.image(qr_url, caption="QR Code à imprimer")
+                st.success("Matériel enregistré et synchronisé avec le tableau d'Olivier !")

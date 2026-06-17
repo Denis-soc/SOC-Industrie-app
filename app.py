@@ -58,7 +58,7 @@ with tab5:
                 ref = st.text_input("Référence")
                 num_serie = st.text_input("N° de Série")
                 
-           st.subheader("📸 Photo du matériel")
+            st.subheader("📸 Photo du matériel")
             source_photo = st.radio("Source :", ["Prendre une photo", "Déposer un fichier"], horizontal=True)
             
             image_a_traiter = None

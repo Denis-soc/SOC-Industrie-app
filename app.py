@@ -57,34 +57,39 @@ with tab5:
                 ref = st.text_input("Référence")
                 num_serie = st.text_input("N° de Série")
             
-           # --- GESTION PHOTO MISE À JOUR ---
-            st.subheader("📸 Photo du matériel")
-            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True)
-            
-            # On initialise la variable
-            uploaded_file = None
-            
-            # Gestion des conditions
-            if source_photo == "Fichier":
-                uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'])
-            elif source_photo == "Caméra":
-                uploaded_file = st.camera_input("Prendre une photo")
-            
-            if st.form_submit_button("Enregistrer et générer QR Code"):
-                # Requête SQL mise à jour avec les colonnes existantes
-                query = """
-                INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur)
-                VALUES (:id, :nom, :cat, :ref, :serie, :fourn)
-                """
-                try:
-                    # Vérification si l'ID existe déjà
-                    check_query = sqlalchemy.text("SELECT id FROM materiel WHERE id = :id")
-                    with engine.connect() as conn:
-                        result = conn.execute(check_query, {"id": num_interne}).fetchone()
-
-                    if result:
-                        st.warning(f"⚠️ Le numéro interne '{num_interne}' existe déjà. Veuillez en choisir un autre ou passer par l'onglet 'Modifier'.")
-                    else:
+# --- GESTION PHOTO ET SOUMISSION ---
+        st.subheader("📸 Photo du matériel")
+        url_photo = st.text_input("URL de l'image (Lien web direct) :", placeholder="https://exemple.com/image.jpg")
+        
+        soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?")
+        
+        if st.form_submit_button("Enregistrer et générer QR Code"):
+            # Requête SQL sécurisée
+            query = """
+            INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur, photo_url)
+            VALUES (:id, :nom, :cat, :ref, :serie, :fourn, :url)
+            """
+            try:
+                # IMPORTANT : Tout ce qui suit doit être décalé de 4 espaces
+                with engine.begin() as conn:
+                    conn.execute(sqlalchemy.text(query), {
+                        "id": num_interne, 
+                        "nom": nom, 
+                        "cat": destination, 
+                        "ref": ref, 
+                        "serie": num_serie, 
+                        "fourn": fournisseur,
+                        "url": url_photo
+                    })
+                st.success("Matériel enregistré avec succès !")
+                
+                # Génération du QR Code
+                data_qr = f"ID: {num_interne} | {nom}"
+                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(data_qr)}"
+                st.image(qr_url, caption="QR Code")
+                
+            except Exception as e:
+                st.error(f"Erreur technique : {e}")
     # ... votre code d'insertion actuel ...
                     with engine.begin() as conn:
                         conn.execute(sqlalchemy.text(query), {

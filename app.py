@@ -114,6 +114,20 @@ with tab5:
         st.info("Sélectionnez un matériel pour charger ses informations.")
         # La logique de modification sera insérée ici une fois la structure validée
 
-    # --- BLOC SUPPRESSION ---
     elif admin_action == "Supprimer une fiche":
-        st.warning("Prêt pour la suppression.")
+        st.subheader("⚠️ Supprimer un matériel")
+        
+        # 1. On récupère la liste des IDs pour choisir ce qu'on supprime
+        df_list = pd.read_sql("SELECT id FROM materiel", engine)
+        id_a_supprimer = st.selectbox("Sélectionner l'ID à supprimer :", df_list['id'].tolist(), key="select_del")
+        
+        # 2. Bouton de confirmation (sécurité indispensable pour éviter les erreurs)
+        if st.button("Confirmer la suppression définitive"):
+            try:
+                query_del = sqlalchemy.text("DELETE FROM materiel WHERE id = :id")
+                with engine.begin() as conn:
+                    conn.execute(query_del, {"id": id_a_supprimer})
+                st.success(f"Le matériel {id_a_supprimer} a été supprimé.")
+                st.rerun() # Recharge pour mettre à jour la liste
+            except Exception as e:
+                st.error(f"Erreur lors de la suppression : {e}")

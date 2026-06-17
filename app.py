@@ -50,49 +50,81 @@ if "materiel_id" in query_params:
 # ... Onglet N°5...
 with tab5:
     st.header("⚙️ Administration Matériel")
-    
-    # 1. Menu d'action avec clé unique
     admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="admin_radio")
-    
-    # --- BLOC CRÉATION ---
-    if admin_action == "Créer une fiche":
-        with st.form("form_creation_admin"):
+
+    # --- FONCTION FORMULAIRE PARTAGÉ ---
+    def afficher_formulaire(donnees=None):
+        with st.form("form_partage"):
             col1, col2 = st.columns(2)
-            with col1:
-                num_interne = st.text_input("Numéro interne", key="c_id")
-                nom = st.text_input("Nom de l'article", key="c_nom")
-                fournisseur = st.text_input("Fournisseur", key="c_fourn")
-            with col2:
-                categorie = st.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"], key="c_cat")
-                ref = st.text_input("Référence", key="c_ref")
-                num_serie = st.text_input("N° de Série", key="c_serie")
             
+            # Récupération des valeurs existantes si mode modification
+            id_v = donnees['id'] if donnees is not None else ""
+            nom_v = donnees['nom'] if donnees is not None else ""
+            fourn_v = donnees['fournisseur'] if donnees is not None else ""
+            ref_v = donnees['reference'] if donnees is not None else ""
+            serie_v = donnees['num_serie'] if donnees is not None else ""
+            
+            num_interne = col1.text_input("Numéro interne", value=id_v, disabled=(donnees is not None))
+            nom = col1.text_input("Nom de l'article", value=nom_v)
+            fournisseur = col1.text_input("Fournisseur", value=fourn_v)
+            
+            ref = col2.text_input("Référence / Modèle", value=ref_v)
+            num_serie = col2.text_input("N° de Série", value=serie_v)
+            
+            # Maintenance (optionnel dans le formulaire)
             st.subheader("📅 Suivi et Maintenance")
-            soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?", key="c_maint")
-            date_c, perio = None, 0
+            soumis_verif = st.checkbox("Soumis à contrôle ?", key="maint_check")
+            date_c = None
+            perio = 0
             if soumis_verif:
-                c1, c2 = st.columns(2)
-                date_c = c1.date_input("Date du dernier contrôle")
-                perio = c2.number_input("Périodicité (mois)", value=12)
+                c_m1, c_m2 = st.columns(2)
+                date_c = c_m1.date_input("Date dernier contrôle")
+                perio = c_m2.number_input("Périodicité (mois)", value=12)
 
-            # Votre code de photo
-            st.subheader("📸 Photo du matériel")
-            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True, key="c_photo_src")
-            uploaded_file = None
-            if source_photo == "Fichier":
-                uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'], key="c_file")
-            elif source_photo == "Caméra":
-                uploaded_file = st.camera_input("Prendre une photo", key="c_cam")
+            btn_label = "Mettre à jour" if donnees is not None else "Enregistrer"
+            
+            if st.form_submit_button(btn_label):
+                try:
+                    with engine.begin() as conn:
+                        if donnees is None: # CRÉATION
+                            query = sqlalchemy.text("""
+                                INSERT INTO materiel (id, nom, fournisseur, reference, num_serie, date_controle, intervalle_mois) 
+                                VALUES (:id, :nom, :fourn, :ref, :serie, :date_c, :perio)
+                            """)
+                            conn.execute(query, {"id": num_interne, "nom": nom, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio})
+                            st.success("Matériel créé avec succès !")
+                        else: # MODIFICATION
+                            query = sqlalchemy.text("""
+                                UPDATE materiel SET nom = :nom, fournisseur = :fourn, reference = :ref, num_serie = :serie, date_controle = :date_c, intervalle_mois = :perio
+                                WHERE id = :id
+                            """)
+                            conn.execute(query, {"nom": nom, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne})
+                            st.success("Matériel mis à jour !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur technique : {e}")
 
-            if st.form_submit_button("Enregistrer"):
-                # Votre logique SQL ici...
-                st.success("Fiche créée !")
-
-    # --- BLOC MODIFICATION (Bien aligné avec le IF) ---
+    # --- LOGIQUE D'ACTION ---
+    if admin_action == "Créer une fiche":
+        afficher_formulaire()
+        
     elif admin_action == "Modifier une fiche":
-        st.info("Interface de modification en construction.")
-        # Le code de modification viendra ici...
-
-    # --- BLOC SUPPRESSION ---
+        df_list = pd.read_sql("SELECT id FROM materiel", engine)
+        if not df_list.empty:
+            id_select = st.selectbox("Choisir l'ID à modifier :", df_list['id'].tolist())
+            data = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_select}'", engine).iloc[0]
+            afficher_formulaire(donnees=data)
+        else:
+            st.warning("Aucun matériel en base.")
+            
     elif admin_action == "Supprimer une fiche":
-        st.warning("Interface de suppression en construction.")
+        df_list = pd.read_sql("SELECT id FROM materiel", engine)
+        if not df_list.empty:
+            id_del = st.selectbox("Choisir l'ID à supprimer :", df_list['id'].tolist())
+            if st.button("Confirmer la suppression"):
+                with engine.begin() as conn:
+                    conn.execute(sqlalchemy.text("DELETE FROM materiel WHERE id = :id"), {"id": id_del})
+                st.success("Supprimé !")
+                st.rerun()
+        else:
+            st.warning("Aucun matériel à supprimer.")

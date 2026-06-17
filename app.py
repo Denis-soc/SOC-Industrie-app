@@ -5,12 +5,14 @@ import sqlalchemy
 # ==========================================
 # 1. CONNEXION GLOBALE SUPABASE (SQLAlchemy)
 # ==========================================
+import streamlit as st
 import sqlalchemy
+import pandas as pd
 
-# Connexion via le Transaction Pooler de Supabase (Port 6543)
-# REMPLACEZ "VotreMotDePasse" par votre vrai mot de passe (sans les crochets [ ])
+# Connexion via l'IP directe IPv4 pour contourner le problème réseau
+# REMPLACEZ 'VotreMotDePasse' par votre vrai mot de passe Supabase
 engine = sqlalchemy.create_engine(
-    "postgresql://postgres:LesGaulois2026@db.spxrxmzeaybndgpmoslo.supabase.co:6543/postgres?sslmode=require"
+    "postgresql://postgres:LesGaulois2026@104.18.38.10:5432/postgres"
 )
 
 try:
@@ -18,6 +20,10 @@ try:
 except Exception as e:
     st.error(f"Erreur de connexion à la base de données : {e}")
     st.stop()
+
+# --- RESTE DE VOTRE INTERFACE ---
+st.title("🏗️ SOC Industrie — Gestion Interne")
+st.write("Connexion établie avec succès.")
 
 # ==========================================
 # 2. CONFIGURATION DE LA PAGE

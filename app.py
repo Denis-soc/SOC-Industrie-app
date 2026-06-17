@@ -40,27 +40,52 @@ tab0, tab1, tab2, tab3, tab4 = st.tabs([
 ])
 # ... après la définition de tab0, tab1...
 
-# --- CONTENU TAB0 : TABLEAU DE BORD OLIVIER ---
 with tab0:
     st.header("👑 Tableau de Bord Olivier")
     
+    # 1. Gestion des demandes
     st.subheader("📋 Demandes en attente")
+    
     if not df_demandes_reel.empty:
-        st.dataframe(df_demandes_reel, use_container_width=True)
+        st.dataframe(df_demandes_reel, use_container_width=True, hide_index=True)
+        
+        # Formulaire d'action pour Olivier
+        with st.form("action_olivier"):
+            col_v1, col_v2 = st.columns(2)
+            with col_v1:
+                # Création d'une liste unique pour la sélection
+                liste_demandes = df_demandes_reel.index.tolist()
+                selection = st.selectbox("Sélectionner la ligne (ID) à traiter :", liste_demandes)
+            with col_v2:
+                action_decision = st.radio("Action :", ["Laisser en attente", "Valider / Matériel Prêt", "Supprimer"], horizontal=True)
+                                           
+            if st.form_submit_button("Confirmer l'action"):
+                try:
+                    with engine.begin() as conn:
+                        if action_decision == "Supprimer":
+                            conn.execute(sqlalchemy.text("DELETE FROM demandes_collaborateurs WHERE id = :id;"), {"id": selection})
+                        elif action_decision == "Valider / Matériel Prêt":
+                            conn.execute(sqlalchemy.text("UPDATE demandes_collaborateurs SET statut = :s WHERE id = :id;"), 
+                                         {"s": "Validé", "id": selection})
+                    st.success("Action effectuée avec succès !")
+                    st.rerun() # Recharge la page pour mettre à jour le tableau
+                except Exception as e:
+                    st.error(f"Erreur lors de la mise à jour : {e}")
     else:
         st.success("✅ Aucune demande en attente.")
 
     st.markdown("---")
     
+    # 2. Alertes étalonnage
     st.subheader("🚨 Alertes Étalonnages (< 90 jours)")
-    # Calcul simple des alertes basé sur la colonne 'prochain_controle'
     aujourdhui = datetime.now().date()
     
-    # On convertit en datetime pour comparer
-    df_materiel_reel['prochain_controle'] = pd.to_datetime(df_materiel_reel['prochain_controle']).dt.date
-    alertes = df_materiel_reel[df_materiel_reel['prochain_controle'] <= (aujourdhui + pd.Timedelta(days=90))]
-    
-    if not alertes.empty:
-        st.dataframe(alertes[['id', 'nom', 'prochain_controle']], use_container_width=True)
-    else:
-        st.success("✅ Aucun étalonnage critique à prévoir.")
+    # On filtre les alertes
+    if not df_materiel_reel.empty:
+        df_materiel_reel['prochain_controle'] = pd.to_datetime(df_materiel_reel['prochain_controle']).dt.date
+        alertes = df_materiel_reel[df_materiel_reel['prochain_controle'] <= (aujourdhui + pd.Timedelta(days=90))]
+        
+        if not alertes.empty:
+            st.dataframe(alertes[['id', 'nom', 'prochain_controle']], use_container_width=True, hide_index=True)
+        else:
+            st.success("✅ Aucun étalonnage critique à prévoir.")

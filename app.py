@@ -60,10 +60,10 @@ with tab5:
             st.subheader("📸 Photo du matériel")
             source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True)
             uploaded_file = None
-if source_photo == "Fichier":
-    uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'])
-elif source_photo == "Caméra":
-    uploaded_file = st.camera_input("Prendre une photo")
+            if source_photo == "Fichier":
+            uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'])
+            elif source_photo == "Caméra":
+            uploaded_file = st.camera_input("Prendre une photo")
             
             if st.form_submit_button("Enregistrer et générer QR Code"):
                 # Requête SQL mise à jour avec les colonnes existantes

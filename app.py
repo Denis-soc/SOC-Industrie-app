@@ -85,6 +85,10 @@ with tab5:
 
     # --- FONCTION FORMULAIRE PARTAGÉ ---
     def afficher_formulaire(donnees=None):
+        # Affiche la photo si on modifie une fiche existante
+        if donnees is not None and donnees.get('photo_data'):
+            st.image(base64.b64decode(donnees['photo_data']), width=200, caption="Photo actuelle")
+
         with st.form("form_partage"):
             col1, col2 = st.columns(2)
             
@@ -113,27 +117,31 @@ with tab5:
 
             btn_label = "Mettre à jour" if donnees is not None else "Enregistrer"
             
-            if st.form_submit_button(btn_label):
+            i# --- RÉINTÉGRATION PHOTO ---
+            st.subheader("📸 Photo du matériel")
+            uploaded_file = st.file_uploader("Ajouter une image", type=['png', 'jpg'])
+            
+            if st.form_submit_button("Enregistrer / Mettre à jour"):
+                photo_data = base64.b64encode(uploaded_file.getvalue()).decode('utf-8') if uploaded_file else None
+                
                 try:
                     with engine.begin() as conn:
-                        if donnees is None: # CRÉATION
+                        if donnees is None: # Création
                             query = sqlalchemy.text("""
-                                INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, date_controle, intervalle_mois) 
-                                VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :date_c, :perio)
+                                INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, date_controle, intervalle_mois, photo_data) 
+                                VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :date_c, :perio, :pdata)
                             """)
-                            conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio})
-                            st.success("Matériel créé avec succès !")
-                        else: # MODIFICATION
+                            conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "pdata": photo_data})
+                        else: # Modification
                             query = sqlalchemy.text("""
-                                UPDATE materiel SET nom=:nom, categorie=:cat, fournisseur=:fourn, reference=:ref, num_serie=:serie, date_controle=:date_c, intervalle_mois=:perio
-                                WHERE id=:id
+                                UPDATE materiel SET nom=:nom, categorie=:cat, fournisseur=:fourn, reference=:ref, num_serie=:serie, 
+                                date_controle=:date_c, intervalle_mois=:perio, photo_data=:pdata WHERE id=:id
                             """)
-                            conn.execute(query, {"nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne})
-                            st.success("Matériel mis à jour !")
+                            conn.execute(query, {"nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "pdata": photo_data, "id": num_interne})
+                    st.success("Fiche enregistrée avec succès !")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erreur technique : {e}")
-
     # --- LOGIQUE D'ACTION ---
     if admin_action == "Créer une fiche":
         afficher_formulaire()

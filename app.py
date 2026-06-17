@@ -65,11 +65,11 @@ CATALOGUE_OUTILLAGE = [
 ]
 
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
-    "👑 ESPACE OLIVIER : Centralisation & Logistique",
-    "🛒 CATALOGUE MAGASIN (EPI / Consommables)",
-    "🛠️ CATALOGUE VISUEL & REGISTRE MATÉRIEL", 
-    "📅 Sorties & Mouvements Terrain", 
-    "📍 Carte des Chantiers"
+    "👑 Tableau de Bord Logistique", 
+    "🛒 Catalogue Magasin & Outillage", 
+    "🛠️ Catalogue Visuel", 
+    "📦 Sorties & Mouvements", 
+    "🗺️ Carte des Chantiers"
 ])
 
 # ==========================================

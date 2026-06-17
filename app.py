@@ -84,11 +84,7 @@ with tab5:
     admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="admin_radio")
 
     # --- FONCTION FORMULAIRE PARTAGÉ ---
-    def afficher_formulaire(donnees=None):
-        # Affichage de la photo actuelle si en mode modification
-        if donnees is not None and donnees.get('photo_data'):
-            st.image(base64.b64decode(donnees['photo_data']), width=200, caption="Photo actuelle")
-
+def afficher_formulaire(donnees=None):
         with st.form("form_partage"):
             col1, col2 = st.columns(2)
             
@@ -115,38 +111,24 @@ with tab5:
                 date_c = c_m1.date_input("Date dernier contrôle")
                 perio = c_m2.number_input("Périodicité (mois)", value=12)
 
-            st.subheader("📸 Photo du matériel")
-            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True)
-            uploaded_file = None
-            if source_photo == "Fichier":
-                uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'])
-            elif source_photo == "Caméra":
-                uploaded_file = st.camera_input("Prendre une photo")
-
-            btn_label = "Mettre à jour" if donnees is not None else "Enregistrer et générer QR Code"
+            btn_label = "Mettre à jour" if donnees is not None else "Enregistrer"
             
             if st.form_submit_button(btn_label):
-                # Conversion photo
-                photo_data = base64.b64encode(uploaded_file.getvalue()).decode('utf-8') if uploaded_file else None
-                
                 try:
                     with engine.begin() as conn:
                         if donnees is None: # CRÉATION
                             query = sqlalchemy.text("""
-                                INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, date_controle, intervalle_mois, photo_data) 
-                                VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :date_c, :perio, :pdata)
+                                INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, date_controle, intervalle_mois) 
+                                VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :date_c, :perio)
                             """)
-                            conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "pdata": photo_data})
-                            st.success("Matériel créé !")
+                            conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio})
+                            st.success("Matériel créé avec succès !")
                         else: # MODIFICATION
-                            update_query = "UPDATE materiel SET nom=:nom, fournisseur=:fourn, reference=:ref, num_serie=:serie, date_controle=:date_c, intervalle_mois=:perio"
-                            if photo_data: update_query += ", photo_data=:pdata"
-                            update_query += " WHERE id=:id"
-                            
-                            params = {"nom": nom, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne}
-                            if photo_data: params["pdata"] = photo_data
-                            
-                            conn.execute(sqlalchemy.text(update_query), params)
+                            query = sqlalchemy.text("""
+                                UPDATE materiel SET nom=:nom, categorie=:cat, fournisseur=:fourn, reference=:ref, num_serie=:serie, date_controle=:date_c, intervalle_mois=:perio
+                                WHERE id=:id
+                            """)
+                            conn.execute(query, {"nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne})
                             st.success("Matériel mis à jour !")
                     st.rerun()
                 except Exception as e:

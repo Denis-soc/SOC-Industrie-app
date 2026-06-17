@@ -16,7 +16,7 @@ st.title("🏗️ SOC Industrie — Gestion Interne")
 # 2. CONNEXION À LA BASE DE DONNÉES (POOLER)
 @st.cache_resource
 def init_connection():
-    db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
+    db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:VotreMotDePasse@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
     return sqlalchemy.create_engine(db_url)
 
 try:
@@ -28,7 +28,6 @@ except Exception as e:
     st.stop()
 
 # 3. INITIALISATION DES BASES DE DONNÉES TEMPORAIRES (SESSION STATE)
-# Parc Matériel principal
 if 'db_materiel' not in st.session_state:
     st.session_state.db_materiel = pd.DataFrame([
         {"ID": "MAT-001", "Nom": "Meuleuse d'angle Ø230", "Catégorie": "Outillage Électroportatif", "Statut": "En Chantier", "Détenteur": "Yannick", "Date Contrôle": datetime(2026, 1, 15).date(), "Intervalle (mois)": 6, "Prochain Contrôle": datetime(2026, 7, 15).date()},
@@ -36,14 +35,13 @@ if 'db_materiel' not in st.session_state:
         {"ID": "MAT-003", "Nom": "Appareil de métrologie", "Catégorie": "Mesure", "Statut": "Disponible", "Détenteur": "Atelier / Agence", "Date Contrôle": datetime(2026, 5, 20).date(), "Intervalle (mois)": 1, "Prochain Contrôle": datetime(2026, 6, 20).date()}
     ])
 
-# Registre central des demandes des collaborateurs pour Olivier
+# Registre central incluant la colonne obligatoire "Code Imputation"
 if 'db_demandes_collaborateurs' not in st.session_state:
     st.session_state.db_demandes_collaborateurs = pd.DataFrame([
-        {"Date": "15/06/2026", "Collaborateur": "Yannick", "Type": "🦺 EPI", "Désignation": "Gants de soudure T10", "Détails / Dates": "Urgents - Usés sur chantier", "Statut": "En attente"},
-        {"Date": "16/06/2026", "Collaborateur": "David", "Type": "🪵 Consommable", "Désignation": "Électrodes Inox Ø2.5", "Détails / Dates": "2 paquets pour Chantier Angers", "Statut": "En attente"},
-        {"Date": "17/06/2026", "Collaborateur": "Mathieu", "Type": "🛠️ Outillage", "Désignation": "Poste à souder TIG", "Détails / Dates": "Du 22/06 au 26/06", "Statut": "En attente"}
+        {"Date": "15/06/2026", "Collaborateur": "Yannick", "Type": "🦺 EPI", "Désignation": "Gants de soudure T10", "Code Imputation": "CH-MILLET-2025", "Détails / Dates": "Urgents - Usés sur chantier", "Statut": "En attente"},
+        {"Date": "16/06/2026", "Collaborateur": "David", "Type": "🪵 Consommable", "Désignation": "Électrodes Inox Ø2.5", "Code Imputation": "CH-ANGERS-2026", "Détails / Dates": "2 paquets pour Chantier", "Statut": "En attente"},
+        {"Date": "17/06/2026", "Collaborateur": "Mathieu", "Type": "🛠️ Outillage", "Désignation": "Poste à souder TIG", "Code Imputation": "CH-CHOLET-2026", "Détails / Dates": "Du 22/06 au 26/06", "Statut": "En attente"}
     ])
-
 
 # Répartition des modules par Onglets
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
@@ -55,16 +53,16 @@ tab0, tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 # ==========================================
-# ONGLET 0 : ESPACE OLIVIER (CENTRALISATION TOTALE)
+# ONGLET 0 : ESPACE OLIVIER (CENTRALISATION TOTALE AVEC CODE IMPUTATION)
 # ==========================================
 with tab0:
     st.header("👑 Tableau de Bord Général d'Olivier")
-    st.write("Suivi des obligations réglementaires et validation des demandes logistiques des collaborateurs.")
+    st.write("Suivi des obligations réglementaires, codes imputations chantiers et validation des demandes logistiques.")
     
     # --- PARTIE A : RÉCAPITULATIF DES DEMANDES ÉQUIPES ---
     st.subheader("📥 Demandes de Matériels, EPI et Consommables reçues")
     if not st.session_state.db_demandes_collaborateurs.empty:
-        # Affichage du tableau des demandes
+        # Affichage du tableau avec le Code Imputation mis en valeur
         st.dataframe(st.session_state.db_demandes_collaborateurs, use_container_width=True, hide_index=True)
         
         # Actions de validation rapide
@@ -183,7 +181,7 @@ with tab1:
 
 
 # ==========================================
-# ONGLET 2 : SORTIES & MOUVEMENTS (ALIMENTE L'ESPACE OLIVIER)
+# ONGLET 2 : SORTIES & MOUVEMENTS (AVEC CODE IMPUTATION CRITIQUE)
 # ==========================================
 with tab2:
     st.header("📅 Demandes d'Utilisation et Transferts")
@@ -194,23 +192,28 @@ with tab2:
         with st.form("form_demande_outillage"):
             nom_tech_out = st.text_input("Nom du Technicien")
             out_choisi = st.selectbox("Matériel souhaité", st.session_state.db_materiel["Nom"])
+            code_imp_out = st.text_input("Code Imputation Obligatoire (ex: CH-ANGERS-2026)")
             date_d = st.date_input("Date de début")
             date_f = st.date_input("Date de fin")
             
             if st.form_submit_button("Envoyer la demande à Olivier"):
-                nouvelle_demande = {
-                    "Date": datetime.now().strftime("%d/%m/%m"),
-                    "Collaborateur": nom_tech_out, "Type": "🛠️ Outillage",
-                    "Désignation": out_choisi, "Détails / Dates": f"Du {date_d} au {date_f}", "Statut": "En attente"
-                }
-                st.session_state.db_demandes_collaborateurs = pd.concat([st.session_state.db_demandes_collaborateurs, pd.DataFrame([nouvelle_demande])], ignore_index=True)
-                st.success("Demande d'outillage transmise dans l'Espace d'Olivier !")
+                if not code_imp_out.strip():
+                    st.error("🛑 Erreur : Vous devez spécifier un Code Imputation pour valider la demande.")
+                else:
+                    nouvelle_demande = {
+                        "Date": datetime.now().strftime("%d/%m/%Y"),
+                        "Collaborateur": nom_tech_out, "Type": "🛠️ Outillage",
+                        "Désignation": out_choisi, "Code Imputation": code_imp_out.upper().strip(),
+                        "Détails / Dates": f"Du {date_d} au {date_f}", "Statut": "En attente"
+                    }
+                    st.session_state.db_demandes_collaborateurs = pd.concat([st.session_state.db_demandes_collaborateurs, pd.DataFrame([nouvelle_demande])], ignore_index=True)
+                    st.success("Demande d'outillage transmise dans l'Espace d'Olivier !")
 
     with col_m2:
         st.subheader("🔄 Mouvements directs (Retour / Transfert)")
         mat_en_cours = st.selectbox("Matériel en mouvement (Sur chantier) :", st.session_state.db_materiel[st.session_state.db_materiel["Statut"] == "En Chantier"]["Nom"], key="mvmt")
         mouvement = st.radio("Mouvement", ["Réintégration à l'agence", "Transfert à un collègue"], key="rad_mv")
-        if movimiento := (mouvement == "Transfert à un collègue"):
+        if mouvement == "Transfert à un collègue":
             receveur = st.text_input("Nom du collègue qui récupère")
             
         if st.button("Valider le mouvement"):
@@ -223,7 +226,7 @@ with tab2:
 
 
 # ==========================================
-# ONGLET 3 : CONSUMIBLES & EPI (ALIMENTE L'ESPACE OLIVIER)
+# ONGLET 3 : CONSOMMABLES & EPI (AVEC CODE IMPUTATION CRITIQUE)
 # ==========================================
 with tab3:
     st.header("🪵 Demandes de Consommables & Dotations EPI")
@@ -235,33 +238,43 @@ with tab3:
         st.subheader("🦺 Demander un Équipement de Protection (EPI)")
         with st.form("form_demande_epi"):
             nom_tech_epi = st.text_input("Nom du Collaborateur")
-            epi_demande = st.text_input("EPI nécessaire (ex: Chaussures de sécu T43, Lunettes)")
-            raison_epi = st.text_input("Motif / Précision", "Renouvellement annuel / Vol / Perte")
+            epi_demande = st.text_input("EPI nécessaire (ex: Gants, Lunettes, Chaussures)")
+            code_imp_epi = st.text_input("Code Imputation Obligatoire")
+            raison_epi = st.text_input("Motif / Précision", "Renouvellement annuel / Usé sur chantier")
             
             if st.form_submit_button("Transmettre la demande d'EPI"):
-                nouvelle_demande = {
-                    "Date": datetime.now().strftime("%d/%m/%Y"),
-                    "Collaborateur": nom_tech_epi, "Type": "🦺 EPI",
-                    "Désignation": epi_demande, "Détails / Dates": raison_epi, "Statut": "En attente"
-                }
-                st.session_state.db_demandes_collaborateurs = pd.concat([st.session_state.db_demandes_collaborateurs, pd.DataFrame([nouvelle_demande])], ignore_index=True)
-                st.success("Demande d'EPI envoyée dans l'Espace d'Olivier !")
+                if not code_imp_epi.strip():
+                    st.error("🛑 Erreur : Vous devez spécifier un Code Imputation pour valider la demande d'EPI.")
+                else:
+                    nouvelle_demande = {
+                        "Date": datetime.now().strftime("%d/%m/%Y"),
+                        "Collaborateur": nom_tech_epi, "Type": "🦺 EPI",
+                        "Désignation": epi_demande, "Code Imputation": code_imp_epi.upper().strip(),
+                        "Détails / Dates": raison_epi, "Statut": "En attente"
+                    }
+                    st.session_state.db_demandes_collaborateurs = pd.concat([st.session_state.db_demandes_collaborateurs, pd.DataFrame([nouvelle_demande])], ignore_index=True)
+                    st.success("Demande d'EPI envoyée dans l'Espace d'Olivier !")
 
     with col_e2:
         st.subheader("📦 Demander du Consommable (Quincaillerie / Soudure)")
         with st.form("form_demande_cons"):
             nom_tech_cons = st.text_input("Nom du Collaborateur", key="tech_c")
-            cons_demande = st.text_input("Désignation du consommable & Quantité (ex: 5 disques à tronçonner Ø125)")
-            chantier_cons = st.text_input("Chantier concerné")
+            cons_demande = st.text_input("Désignation du consommable & Quantité (ex: 5 disques Ø125)")
+            code_imp_cons = st.text_input("Code Imputation Obligatoire")
+            chantier_cons = st.text_input("Nom / Ville du Chantier")
             
             if st.form_submit_button("Transmettre la demande de stock"):
-                nouvelle_demande = {
-                    "Date": datetime.now().strftime("%d/%m/%Y"),
-                    "Collaborateur": nom_tech_cons, "Type": "🪵 Consommable",
-                    "Désignation": cons_demande, "Détails / Dates": f"Pour Chantier : {chantier_cons}", "Statut": "En attente"
-                }
-                st.session_state.db_demandes_collaborateurs = pd.concat([st.session_state.db_demandes_collaborateurs, pd.DataFrame([nouvelle_demande])], ignore_index=True)
-                st.success("Besoin consommable envoyé dans l'Espace d'Olivier !")
+                if not code_imp_cons.strip():
+                    st.error("🛑 Erreur : Vous devez spécifier un Code Imputation pour valider le consommable.")
+                else:
+                    nouvelle_demande = {
+                        "Date": datetime.now().strftime("%d/%m/%Y"),
+                        "Collaborateur": nom_tech_cons, "Type": "🪵 Consommable",
+                        "Désignation": cons_demande, "Code Imputation": code_imp_cons.upper().strip(),
+                        "Détails / Dates": f"Lieu : {chantier_cons}", "Statut": "En attente"
+                    }
+                    st.session_state.db_demandes_collaborateurs = pd.concat([st.session_state.db_demandes_collaborateurs, pd.DataFrame([nouvelle_demande])], ignore_index=True)
+                    st.success("Besoin consommable envoyé dans l'Espace d'Olivier !")
 
 
 # ==========================================
@@ -275,4 +288,4 @@ with tab4:
 # Barre latérale
 st.sidebar.image("https://img.icons8.com/clouds/100/000000/crane.png", width=60)
 st.sidebar.title("Navigation")
-st.sidebar.info("Application Interne v1.6 — SOC Industrie. Le guichet unique logistique d'Olivier est maintenant actif.")
+st.sidebar.info("Application Interne v1.7 — SOC Industrie. Traçabilité analytique par Code Imputation activée.")

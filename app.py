@@ -67,21 +67,44 @@ def initialiser_db():
         CREATE TABLE IF NOT EXISTS stocks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nom TEXT, marque TEXT, reference TEXT, fournisseur TEXT,
-            quantite INTEGER, seuil_mini INTEGER DEFAULT 5, seuil_maxi INTEGER DEFAULT 50,
+            quantite INTEGER DEFAULT 0, seuil_mini INTEGER DEFAULT 5, seuil_maxi INTEGER DEFAULT 50,
             type_article TEXT DEFAULT 'Consommable', photo_data TEXT
         )
     ''')
+    
+    # NOUVELLE TABLE : Gestion des déclinaisons (Tailles, Dimensions...)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS variantes_stock (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            article_id INTEGER,
+            caracteristique TEXT,
+            quantite INTEGER DEFAULT 0,
+            FOREIGN KEY(article_id) REFERENCES stocks(id) ON DELETE CASCADE
+        )
+    ''')
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sorties_stocks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            article_id INTEGER, technicien TEXT, num_affaire TEXT,
-            quantite_sortie INTEGER, date_sortie TEXT
+            article_id INTEGER, variante_id INTEGER, technicien TEXT, num_affaire TEXT,
+            quantite_sortie INTEGER, caracteristique TEXT, date_sortie TEXT
         )
     ''')
     conn.commit()
     conn.close()
 
 initialiser_db()
+
+# Recalculer le total général dans la table stocks par sécurité
+def recalculer_total_stock(article_id):
+    conn = connexion_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT SUM(quantite) FROM variantes_stock WHERE article_id = ?", (article_id,))
+    total = cursor.fetchone()[0]
+    total = total if total is not None else 0
+    cursor.execute("UPDATE stocks SET quantite = ? WHERE id = ?", (total, article_id))
+    conn.commit()
+    conn.close()
 
 # --- ENVOI DE MAIL ---
 def generer_lien_mail(sujet, corps):
@@ -93,6 +116,7 @@ def generer_lien_mail(sujet, corps):
 conn = connexion_db()
 df_mat = pd.read_sql_query("SELECT * FROM materiel", conn)
 df_stock_total = pd.read_sql_query("SELECT * FROM stocks", conn)
+df_variantes_toutes = pd.read_sql_query("SELECT * FROM variantes_stock", conn)
 conn.close()
 
 # --- LECTURE SÉCURISÉE DES PARAMÈTRES ---
@@ -199,35 +223,61 @@ with tab3:
                 afficher_image_securisee(row['photo_data'], width=120)
                 st.markdown(f"**{row['nom']}**")
                 
-                # Alerte de couleur si le stock atteint le seuil mini
+                # Récupération et affichage des variantes pour cet article
+                vars_art = df_variantes_toutes[df_variantes_toutes['article_id'] == row['id']]
+                
                 qte_actuelle = int(row['quantite'])
                 seuil_critique = int(row['seuil_mini']) if row['seuil_mini'] is not None else 5
                 
                 if qte_actuelle <= 0:
-                    st.error(f"🚨 RUPTURE DE STOCK : **{qte_actuelle}**")
+                    st.error(f"🚨 RUPTURE DE STOCK GÉNÉRALE : **{qte_actuelle}**")
                 elif qte_actuelle <= seuil_critique:
-                    st.warning(f"⚠️ Stock Critique : **{qte_actuelle}** (Seuil mini: {seuil_critique})")
+                    st.warning(f"⚠️ Stock Total Critique : **{qte_actuelle}** (Seuil: {seuil_critique})")
                 else:
-                    st.success(f"✅ Stock Ok : **{qte_actuelle}**")
+                    st.success(f"✅ Stock Total OK : **{qte_actuelle}**")
+                
+                # Petit affichage propre des déclinaisons sous le statut
+                if not vars_art.empty:
+                    texte_variantes = " / ".join([f"`{r['caracteristique']}`: **{r['quantite']}**" for _, r in vars_art.iterrows()])
+                    st.markdown(f"📊 **Détail :** {texte_variantes}")
+                else:
+                    st.caption("ℹ️ Aucune taille/dimension configurée.")
                     
                 st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}")
                 st.write("---")
         
         st.write("### 🛠️ Déclarer un retrait de consommable")
         with st.form("form_sort_c"):
-            art_id = st.selectbox("Article prélevé", df_conso['id'].tolist(), format_func=lambda x: f"{df_conso[df_conso['id']==x]['nom'].values[0]} (En stock : {df_conso[df_conso['id']==x]['quantite'].values[0]})")
+            art_id = st.selectbox("Article prélevé", df_conso['id'].tolist(), format_func=lambda x: f"{df_conso[df_conso['id']==x]['nom'].values[0]} (En stock global : {df_conso[df_conso['id']==x]['quantite'].values[0]})")
+            
+            # Sélectionner dynamiquement la variante disponible pour cet article
+            df_v_dispos = df_variantes_toutes[df_variantes_toutes['article_id'] == art_id]
+            if not df_v_dispos.empty:
+                var_id = st.selectbox("Dimension / Caractéristique disponible", df_v_dispos['id'].tolist(), format_func=lambda x: f"{df_v_dispos[df_v_dispos['id']==x]['caracteristique'].values[0]} (Dispo: {df_v_dispos[df_v_dispos['id']==x]['quantite'].values[0]})")
+            else:
+                var_id = None
+                st.error("⚠️ Cet article n'a pas de caractéristiques/tailles enregistrées en base. Créez-en une en Administration.")
+                
             t_nom = st.text_input("Nom du Technicien")
             a_nom = st.text_input("N° d'affaire")
             q_s = st.number_input("Quantité retirée", min_value=1, value=1)
             
-            if st.form_submit_button("Déclarer la sortie"):
+            if st.form_submit_button("Déclarer la sortie") and var_id:
                 conn = connexion_db()
-                # 1. Mise à jour de la quantité
-                conn.execute("UPDATE stocks SET quantite = quantite - ? WHERE id = ?", (q_s, art_id))
+                # 1. Prélèvement sur la variante
+                conn.execute("UPDATE variantes_stock SET quantite = quantite - ? WHERE id = ?", (q_s, var_id))
+                
+                # Récupération du nom de la caractéristique pour l'historique
+                carac_nom = df_v_dispos[df_v_dispos['id'] == var_id]['caracteristique'].values[0]
+                
                 # 2. Enregistrement dans l'historique
-                conn.execute("INSERT INTO sorties_stocks (article_id, technicien, num_affaire, quantite_sortie, date_sortie) VALUES (?, ?, ?, ?, ?)", (art_id, t_nom, a_nom, q_s, datetime.now().strftime('%Y-%m-%d %H:%M')))
+                conn.execute("INSERT INTO sorties_stocks (article_id, variante_id, technicien, num_affaire, quantite_sortie, caracteristique, date_sortie) VALUES (?, ?, ?, ?, ?, ?, ?)", (art_id, var_id, t_nom, a_nom, q_s, carac_nom, datetime.now().strftime('%Y-%m-%d %H:%M')))
                 conn.commit()
                 conn.close()
+                
+                # 3. Recalcul automatique du total
+                reculculer_total_stock(art_id)
+                
                 st.success("Prélèvement enregistré !")
                 st.session_state["derniere_sortie_id"] = art_id
                 st.rerun()
@@ -241,7 +291,7 @@ with tab3:
         if not art_verif.empty:
             row_v = art_verif.iloc[0]
             if int(row_v['quantite']) <= int(row_v['seuil_mini']):
-                st.error(f"🛑 Attention ! Le stock de **{row_v['nom']}** est descendu à **{row_v['quantite']}** (Seuil mini : {row_v['seuil_mini']}).")
+                st.error(f"🛑 Attention ! Le stock global de **{row_v['nom']}** est descendu à **{row_v['quantite']}** (Seuil mini : {row_v['seuil_mini']}).")
                 sujet_alerte = f"[ALERTE REAPPRO] Stock critique : {row_v['nom']}"
                 corps_alerte = f"Bonjour Olivier,\n\nLe consommable suivant a atteint son seuil d'alerte à l'atelier :\n• Article : {row_v['nom']}\n• Référence : {row_v['reference']}\n• Stock restant : {row_v['quantite']} (Seuil d'alerte : {row_v['seuil_mini']})\n\nMerci de prévoir un réapprovisionnement."
                 st.markdown(f'<a href="{generer_lien_mail(sujet_alerte, corps_alerte)}" target="_blank" style="display:inline-block; padding:12px; background-color:#FF4B4B; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">📧 Envoyer l\'alerte réappro à Olivier</a>', unsafe_allow_html=True)
@@ -252,7 +302,7 @@ with tab3:
     conn = connexion_db()
     df_historique = pd.read_sql_query('''
         SELECT s.date_sortie as 'Date', st.type_article as 'Type', st.nom as 'Désignation', 
-               st.reference as 'Référence', s.quantite_sortie as 'Quantité', 
+               s.caracteristique as 'Taille / Dim', s.quantite_sortie as 'Quantité', 
                s.technicien as 'Technicien', s.num_affaire as 'N° Affaire'
         FROM sorties_stocks s
         JOIN stocks st ON s.article_id = st.id
@@ -277,16 +327,24 @@ with tab4:
                 afficher_image_securisee(row['photo_data'], width=120)
                 st.markdown(f"**{row['nom']}**")
                 
-                # Alerte de couleur si le stock atteint le seuil mini
+                # Récupération et affichage des variantes pour cet EPI
+                vars_epi = df_variantes_toutes[df_variantes_toutes['article_id'] == row['id']]
+                
                 qte_actuelle_epi = int(row['quantite'])
                 seuil_critique_epi = int(row['seuil_mini']) if row['seuil_mini'] is not None else 5
                 
                 if qte_actuelle_epi <= 0:
-                    st.error(f"🚨 RUPTURE : **{qte_actuelle_epi}**")
+                    st.error(f"🚨 RUPTURE GÉNÉRALE : **{qte_actuelle_epi}**")
                 elif qte_actuelle_epi <= seuil_critique_epi:
-                    st.warning(f"⚠️ Stock Faible : **{qte_actuelle_epi}** (Mini: {seuil_critique_epi})")
+                    st.warning(f"⚠️ Stock Total Faible : **{qte_actuelle_epi}** (Mini: {seuil_critique_epi})")
                 else:
-                    st.success(f"✅ En stock : **{qte_actuelle_epi}**")
+                    st.success(f"✅ En stock Total : **{qte_actuelle_epi}**")
+                
+                if not vars_epi.empty:
+                    texte_vars_epi = " / ".join([f"`{r['caracteristique']}`: **{r['quantite']}**" for _, r in vars_epi.iterrows()])
+                    st.markdown(f"📏 **Tailles :** {texte_vars_epi}")
+                else:
+                    st.caption("ℹ️ Aucune taille configurée.")
                     
                 st.caption(f"Marque: {row['marque']} | Réf: {row['reference']}")
                 st.write("---")
@@ -296,24 +354,32 @@ with tab4:
             col_epi1, col_epi2 = st.columns(2)
             with col_epi1:
                 epi_id = st.selectbox("EPI demandé", df_epi['id'].tolist(), format_func=lambda x: df_epi[df_epi['id']==x]['nom'].values[0])
+                
+                df_v_epi = df_variantes_toutes[df_variantes_toutes['article_id'] == epi_id]
+                if not df_v_epi.empty:
+                    var_epi_id = st.selectbox("Taille / Pointure disponible à l'atelier", df_v_epi['id'].tolist(), format_func=lambda x: f"Taille {df_v_epi[df_v_epi['id']==x]['caracteristique'].values[0]} (Restant: {df_v_epi[df_v_epi['id']==x]['quantite'].values[0]})")
+                else:
+                    var_epi_id = None
+                    st.error("⚠️ Aucune taille configurée en base pour cet EPI.")
+                    
                 sal = st.text_input("Salarié demandeur / Technicien")
                 motif = st.text_input("Affaire de destination / Motif")
             with col_epi2:
                 qte_demandee = st.number_input("Quantité souhaitée", min_value=1, value=1, step=1)
-                taille_demandee = st.text_input("Taille ou Pointure (ex: XL, 43, M...)", value="-")
                 valider_sortie_epi_direct = st.checkbox("Déduire directement du stock disponible à l'atelier")
             
-            if st.form_submit_button("📩 Préparer le Mail pour Olivier"):
+            if st.form_submit_button("📩 Préparer le Mail pour Olivier") and var_epi_id:
                 n_epi = df_epi[df_epi['id']==epi_id]['nom'].values[0]
                 ref_epi = df_epi[df_epi['id']==epi_id]['reference'].values[0]
+                taille_selectionnee = df_v_epi[df_v_epi['id']==var_epi_id]['caracteristique'].values[0]
                 
-                # Si coché, on déduit du stock et on met dans l'historique
                 if valider_sortie_epi_direct:
                     conn = connexion_db()
-                    conn.execute("UPDATE stocks SET quantite = quantite - ? WHERE id = ?", (qte_demandee, epi_id))
-                    conn.execute("INSERT INTO sorties_stocks (article_id, technicien, num_affaire, quantite_sortie, date_sortie) VALUES (?, ?, ?, ?, ?)", (epi_id, sal, motif, qte_demandee, datetime.now().strftime('%Y-%m-%d %H:%M')))
+                    conn.execute("UPDATE variantes_stock SET quantite = quantite - ? WHERE id = ?", (qte_demandee, var_epi_id))
+                    conn.execute("INSERT INTO sorties_stocks (article_id, variante_id, technicien, num_affaire, quantite_sortie, caracteristique, date_sortie) VALUES (?, ?, ?, ?, ?, ?, ?)", (epi_id, var_epi_id, sal, motif, qte_demandee, taille_selectionnee, datetime.now().strftime('%Y-%m-%d %H:%M')))
                     conn.commit()
                     conn.close()
+                    reculculer_total_stock(epi_id)
                 
                 s_mail = f"[EPI] Demande de matériel - {sal}"
                 c_mail = (
@@ -322,7 +388,7 @@ with tab4:
                     f"• Salarié : {sal}\n"
                     f"• Équipement : {n_epi} (Réf : {ref_epi})\n"
                     f"• Quantité demandée : {qte_demandee}\n"
-                    f"• Taille / Pointure : {taille_demandee}\n"
+                    f"• Taille / Pointure choisie : {taille_selectionnee}\n"
                     f"• Motif / N° Affaire : {motif}\n\n"
                     f"Merci d'avance.\nCordialement."
                 )
@@ -349,7 +415,9 @@ with tab5:
 # --- TAB 6 : ADMINISTRATION ---
 with tab6:
     st.subheader("⚙️ Panneau d'Administration")
-    subtab_creer, subtab_modifier = st.tabs(["➕ Créer des Articles / Machines", "✏️ Modifier ou Supprimer un Article existant"])
+    subtab_creer, subtab_variantes, subtab_modifier = st.tabs([
+        "➕ Créer des Articles / Machines", "📏 Gérer les Tailles & Dimensions", "✏️ Modifier ou Supprimer un Article"
+    ])
     
     with subtab_creer:
         st.write("### ➕ Ajouter une Machine")
@@ -372,7 +440,8 @@ with tab6:
                 st.rerun()
                     
         st.write("---")
-        st.write("### ➕ Ajouter un Consommable / EPI")
+        st.write("### ➕ Ajouter un Nouveau Modèle d'Article (Consommable / EPI)")
+        st.info("💡 Étape 1 : Créez la fiche de l'article ici. Étape 2 : Allez dans l'onglet 'Gérer les Tailles' pour lui attribuer ses stocks spécifiques.")
         with st.form("f_add_s"):
             c3, c4 = st.columns(2)
             with c3:
@@ -381,28 +450,77 @@ with tab6:
                 m_s = st.text_input("Marque")
                 r_s = st.text_input("Référence")
                 f_s = st.text_input("Fournisseur")
-                q_i = st.number_input("Stock initial", min_value=0, value=10)
-                s_mini = st.number_input("Seuil Minimal d'alerte", min_value=0, value=5)
+                s_mini = st.number_input("Seuil Minimal d'alerte global", min_value=0, value=5)
             with c4:
                 fichier_photo_s = st.file_uploader("📸 Capture écran ou Photo (JPG/PNG) - Article", type=["jpg", "jpeg", "png"], key="add_s_photo")
                 
             if st.form_submit_button("Enregistrer l'Article"):
                 p_base64_s = convertir_image_en_base64(fichier_photo_s)
                 conn = connexion_db()
-                conn.execute("INSERT INTO stocks (nom, marque, reference, fournisseur, quantite, seuil_mini, seuil_maxi, type_article, photo_data) VALUES (?,?,?,?,?,?,100,?,?)", (n_s, m_s, r_s, f_s, q_i, s_mini, t_s, p_base64_s))
+                # Stock initialisé à 0, il montera au fur et à mesure de la création des tailles
+                conn.execute("INSERT INTO stocks (nom, marque, reference, fournisseur, quantite, seuil_mini, seuil_maxi, type_article, photo_data) VALUES (?,?,?,?,?,?,100,?,?)", (n_s, m_s, r_s, f_s, 0, s_mini, t_s, p_base64_s))
                 conn.commit()
                 conn.close()
-                st.success("Article enregistré !")
+                st.success("Modèle d'article créé ! Pensez à lui ajouter ses tailles/dimensions dans le second onglet.")
                 st.rerun()
 
+    # NOUVEL ONGLET : Création, modification et réapprovisionnement des tailles/dimensions
+    with subtab_variantes:
+        st.write("### 📏 Gestion des Variantes (Tailles, Pointures, Dimensions)")
+        if df_stock_total.empty:
+            st.info("Créez d'abord un article pour lui attribuer des déclinaisons.")
+        else:
+            art_sel_id = st.selectbox(
+                "Sélectionner l'article à configurer ou réapprovisionner",
+                options=df_stock_total['id'].tolist(),
+                format_func=lambda x: f"[{df_stock_total[df_stock_total['id']==x]['type_article'].values[0]}] {df_stock_total[df_stock_total['id']==x]['nom'].values[0]}"
+            )
+            
+            # Afficher les tailles déjà existantes pour cet article
+            df_existantes = df_variantes_toutes[df_variantes_toutes['article_id'] == art_sel_id]
+            if not df_existantes.empty:
+                st.write("**Variantes existantes pour cet article :**")
+                st.dataframe(df_existantes[['id', 'caracteristique', 'quantite']], use_container_width=True, hide_index=True)
+            
+            st.write("#### ➕ Ajouter ou Modifier le stock d'une variante")
+            with st.form("form_gestion_variante"):
+                carac_input = st.text_input("Taille ou Dimension (ex: M, XL, 8x70, 10x100)", placeholder="Ex: XL")
+                qte_input = st.number_input("Quantité en stock pour cette variante", min_value=0, value=10)
+                
+                if st.form_submit_button("💾 Enregistrer la variante"):
+                    carac_input = carac_input.strip()
+                    if carac_input == "":
+                        st.error("La taille/dimension ne peut pas être vide.")
+                    else:
+                        conn = connexion_db()
+                        cursor = conn.cursor()
+                        # Vérifier si cette variante précise existe déjà pour cet article
+                        cursor.execute("SELECT id FROM variantes_stock WHERE article_id = ? AND caracteristique = ?", (art_sel_id, carac_input))
+                        existe = cursor.fetchone()
+                        
+                        if existe:
+                            # Mise à jour directe
+                            cursor.execute("UPDATE variantes_stock SET quantite = ? WHERE id = ?", (qte_input, existe[0]))
+                            st.success(f"Mise à jour de la taille `{carac_input}` enregistrée.")
+                        else:
+                            # Nouvelle insertion
+                            cursor.execute("INSERT INTO variantes_stock (article_id, caracteristique, quantite) VALUES (?, ?, ?)", (art_sel_id, carac_input, qte_input))
+                            st.success(f"Nouvelle variante `{carac_input}` ajoutée avec succès.")
+                        
+                        conn.commit()
+                        conn.close()
+                        recalculer_total_stock(art_sel_id)
+                        st.rerun()
+
     with subtab_modifier:
-        st.write("### ✏️ Éditer un Consommable ou un EPI")
+        st.write("### ✏️ Éditer la Fiche Générale d'un Article")
         if df_stock_total.empty:
             st.info("Aucun article en stock à modifier.")
         else:
             id_article_choisi = st.selectbox(
                 "Sélectionner l'article à modifier ou à supprimer",
                 options=df_stock_total['id'].tolist(),
+                key="sb_edit_art",
                 format_func=lambda x: f"[{df_stock_total[df_stock_total['id']==x]['type_article'].values[0]}] {df_stock_total[df_stock_total['id']==x]['nom'].values[0]}"
             )
             
@@ -417,29 +535,31 @@ with tab6:
                     edit_ref = st.text_input("Référence", value=art_actuel['reference'])
                 with col_mod2:
                     edit_fourn = st.text_input("Fournisseur", value=art_actuel['fournisseur'])
-                    edit_qte = st.number_input("Quantité en Stock", min_value=0, value=int(art_actuel['quantite']))
-                    edit_seuil = st.number_input("Modifier le Seuil Minimal", min_value=0, value=int(art_actuel['seuil_mini'] if art_actuel['seuil_mini'] is not None else 5))
+                    st.info(f"📈 Stock total actuel (calculé) : **{art_actuel['quantite']}** unités.")
+                    edit_seuil = st.number_input("Modifier le Seuil Minimal Global", min_value=0, value=int(art_actuel['seuil_mini'] if art_actuel['seuil_mini'] is not None else 5))
                     fichier_photo_edit = st.file_uploader("Remplacer la photo", type=["jpg", "jpeg", "png"], key="edit_photo")
                 
                 btn_col1, btn_col2 = st.columns([1, 4])
                 with btn_col1:
-                    sauvegarder_changement = st.form_submit_button("💾 Enregistrer")
+                    sauvegarder_changement = st.form_submit_button("💾 Enregistrer les infos")
                 with btn_col2:
-                    supprimer_definitivement = st.form_submit_button("🗑️ Supprimer l'article")
+                    supprimer_definitivement = st.form_submit_button("🗑️ Supprimer l'article et ses tailles")
 
             if sauvegarder_changement:
                 nouveau_b64 = convertir_image_en_base64(fichier_photo_edit) if fichier_photo_edit is not None else art_actuel['photo_data']
                 conn = connexion_db()
-                conn.execute('UPDATE stocks SET nom=?, type_article=?, marque=?, reference=?, fournisseur=?, quantite=?, seuil_mini=?, photo_data=? WHERE id=?', (edit_nom, edit_type, edit_marque, edit_ref, edit_fourn, edit_qte, edit_seuil, nouveau_b64, id_article_choisi))
+                conn.execute('UPDATE stocks SET nom=?, type_article=?, marque=?, reference=?, fournisseur=?, seuil_mini=?, photo_data=? WHERE id=?', (edit_nom, edit_type, edit_marque, edit_ref, edit_fourn, edit_seuil, nouveau_b64, id_article_choisi))
                 conn.commit()
                 conn.close()
-                st.success("Mis à jour avec succès !")
+                st.success("Fiche article mise à jour avec succès !")
                 st.rerun()
                 
             if supprimer_definitivement:
                 conn = connexion_db()
+                # Supprime l'article ainsi que ses variantes associées grâce au ON DELETE CASCADE
                 conn.execute("DELETE FROM stocks WHERE id=?", (id_article_choisi,))
+                conn.execute("DELETE FROM variantes_stock WHERE article_id=?", (id_article_choisi,))
                 conn.commit()
                 conn.close()
-                st.warning("Article supprimé.")
+                st.warning("Article et toutes ses déclinaisons supprimés.")
                 st.rerun()

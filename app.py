@@ -58,12 +58,14 @@ with tab5:
                 num_serie = st.text_input("N° de Série")
             
             st.subheader("📸 Photo du matériel")
-            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True)
+            source_photo = st.radio("Source :", ["Aucune", "Fichier"], horizontal=True)
+            
+            # On initialise la variable
             uploaded_file = None
+            
+            # Le "if" est ici, et la ligne suivante DOIT être décalée
             if source_photo == "Fichier":
-            uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'])
-            elif source_photo == "Caméra":
-            uploaded_file = st.camera_input("Prendre une photo")
+                uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'])
             
             if st.form_submit_button("Enregistrer et générer QR Code"):
                 # Requête SQL mise à jour avec les colonnes existantes

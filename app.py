@@ -1,40 +1,52 @@
 import streamlit as st
-import pandas as pd
 import sqlalchemy
+import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta
+import urllib.parse
+import base64
 
-# ... (Après vos imports et st.set_page_config)
+# 1. CONFIGURATION
+st.set_page_config(page_title="SOC Industrie — Gestion Interne", page_icon="🏗️", layout="wide")
+st.title("🏗️ SOC Industrie — Gestion Interne")
 
-# 1. Connexion (Engine)
-engine = init_connection()
+# 2. DÉFINITION DE LA CONNEXION (Doit être défini AVANT d'être appelé)
+@st.cache_resource
+def init_connection():
+    # Remplacez "VotreMotDePasse" par votre vrai mot de passe Supabase
+    db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:VotreMotDePasse@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
+    return sqlalchemy.create_engine(db_url)
 
-# 2. Définition des fonctions de chargement
+# 3. INITIALISATION DU MOTEUR
+try:
+    engine = init_connection()
+    with engine.connect() as conn:
+        pass
+except Exception as e:
+    st.error(f"Erreur de connexion : {e}")
+    st.stop()
+
+# 4. FONCTIONS DE CHARGEMENT
 def charger_materiel():
-    query = 'SELECT ... FROM materiel;' # Votre requête ici
+    query = 'SELECT id AS "ID", nom AS "Nom", categorie AS "Catégorie", statut AS "Statut", detenteur AS "Détenteur", date_controle AS "Date Contrôle", intervalle_mois AS "Intervalle (mois)", prochain_controle AS "Prochain Contrôle", photo_base64 AS "Photo", marque AS "Marque", reference AS "Référence", num_serie AS "N° de Série" FROM materiel;'
     return pd.read_sql(query, engine)
 
 def charger_demandes():
-    query = 'SELECT ... FROM demandes_collaborateurs;' # Votre requête ici
+    query = 'SELECT date_demande AS "Date", collaborateur AS "Collaborateur", type_demande AS "Type", designation AS "Désignation", code_imputation AS "Code Imputation", details AS "Détails / Dates", statut AS "Statut" FROM demandes_collaborateurs;'
     return pd.read_sql(query, engine)
 
-# 3. INITIALISATION DES DONNÉES (CRUCIAL)
-# Ces deux lignes doivent être placées ICI, avant la création des onglets
-try:
-    df_materiel_reel = charger_materiel()
-    df_demandes_reel = charger_demandes()
-except Exception as e:
-    st.error("Erreur lors du chargement des données. Vérifiez votre connexion SQL.")
-    st.stop()
+# 5. CHARGEMENT DES DONNÉES
+df_materiel_reel = charger_materiel()
+df_demandes_reel = charger_demandes()
 
-# 4. Création des onglets
+# 6. CRÉATION DES ONGLETS
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
-    "👑 Tableau de Bord Olivier", 
-    "🛒 Catalogues EPI/Consommables/Outillage", 
-    "📦 Matériels Commun", 
-    "📅 Réservation matériel",
-    "📍 Carte de localisation du matériel"
+    "👑 ESPACE OLIVIER : Centralisation & Logistique",
+    "🛒 CATALOGUE MAGASIN (EPI / Consommables)",
+    "🛠️ CATALOGUE VISUEL & REGISTRE MATÉRIEL", 
+    "📅 Sorties & Mouvements Terrain", 
+    "📍 Carte des Chantiers"
 ])
-
 # 5. Contenu des onglets
 with tab0:
     st.header("👑 Tableau de Bord Olivier")

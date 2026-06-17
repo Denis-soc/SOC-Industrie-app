@@ -54,10 +54,14 @@ with tab5:
 
     # --- FONCTION FORMULAIRE PARTAGÉ ---
     def afficher_formulaire(donnees=None):
+        # Affichage de la photo actuelle si en mode modification
+        if donnees is not None and donnees.get('photo_data'):
+            st.image(base64.b64decode(donnees['photo_data']), width=200, caption="Photo actuelle")
+
         with st.form("form_partage"):
             col1, col2 = st.columns(2)
             
-            # Récupération des valeurs existantes si mode modification
+            # Valeurs par défaut
             id_v = donnees['id'] if donnees is not None else ""
             nom_v = donnees['nom'] if donnees is not None else ""
             fourn_v = donnees['fournisseur'] if donnees is not None else ""
@@ -68,37 +72,50 @@ with tab5:
             nom = col1.text_input("Nom de l'article", value=nom_v)
             fournisseur = col1.text_input("Fournisseur", value=fourn_v)
             
+            categorie = col2.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"], index=0)
             ref = col2.text_input("Référence / Modèle", value=ref_v)
             num_serie = col2.text_input("N° de Série", value=serie_v)
             
-            # Maintenance (optionnel dans le formulaire)
             st.subheader("📅 Suivi et Maintenance")
-            soumis_verif = st.checkbox("Soumis à contrôle ?", key="maint_check")
-            date_c = None
-            perio = 0
+            soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?", key="maint_check")
+            date_c, perio = None, 0
             if soumis_verif:
                 c_m1, c_m2 = st.columns(2)
                 date_c = c_m1.date_input("Date dernier contrôle")
                 perio = c_m2.number_input("Périodicité (mois)", value=12)
 
-            btn_label = "Mettre à jour" if donnees is not None else "Enregistrer"
+            st.subheader("📸 Photo du matériel")
+            source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True)
+            uploaded_file = None
+            if source_photo == "Fichier":
+                uploaded_file = st.file_uploader("Déposer une image", type=['png', 'jpg'])
+            elif source_photo == "Caméra":
+                uploaded_file = st.camera_input("Prendre une photo")
+
+            btn_label = "Mettre à jour" if donnees is not None else "Enregistrer et générer QR Code"
             
             if st.form_submit_button(btn_label):
+                # Conversion photo
+                photo_data = base64.b64encode(uploaded_file.getvalue()).decode('utf-8') if uploaded_file else None
+                
                 try:
                     with engine.begin() as conn:
                         if donnees is None: # CRÉATION
                             query = sqlalchemy.text("""
-                                INSERT INTO materiel (id, nom, fournisseur, reference, num_serie, date_controle, intervalle_mois) 
-                                VALUES (:id, :nom, :fourn, :ref, :serie, :date_c, :perio)
+                                INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, date_controle, intervalle_mois, photo_data) 
+                                VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :date_c, :perio, :pdata)
                             """)
-                            conn.execute(query, {"id": num_interne, "nom": nom, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio})
-                            st.success("Matériel créé avec succès !")
+                            conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "pdata": photo_data})
+                            st.success("Matériel créé !")
                         else: # MODIFICATION
-                            query = sqlalchemy.text("""
-                                UPDATE materiel SET nom = :nom, fournisseur = :fourn, reference = :ref, num_serie = :serie, date_controle = :date_c, intervalle_mois = :perio
-                                WHERE id = :id
-                            """)
-                            conn.execute(query, {"nom": nom, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne})
+                            update_query = "UPDATE materiel SET nom=:nom, fournisseur=:fourn, reference=:ref, num_serie=:serie, date_controle=:date_c, intervalle_mois=:perio"
+                            if photo_data: update_query += ", photo_data=:pdata"
+                            update_query += " WHERE id=:id"
+                            
+                            params = {"nom": nom, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne}
+                            if photo_data: params["pdata"] = photo_data
+                            
+                            conn.execute(sqlalchemy.text(update_query), params)
                             st.success("Matériel mis à jour !")
                     st.rerun()
                 except Exception as e:
@@ -126,5 +143,3 @@ with tab5:
                     conn.execute(sqlalchemy.text("DELETE FROM materiel WHERE id = :id"), {"id": id_del})
                 st.success("Supprimé !")
                 st.rerun()
-        else:
-            st.warning("Aucun matériel à supprimer.")

@@ -123,28 +123,35 @@ with tab1:
      for prod in CATALOGUE_TOTAL:
         if filtre_type != "Tous" and prod["type"] != filtre_type: 
             continue
+            
+        # Tout ce qui suit doit être aligné ici (8 espaces)
         with st.container(border=True):
-               c_img, c_txt, c_form = st.columns([1, 2, 1.5])
+            c_img, c_txt, c_form = st.columns([1, 2, 1.5])
+            
+            # Gestion de l'image
+            photo_url = prod.get("photo")
+            if photo_url:
+                c_img.image(photo_url, width=100)
+            else:
+                c_img.write("Pas d'image")
                 
-                # Gestion image
-                photo_url = prod.get("photo")
-                if photo_url:
-                    c_img.image(photo_url, width=100)
-                else:
-                    c_img.write("Pas d'image")
-                
-                # Texte
-                with c_txt:
-                    st.markdown(f"### {prod['nom']}")
-                    st.caption(f"**Marque :** {prod['marque']} | **Ref :** {prod['ref']}\n\n{prod['desc']}")
-    with col_panier:
-        st.subheader("🛒 Mon Panier")
-        if not st.session_state.panier: st.info("Panier vide.")
-        else:
-            st.dataframe(pd.DataFrame(st.session_state.panier), use_container_width=True, hide_index=True)
-            if st.button("🗑️ Vider", use_container_width=True):
-                st.session_state.panier = []
-                st.rerun()
+            # Texte du produit
+            with c_txt:
+                st.markdown(f"### {prod['nom']}")
+                st.caption(f"**Marque :** {prod['marque']} | **Ref :** {prod['ref']}\n\n{prod['desc']}")
+            
+            # Formulaire
+            with c_form:
+                t_choisie = st.selectbox("Option / Taille", prod["tailles"], key=f"t_{prod['id']}")
+                q_choisie = st.number_input("Quantité", min_value=1, value=1, key=f"q_{prod['id']}")
+                if st.button("➕ Ajouter", key=f"b_{prod['id']}", use_container_width=True):
+                    st.session_state.panier.append({
+                        "type": prod["type"], 
+                        "designation": f"{prod['nom']} ({prod['marque']})", 
+                        "taille": t_choisie, 
+                        "qte": q_choisie
+                    })
+                    st.rerun()
             st.markdown("---")
             with st.form("form_panier"):
                 nom_c = st.text_input("Votre Nom")

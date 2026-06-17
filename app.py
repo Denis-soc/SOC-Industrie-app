@@ -84,7 +84,7 @@ with tab5:
     admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="admin_radio")
 
     # --- FONCTION FORMULAIRE PARTAGÉ ---
-def afficher_formulaire(donnees=None):
+    def afficher_formulaire(donnees=None):
         with st.form("form_partage"):
             col1, col2 = st.columns(2)
             

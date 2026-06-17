@@ -42,7 +42,7 @@ st.subheader("Données de l'application")
 
 try:
     # Utilisation de Pandas pour lire directement via la connexion SQLAlchemy
-    query = "SELECT * FROM SOC_Industrie LIMIT 10;"  # Remplacez par le nom de vos vraies tables
+    query = "SELECT * FROM materiel LIMIT 10;"  # Remplacez par le nom de vos vraies tables
     df = pd.read_sql(query, conn)
     
     if df.empty:

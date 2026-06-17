@@ -120,11 +120,11 @@ with tab1:
         filtre_type = st.radio("Filtrer par type :", ["Tous", "🦺 EPI", "🪵 Consommable", "🛠️ Outillage"], horizontal=True)
         
         # On utilise CATALOGUE_TOTAL
-        for prod in CATALOGUE_TOTAL:
-            if filtre_type != "Tous" and prod["type"] != filtre_type: 
-                continue
-          with st.container(border=True):
-                c_img, c_txt, c_form = st.columns([1, 2, 1.5])
+     for prod in CATALOGUE_TOTAL:
+        if filtre_type != "Tous" and prod["type"] != filtre_type: 
+            continue
+        with st.container(border=True):
+               c_img, c_txt, c_form = st.columns([1, 2, 1.5])
                 
                 # Gestion image
                 photo_url = prod.get("photo")

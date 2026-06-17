@@ -114,7 +114,7 @@ with tab1:
     st.header("🛒 Catalogue Magasin SOC Industrie")
     col_cat, col_panier = st.columns([3, 2])
     with col_cat:
-        filtre_type = st.radio("Filtrer par type :", ["Tous", "𦺺 EPI", "🪵 Consommable"], horizontal=True)
+        filtre_type = st.radio("Filtrer par type :", ["Tous", "🦺 EPI", "🪵 Consommable"], horizontal=True)
         for prod in CATALOGUE:
             if filtre_type != "Tous" and prod["type"] != filtre_type: continue
             with st.container(border=True):
@@ -153,7 +153,7 @@ with tab1:
                     else: st.error("Champs obligatoires manquants.")
 
 # ==========================================
-# ONGLET 2 : CATALOGUE VISUEL & ADMINISTRATION
+# ONGLET 2 : CATALOGUE VISUEL & REGISTRE
 # ==========================================
 with tab2:
     st.header("🛠️ Catalogue Commun du Parc Matériel")
@@ -221,119 +221,129 @@ with tab2:
                                     st.success("Demande envoyée !")
                                     st.rerun()
 
-    # ==========================================
-    # SECTION LOGICIELLE : MODIFIER & SUPPRIMER
-    # ==========================================
+    # ========================================================
+    # ⚙️ PANNEAU UNIQUE : CRÉER / MODIFIER / SUPPRIMER
+    # ========================================================
     st.markdown("---")
-    st.subheader("✏️ Administration : Modifier ou Supprimer un matériel existant")
+    st.subheader("⚙️ Administration Unique du Parc Matériel")
     
-    if df_materiel_reel.empty:
-        st.info("Aucun matériel disponible pour modification.")
-    else:
-        # Sélection de l'élément à modifier
-        liste_choix = df_materiel_reel["ID"] + " - " + df_materiel_reel["Nom"]
-        materiel_selectionne = st.selectbox("Choisir le matériel à éditer ou supprimer :", liste_choix)
-        
-        # Récupération de la ligne sélectionnée
-        id_selectionne = materiel_selectionne.split(" - ")[0]
-        row_actuelle = df_materiel_reel[df_materiel_reel["ID"] == id_selectionne].iloc[0]
-        
-        with st.form("form_modification"):
-            col_mod_1, col_mod_2 = st.columns(2)
-            with col_mod_1:
-                mod_nom = st.text_input("Nom de l'équipement", value=str(row_actuelle["Nom"]))
-                mod_cat = st.selectbox("Catégorie", ["Outillage Électroportatif", "Manutention", "Soudage", "Mesure"], index=["Outillage Électroportatif", "Manutention", "Soudage", "Mesure"].index(row_actuelle["Catégorie"]))
-                mod_marque = st.text_input("Marque / Fabricant", value=str(row_actuelle["Marque"]) if pd.notna(row_actuelle["Marque"]) else "")
-            with col_mod_2:
-                mod_ref = st.text_input("Référence Modèle", value=str(row_actuelle["Référence"]) if pd.notna(row_actuelle["Référence"]) else "")
-                mod_serie = st.text_input("Numéro de Série usine", value=str(row_actuelle["N° de Série"]) if pd.notna(row_actuelle["N° de Série"]) else "")
-                mod_intervalle = st.number_input("Intervalle de contrôle (mois)", min_value=1, value=int(row_actuelle["Intervalle (mois)"]))
+    # Choix de l'action principale
+    action_choisie = st.radio(
+        "Quelle action souhaitez-vous réaliser ?",
+        ["➕ Enregistrer un nouveau matériel", "✏️ Modifier un matériel existant", "🗑️ Supprimer un matériel du parc"],
+        horizontal=True
+    )
+    
+    # Initialisation des variables par défaut
+    val_id = ""
+    val_nom = ""
+    val_cat = "Outillage Électroportatif"
+    val_marque = ""
+    val_ref = ""
+    val_serie = ""
+    val_intervalle = 12
+    val_date = aujourdhui
+    desactiver_id = False
+    
+    # Logique d'affichage si Modification ou Suppression
+    if action_choisie in ["✏️ Modifier un matériel existant", "🗑️ Supprimer un matériel du parc"]:
+        if df_materiel_reel.empty:
+            st.warning("Aucun matériel enregistré dans la base de données.")
+            st.stop()
+        else:
+            liste_choix = df_materiel_reel["ID"] + " - " + df_materiel_reel["Nom"]
+            mat_selectionne = st.selectbox("Sélectionnez l'équipement cible :", liste_choix, key="select_unique_admin")
+            id_cible = mat_selectionne.split(" - ")[0]
+            row_actuelle = df_materiel_reel[df_materiel_reel["ID"] == id_cible].iloc[0]
             
-            st.markdown("**📸 Remplacer la photo (Optionnel — laisser vide pour conserver la photo actuelle) :**")
-            nouvelle_photo = st.camera_input("Prendre une nouvelle photo si besoin", key="cam_mod")
-            
-            col_btn_1, col_btn_2 = st.columns(2)
-            with col_btn_1:
-                if st.form_submit_button("💾 Enregistrer les modifications", use_container_width=True):
+            # On injecte les données de la base dans les champs du formulaire
+            val_id = str(row_actuelle["ID"])
+            val_nom = str(row_actuelle["Nom"])
+            val_cat = row_actuelle["Catégorie"]
+            val_marque = str(row_actuelle["Marque"]) if pd.notna(row_actuelle["Marque"]) else ""
+            val_ref = str(row_actuelle["Référence"]) if pd.notna(row_actuelle["Référence"]) else ""
+            val_serie = str(row_actuelle["N° de Série"]) if pd.notna(row_actuelle["N° de Série"]) else ""
+            val_intervalle = int(row_actuelle["Intervalle (mois)"])
+            desactiver_id = True # On empêche de modifier l'ID unique clé
+
+    # Affichage du formulaire unifié
+    if action_choisie == "🗑️ Supprimer un matériel du parc":
+        # Formulaire simplifié pour la suppression
+        with st.form("form_suppression_unique"):
+            st.error(f"⚠️ Vous êtes sur le point de supprimer définitivement la fiche : **{val_id} — {val_nom}** ({val_marque})")
+            confirmer = st.checkbox("Je confirme vouloir détruire ce matériel de la base de données")
+            if st.form_submit_button("💥 CONFIRMER LA SUPPRESSION DÉFINITIVE", use_container_width=True):
+                if confirmer:
                     with engine.begin() as conn_tx:
-                        # Modification de base
-                        conn_tx.execute(
-                            sqlalchemy.text("""
-                                UPDATE materiel 
-                                SET nom = :nom, categorie = :cat, marque = :marque, reference = :ref, num_serie = :serie, intervalle_mois = :inv
-                                WHERE id = :id;
-                            """),
-                            {"nom": mod_nom.strip(), "cat": mod_cat, "marque": mod_marque.strip(), "ref": mod_ref.strip(), "serie": mod_serie.strip(), "inv": int(mod_intervalle), "id": id_selectionne}
-                        )
-                        # Si une nouvelle photo a été prise, on met à jour le champ photo
-                        if nouvelle_photo is not None:
-                            bytes_data = nouvelle_photo.getvalue()
-                            image_b64_str = base64.b64encode(bytes_data).decode('utf-8')
-                            conn_tx.execute(
-                                sqlalchemy.text("UPDATE materiel SET photo_base64 = :img WHERE id = :id;"),
-                                {"img": image_b64_str, "id": id_selectionne}
-                            )
-                    st.success(f"⚡ {mod_nom} mis à jour avec succès !")
+                        conn_tx.execute(sqlalchemy.text("DELETE FROM materiel WHERE id = :id;"), {"id": val_id})
+                    st.warning(f"Le matériel [{val_id}] a été retiré.")
                     st.rerun()
+                else:
+                    st.error("Veuillez cocher la case de confirmation.")
+    else:
+        # Formulaire commun pour Création et Modification
+        with st.form("form_gestion_unique"):
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                new_id = st.text_input("Identifiant Unique SOC (ex: MAT-010)", value=val_id, disabled=desactiver_id)
+                new_nom = st.text_input("Nom de l'équipement", value=val_nom)
+                new_cat = st.selectbox("Catégorie", ["Outillage Électroportatif", "Manutention", "Soudage", "Mesure"], index=["Outillage Électroportatif", "Manutention", "Soudage", "Mesure"].index(val_cat))
+                new_marque = st.text_input("Marque / Fabricant", value=val_marque)
+            with col_f2:
+                new_ref = st.text_input("Référence Modèle", value=val_ref)
+                new_serie = st.text_input("Numéro de Série usine", value=val_serie)
+                if action_choisie == "➕ Enregistrer un nouveau matériel":
+                    new_date = st.date_input("Date du dernier contrôle", val_date)
+                new_intervalle = st.number_input("Intervalle de contrôle (en mois)", min_value=1, value=val_intervalle)
+            
+            st.markdown("**📸 Photo de l'appareil (Laisser vide en modification pour garder l'ancienne photo) :**")
+            photo_capturee = st.camera_input("Prendre la photo du matériel", key="camera_unique")
+
+            # Bouton de validation dynamique
+            texte_bouton = "🚀 Créer et ajouter au parc" if action_choisie == "➕ Enregistrer un nouveau matériel" else "💾 Enregistrer les modifications"
+            
+            if st.form_submit_button(texte_bouton, use_container_width=True):
+                if new_id.strip() and new_nom.strip():
+                    image_b64_str = ""
+                    if photo_capturee is not None:
+                        bytes_data = photo_capturee.getvalue()
+                        image_b64_str = base64.b64encode(bytes_data).decode('utf-8')
                     
-            with col_btn_2:
-                # Ajout d'une case à cocher de sécurité pour la suppression
-                st.markdown("<p style='text-align: center; color: red; font-weight: bold;'>⚠️ Zone Dangereuse</p>", unsafe_allow_html=True)
-                confirmer_suppression = st.checkbox("Je confirme vouloir détruire cette fiche matériel")
-                if st.form_submit_button("🗑️ SUPPRIMER DÉFINITIVEMENT", use_container_width=True):
-                    if confirmer_suppression:
-                        with engine.begin() as conn_tx:
-                            conn_tx.execute(sqlalchemy.text("DELETE FROM materiel WHERE id = :id;"), {"id": id_selectionne})
-                        st.warning(f"🔴 Le matériel [{id_selectionne}] a été retiré du parc.")
-                        st.rerun()
-                    else:
-                        st.error("Veuillez cocher la case de confirmation avant de supprimer.")
-
-    # SECTION CRÉATION (RESTE INCHANGÉE)
-    st.markdown("---")
-    st.subheader("✨ Administration : Enregistrer un nouveau matériel commun")
-    
-    with st.form("form_ajout_complet"):
-        col_form_1, col_form_2 = st.columns(2)
-        with col_form_1:
-            new_id = st.text_input("Identifiant Unique SOC (ex: MAT-010)")
-            new_nom = st.text_input("Nom de l'équipement (ex: Poste à souder TIG)")
-            new_cat = st.selectbox("Catégorie", ["Outillage Électroportatif", "Manutention", "Soudage", "Mesure"])
-            new_marque = st.text_input("Marque / Fabricant (ex: Fronius, Bosch)")
-        with col_form_2:
-            new_ref = st.text_input("Référence Modèle (ex: TransTig 2300)")
-            new_serie = st.text_input("Numéro de Série usine (N° de série)")
-            new_date = st.date_input("Date du dernier contrôle", aujourdhui)
-            new_intervalle = st.number_input("Intervalle de contrôle (en mois)", min_value=1, value=12)
-        
-        st.markdown("**📸 Prise de vue de la machine (Webcam ou Smartphone) :**")
-        photo_capturee = st.camera_input("Prendre la photo du matériel")
-
-        if st.form_submit_button("Ajouter définitivement au parc"):
-            if new_id.strip() and new_nom.strip():
-                image_b64_str = ""
-                if photo_capturee is not None:
-                    bytes_data = photo_capturee.getvalue()
-                    image_b64_str = base64.b64encode(bytes_data).decode('utf-8')
-                
-                prochain_calcul = new_date + timedelta(days=int(new_intervalle) * 30)
-                
-                with engine.begin() as conn_tx:
-                    conn_tx.execute(
-                        sqlalchemy.text("""
-                            INSERT INTO materiel (id, nom, categorie, statut, detenteur, date_controle, intervalle_mois, prochain_controle, photo_base64, marque, reference, num_serie)
-                            VALUES (:id, :nom, :cat, 'Disponible', 'Atelier / Agence', :dt, :inv, :prox, :img, :marque, :ref, :serie);
-                        """),
-                        {
-                            "id": new_id.strip(), "nom": new_nom.strip(), "cat": new_cat, 
-                            "dt": new_date, "inv": int(new_intervalle), "prox": prochain_calcul, 
-                            "img": image_b64_str, "marque": new_marque.strip(), "ref": new_ref.strip(), "serie": new_serie.strip()
-                        }
-                    )
-                st.success(f"🎉 Matériel {new_nom} ({new_marque}) enregistré au registre !")
-                st.rerun()
-            else:
-                st.error("L'ID et le Nom sont obligatoires.")
+                    with engine.begin() as conn_tx:
+                        if action_choisie == "➕ Enregistrer un nouveau matériel":
+                            # Action d'insertion
+                            prochain_calcul = new_date + timedelta(days=int(new_intervalle) * 30)
+                            conn_tx.execute(
+                                sqlalchemy.text("""
+                                    INSERT INTO materiel (id, nom, categorie, statut, detenteur, date_controle, intervalle_mois, prochain_controle, photo_base64, marque, reference, num_serie)
+                                    VALUES (:id, :nom, :cat, 'Disponible', 'Atelier / Agence', :dt, :inv, :prox, :img, :marque, :ref, :serie);
+                                """),
+                                {
+                                    "id": new_id.strip(), "nom": new_nom.strip(), "cat": new_cat, 
+                                    "dt": new_date, "inv": int(new_intervalle), "prox": prochain_calcul, 
+                                    "img": image_b64_str, "marque": new_marque.strip(), "ref": new_ref.strip(), "serie": new_serie.strip()
+                                }
+                            )
+                            st.success(f"🎉 Nouveau matériel {new_nom} enregistré avec succès !")
+                        else:
+                            # Action de mise à jour
+                            conn_tx.execute(
+                                sqlalchemy.text("""
+                                    UPDATE materiel 
+                                    SET nom = :nom, categorie = :cat, marque = :marque, reference = :ref, num_serie = :serie, intervalle_mois = :inv
+                                    WHERE id = :id;
+                                """),
+                                {"nom": new_nom.strip(), "cat": new_cat, "marque": new_marque.strip(), "ref": new_ref.strip(), "serie": new_serie.strip(), "inv": int(new_intervalle), "id": val_id}
+                            )
+                            if photo_capturee is not None:
+                                conn_tx.execute(
+                                    sqlalchemy.text("UPDATE materiel SET photo_base64 = :img WHERE id = :id;"),
+                                    {"img": image_b64_str, "id": val_id}
+                                )
+                            st.success(f"⚡ Fiche {new_nom} mise à jour avec succès !")
+                    st.rerun()
+                else:
+                    st.error("L'ID et le Nom sont requis.")
 
 # ==========================================
 # ONGLETS CHANTIERS & DIRECT
@@ -349,4 +359,4 @@ with tab4:
 
 st.sidebar.image("https://img.icons8.com/clouds/100/000000/crane.png", width=60)
 st.sidebar.title("Navigation")
-st.sidebar.info("Application Interne v3.2 — SOC Industrie. Module Édition & Suppression complet.")
+st.sidebar.info("Application Interne v3.3 — SOC Industrie. Panneau d'administration centralisé.")

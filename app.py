@@ -125,53 +125,47 @@ with tab1:
         st.subheader("⚙️ Gestion des fiches")
         action = st.selectbox("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
         
-        if action == "Créer une fiche":
+       if action == "Créer une fiche":
             with st.form("form_creation"):
                 col1, col2 = st.columns(2)
                 with col1:
-                    num_interne = st.text_input("Numéro interne (ex: SOC-001)")
+                    num_interne = st.text_input("Numéro interne (ex: MAT-001)")
                     nom = st.text_input("Nom de l'article")
-                    ref = st.text_input("Référence interne")
+                    # Ajout de la catégorie
+                    categorie = st.selectbox("Catégorie :", ["EPI", "Outillage", "Consommables", "Matériel Commun"])
                 with col2:
-                    fournisseur = st.text_input("Fournisseur")
-                    ref_fournisseur = st.text_input("Référence fournisseur")
+                    ref = st.text_input("Référence interne")
                     num_serie = st.text_input("N° de Série")
-                
-                # --- GESTION PHOTO (Upload ou Caméra) ---
-                photo_option = st.radio("Comment ajouter la photo ?", ["Uploader un fichier", "Prendre en direct"], horizontal=True)
-                if photo_option == "Uploader un fichier":
-                    photo = st.file_uploader("Choisir une image", type=['png', 'jpg', 'jpeg'])
-                else:
-                    photo = st.camera_input("Prendre une photo")
                 
                 st.subheader("📋 Suivi & Maintenance")
                 soumis_verif = st.checkbox("Matériel soumis à vérification/étalonnage ?")
-                periodicite, date_depart = 0, None
+                periodicite, date_depart = 12, datetime.now().date()
                 if soumis_verif:
                     c1, c2 = st.columns(2)
                     periodicite = c1.number_input("Périodicité (en mois)", min_value=1, value=12)
                     date_depart = c2.date_input("Date de départ (ou dernier contrôle)")
                 
-                if st.form_submit_button("Enregistrer et générer le QR Code"):
-                    # Requête ajustée aux colonnes réelles de votre base
+                if st.form_submit_button("Enregistrer la fiche"):
+                    # Requête mise à jour avec la catégorie
                     query = """
-                    INSERT INTO materiel (id, nom, reference, fournisseur, num_serie, 
-                                          date_controle, intervalle_mois, photo_base64)
-                    VALUES (:id, :nom, :ref, :fourn, :serie, :date_d, :perio, :photo)
+                    INSERT INTO materiel (id, nom, categorie, reference, num_serie, date_controle, intervalle_mois)
+                    VALUES (:id, :nom, :cat, :ref, :serie, :date_d, :perio)
                     """
                     
-                    with engine.begin() as conn:
-                        conn.execute(sqlalchemy.text(query), {
-                            "id": num_interne, 
-                            "nom": nom, 
-                            "ref": ref, 
-                            "fourn": fournisseur, 
-                            "serie": num_serie, 
-                            "date_d": date_depart,      # Correspond à votre colonne date_controle
-                            "perio": periodicite,       # Correspond à votre colonne intervalle_mois
-                            "photo": "image_data"       # À gérer plus tard
-                        })
-                    st.success(f"Fiche {nom} enregistrée !")
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(sqlalchemy.text(query), {
+                                "id": num_interne, 
+                                "nom": nom, 
+                                "cat": categorie, 
+                                "ref": ref, 
+                                "serie": num_serie, 
+                                "date_d": date_depart if soumis_verif else None, 
+                                "perio": periodicite if soumis_verif else None
+                            })
+                        st.success(f"Fiche {nom} ({categorie}) créée avec succès !")
+                    except Exception as e:
+                        st.error(f"Erreur technique : {e}")
                     
                     # 2. Génération du QR Code
                     info_suivi = f"Périodicité: {periodicite}m | Départ: {date_depart}" if soumis_verif else "Non soumis"

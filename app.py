@@ -23,7 +23,7 @@ def init_connection():
     return sqlalchemy.create_engine(db_url)
 
 try:
-    engine = init_connection()
+    engine = sqlalchemy.create_engine(st.secrets["DB_URL"])
     with engine.connect() as conn:
         pass
 except Exception as e:

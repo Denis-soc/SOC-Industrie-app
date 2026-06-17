@@ -39,6 +39,13 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📍 Carte de localisation du matériel",
     "⚙️ Administration Matériel" # Nouvel onglet
 ])
+# Récupération du paramètre dans l'URL
+query_params = st.query_params
+if "materiel_id" in query_params:
+    id_recherche = query_params["materiel_id"]
+    st.info(f"Recherche automatique du matériel : {id_recherche}")
+    # Ici, vous pourriez ajouter une logique pour ouvrir automatiquement 
+    # une fenêtre modale ou filtrer le catalogue sur cet ID
 # ... Onglet N°1...
 # ... Onglet N°5...
 with tab5:
@@ -90,7 +97,18 @@ with tab5:
                             "date_c": date_c, "perio": perio
                         })
                     st.success(f"Fiche {num_interne} enregistrée !")
-                    
+
+                    st.success(f"Fiche {num_interne} enregistrée !")
+
+# 1. URL de votre app (Remplacez par votre vrai lien Streamlit)
+base_url = "https://votre-url-app.streamlit.app" 
+
+# 2. Création du lien direct vers la fiche
+lien_fiche = f"{base_url}/?materiel_id={num_interne}"
+
+# 3. Génération du QR Code avec ce lien
+qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(lien_fiche)}"
+st.image(qr_url, caption="QR Code : Scannez pour accéder à la fiche")
                     # Génération du QR Code
                     qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(num_interne)}"
                     st.image(qr_url, caption="QR Code généré")

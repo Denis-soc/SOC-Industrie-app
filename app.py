@@ -153,12 +153,11 @@ with tab1:
                     date_depart = c2.date_input("Date de départ (ou dernier contrôle)")
                 
                 if st.form_submit_button("Enregistrer et générer le QR Code"):
-                    # --- LOGIQUE D'INSERTION SQL ---
-                    # Nous utilisons une requête SQL pour envoyer les données dans votre table
+                    # Requête ajustée aux colonnes réelles de votre base
                     query = """
-                    INSERT INTO materiel (id, nom, reference, fournisseur, ref_fournisseur, num_serie, 
-                                          soumis_verif, periodicite, date_depart)
-                    VALUES (:id, :nom, :ref, :fourn, :ref_f, :serie, :verif, :perio, :date_d)
+                    INSERT INTO materiel (id, nom, reference, fournisseur, num_serie, 
+                                          date_controle, intervalle_mois, photo_base64)
+                    VALUES (:id, :nom, :ref, :fourn, :serie, :date_d, :perio, :photo)
                     """
                     
                     with engine.begin() as conn:
@@ -167,14 +166,12 @@ with tab1:
                             "nom": nom, 
                             "ref": ref, 
                             "fourn": fournisseur, 
-                            "ref_f": ref_fournisseur, 
                             "serie": num_serie, 
-                            "verif": soumis_verif, 
-                            "perio": periodicite, 
-                            "date_d": date_depart
+                            "date_d": date_depart,      # Correspond à votre colonne date_controle
+                            "perio": periodicite,       # Correspond à votre colonne intervalle_mois
+                            "photo": "image_data"       # À gérer plus tard
                         })
-                    
-                    st.success(f"Fiche {nom} enregistrée et synchronisée !")
+                    st.success(f"Fiche {nom} enregistrée !")
                     
                     # 2. Génération du QR Code
                     info_suivi = f"Périodicité: {periodicite}m | Départ: {date_depart}" if soumis_verif else "Non soumis"

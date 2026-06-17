@@ -48,9 +48,6 @@ if "materiel_id" in query_params:
     # Ici, vous pourriez ajouter une logique pour ouvrir automatiquement 
     # une fenêtre modale ou filtrer le catalogue sur cet ID
 # ... Onglet N°1...
-C'est noté. Puisque votre onglet principal s'appelle tab1 et qu'il porte le nom "🛒 Catalogues EPI/Consommables/Outillage", nous allons adapter la structure pour qu'elle s'intègre parfaitement à votre interface existante.
-
-
 with tab1:
     st.header("🛒 Catalogues Matériel")
     

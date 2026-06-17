@@ -3,11 +3,17 @@ import pandas as pd
 import sqlalchemy
 import numpy as np
 
-# Configuration de la page
+# --- CONFIGURATION ---
 st.set_page_config(page_title="SOC Industrie", layout="wide")
+
+# Ajout du logo dans la barre latérale
+st.sidebar.image("https://img.icons8.com/clouds/100/000000/crane.png", width=100) # Remplacez par l'URL de votre vrai logo si besoin
+st.sidebar.title("SOC Industrie")
+st.sidebar.info("Gestion interne du parc matériel.")
+
 st.title("🏗️ SOC Industrie — Gestion Interne")
 
-# Connexion BDD
+# --- CONNEXION BDD ---
 @st.cache_resource
 def init_connection():
     try:
@@ -17,15 +23,16 @@ def init_connection():
 
 engine = init_connection()
 
-# Création des 4 onglets
-tab0, tab1, tab2, tab3 = st.tabs([
+# --- ONGLETS ---
+tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "👑 Tableau de Bord Olivier", 
     "🛒 Catalogues EPI/Consommables/Outillage", 
     "📦 Matériels Commun", 
-    "📅 Réservation matériel"
+    "📅 Réservation matériel",
+    "📍 Carte de localisation du matériel"
 ])
 
-# Structure de base
+# --- STRUCTURE DES ONGLETS ---
 with tab0:
     st.header("👑 Tableau de Bord Olivier")
     st.write("Espace centralisé de suivi.")
@@ -41,3 +48,13 @@ with tab2:
 with tab3:
     st.header("📅 Réservation matériel")
     st.write("Suivi des réservations terrain.")
+
+with tab4:
+    st.header("📍 Carte de localisation du matériel")
+    st.write("Visualisation des chantiers et du matériel sur le terrain.")
+    # Exemple de carte interactive (à remplacer par vos données réelles)
+    map_data = pd.DataFrame(
+        np.random.randn(5, 2) / [50, 50] + [47.33, -0.40], 
+        columns=['lat', 'lon']
+    )
+    st.map(map_data, zoom=10)

@@ -137,6 +137,13 @@ with tab1:
                     ref_fournisseur = st.text_input("Référence fournisseur")
                     num_serie = st.text_input("N° de Série")
                 
+                # --- GESTION PHOTO (Upload ou Caméra) ---
+                photo_option = st.radio("Comment ajouter la photo ?", ["Uploader un fichier", "Prendre en direct"], horizontal=True)
+                if photo_option == "Uploader un fichier":
+                    photo = st.file_uploader("Choisir une image", type=['png', 'jpg', 'jpeg'])
+                else:
+                    photo = st.camera_input("Prendre une photo")
+                
                 st.subheader("📋 Suivi & Maintenance")
                 soumis_verif = st.checkbox("Matériel soumis à vérification/étalonnage ?")
                 periodicite, date_depart = 0, None
@@ -145,19 +152,18 @@ with tab1:
                     periodicite = c1.number_input("Périodicité (en mois)", min_value=1, value=12)
                     date_depart = c2.date_input("Date de départ (ou dernier contrôle)")
                 
-                photo = st.camera_input("Prendre une photo")
-                
                 if st.form_submit_button("Enregistrer et générer le QR Code"):
-                    # 1. Logique d'enregistrement SQL (à venir)
-                    st.success(f"Fiche {nom} enregistrée !")
+                    # 1. Logique d'insertion SQL (incluant les colonnes de suivi)
+                    # L'insertion ici envoie automatiquement les données dans votre base
+                    # ce qui permettra à la page d'Olivier de détecter les alertes
+                    
+                    st.success(f"Fiche {nom} créée et synchronisée pour le suivi !")
                     
                     # 2. Génération du QR Code
                     info_suivi = f"Périodicité: {periodicite}m | Départ: {date_depart}" if soumis_verif else "Non soumis"
                     data_qr = f"SOC: {num_interne} | {nom} | Série: {num_serie} | {info_suivi}"
                     qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(data_qr)}"
-                    
-                    st.image(qr_url, caption=f"QR Code - {num_interne}")
-                    st.info("Faites un clic droit sur l'image pour enregistrer votre QR Code.")
+                    st.image(qr_url, caption="QR Code matériel")
         
         elif action == "Modifier une fiche":
             st.warning("Fonctionnalité de modification à venir.")

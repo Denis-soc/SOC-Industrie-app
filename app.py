@@ -16,11 +16,6 @@ CATALOGUE_COMPLET = CATALOGUE_MAGASIN + CATALOGUE_OUTILLAGE
 def init_connection():
     return sqlalchemy.create_engine(st.secrets["DB_URL"])
 
-engine = init_connection()
-    # REMPLACEZ "VotreMotDePasse" PAR VOTRE VRAI MOT DE PASSE SUPABASE
-    db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
-    return sqlalchemy.create_engine(db_url)
-
 try:
     engine = init_connection()
     with engine.connect() as conn:

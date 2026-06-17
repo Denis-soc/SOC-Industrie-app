@@ -8,9 +8,10 @@ import sqlalchemy
 import streamlit as st
 import sqlalchemy
 
-# Connexion via le Pooler (Port 6543) et son URL dédiée
+# Connexion via le pooler officiel de Supabase (Port 6543)
+# Remplacez "VotreMotDePasse" par le vrai mot de passe de votre base
 engine = sqlalchemy.create_engine(
-    "postgresql://postgres:VotreMotDePasse@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
+    "postgresql://postgres:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
 )
 
 try:
@@ -19,6 +20,9 @@ except Exception as e:
     st.error(f"Erreur de connexion à la base de données : {e}")
     st.stop()
 
+# --- RESTE DE VOTRE CODE ---
+st.title("🏗️ SOC Industrie — Gestion Interne")
+st.write("Connexion établie avec succès via le Pooler !")
 # ==========================================
 # 2. CONFIGURATION DE LA PAGE
 # ==========================================

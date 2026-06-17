@@ -41,14 +41,6 @@ with tab0:
     # Maintenant, df_demandes_reel est bien défini et accessible
     if not df_demandes_reel.empty:
         st.dataframe(df_demandes_reel)
-# --- STRUCTURE DES ONGLETS ---
-with tab0:
-    st.header("👑 Tableau de Bord Olivier")
-    
-    # 1. Gestion des demandes
-    st.subheader("📋 Demandes en attente")
-    if not df_demandes_reel.empty:
-        st.dataframe(df_demandes_reel, use_container_width=True, hide_index=True)
     else:
         st.success("✅ Aucune demande en attente.")
     

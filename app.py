@@ -62,11 +62,13 @@ with tab5:
         with st.form("form_creation_admin"):
             col1, col2 = st.columns(2)
             with col1:
-                num_interne = st.text_input("Numéro interne", key="in_id")
-                nom = st.text_input("Nom de l'article", key="in_nom")
+                num_interne = st.text_input("Numéro interne")
+                nom = st.text_input("Nom de l'article")
+                fournisseur = st.text_input("Fournisseur")
             with col2:
-                categorie = st.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"], key="in_cat")
-                num_serie = st.text_input("N° de Série", key="in_serie")
+                categorie = st.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"])
+                ref = st.text_input("Référence")
+                num_serie = st.text_input("N° de Série")
             
             # Maintenance
             st.subheader("📅 Suivi et Maintenance")

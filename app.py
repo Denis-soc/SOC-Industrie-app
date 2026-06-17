@@ -16,15 +16,6 @@ def init_connection():
     return sqlalchemy.create_engine(st.secrets["DB_URL"])
 engine = init_connection()
 
-# --- DÉBUT DES ONGLETS ---
-tab0, tab1, tab2, tab3, tab4 = st.tabs([
-    "👑 Tableau de Bord Logistique", 
-    "🛒 Catalogue Magasin & Outillage", 
-    "🛠️ Catalogue Visuel", 
-    "📦 Sorties & Mouvements", 
-    "🗺️ Carte des Chantiers"
-])
-
 try:
     engine = init_connection()
     with engine.connect() as conn:

@@ -17,7 +17,13 @@ def init_connection():
 engine = init_connection()
 
 # --- DÉBUT DES ONGLETS ---
-tab0, tab1, tab2, tab3, tab4 = st.tabs([...])
+tab0, tab1, tab2, tab3, tab4 = st.tabs([
+    "👑 Tableau de Bord Logistique", 
+    "🛒 Catalogue Magasin & Outillage", 
+    "🛠️ Catalogue Visuel", 
+    "📦 Sorties & Mouvements", 
+    "🗺️ Carte des Chantiers"
+])
 
 try:
     engine = init_connection()

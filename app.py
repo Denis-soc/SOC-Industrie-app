@@ -125,13 +125,12 @@ with tab1:
         st.subheader("⚙️ Gestion des fiches")
         action = st.selectbox("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
         
-       if action == "Créer une fiche":
+        if action == "Créer une fiche":
             with st.form("form_creation"):
                 col1, col2 = st.columns(2)
                 with col1:
                     num_interne = st.text_input("Numéro interne (ex: MAT-001)")
                     nom = st.text_input("Nom de l'article")
-                    # Ajout de la catégorie
                     categorie = st.selectbox("Catégorie :", ["EPI", "Outillage", "Consommables", "Matériel Commun"])
                 with col2:
                     ref = st.text_input("Référence interne")
@@ -140,18 +139,18 @@ with tab1:
                 st.subheader("📋 Suivi & Maintenance")
                 soumis_verif = st.checkbox("Matériel soumis à vérification/étalonnage ?")
                 periodicite, date_depart = 12, datetime.now().date()
+                
                 if soumis_verif:
                     c1, c2 = st.columns(2)
                     periodicite = c1.number_input("Périodicité (en mois)", min_value=1, value=12)
                     date_depart = c2.date_input("Date de départ (ou dernier contrôle)")
                 
                 if st.form_submit_button("Enregistrer la fiche"):
-                    # Requête mise à jour avec la catégorie
+                    # Requête corrigée avec les colonnes existantes dans votre table
                     query = """
                     INSERT INTO materiel (id, nom, categorie, reference, num_serie, date_controle, intervalle_mois)
                     VALUES (:id, :nom, :cat, :ref, :serie, :date_d, :perio)
                     """
-                    
                     try:
                         with engine.begin() as conn:
                             conn.execute(sqlalchemy.text(query), {
@@ -163,9 +162,9 @@ with tab1:
                                 "date_d": date_depart if soumis_verif else None, 
                                 "perio": periodicite if soumis_verif else None
                             })
-                        st.success(f"Fiche {nom} ({categorie}) créée avec succès !")
+                        st.success(f"Fiche {nom} créée avec succès !")
                     except Exception as e:
-                        st.error(f"Erreur technique : {e}")
+                        st.error(f"Erreur technique : {e}"))
                     
                     # 2. Génération du QR Code
                     info_suivi = f"Périodicité: {periodicite}m | Départ: {date_depart}" if soumis_verif else "Non soumis"

@@ -107,8 +107,39 @@ with tab5:
                     st.error(f"Erreur technique : {e}")
 
     # --- BLOC MODIFICATION (Aligné avec le if précédent) ---
-    elif admin_action == "Modifier une fiche":
-        st.write("Section modification en cours...")
+   elif admin_action == "Modifier une fiche":
+        st.subheader("Sélectionner le matériel à modifier")
+        
+        # 1. On récupère la liste des IDs
+        df_list = pd.read_sql("SELECT id FROM materiel", engine)
+        id_selectionne = st.selectbox("Choisir l'ID :", df_list['id'].tolist(), key="select_mod")
+        
+        # 2. On récupère les données du matériel choisi
+        donnees = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_selectionne}'", engine).iloc[0]
+        
+        # 3. Formulaire de modification
+        with st.form("form_mod_admin"):
+            # Champs pré-remplis avec 'value=donnees[...]'
+            nouveau_nom = st.text_input("Nom", value=donnees['nom'])
+            nouvelle_ref = st.text_input("Référence", value=donnees.get('reference', ''))
+            nouveau_fourn = st.text_input("Fournisseur", value=donnees.get('fournisseur', ''))
+            
+            if st.form_submit_button("Mettre à jour"):
+                try:
+                    query_upd = sqlalchemy.text("""
+                        UPDATE materiel 
+                        SET nom = :nom, reference = :ref, fournisseur = :fourn 
+                        WHERE id = :id
+                    """)
+                    with engine.begin() as conn:
+                        conn.execute(query_upd, {
+                            "nom": nouveau_nom, "ref": nouvelle_ref, 
+                            "fourn": nouveau_fourn, "id": id_selectionne
+                        })
+                    st.success(f"Matériel {id_selectionne} mis à jour !")
+                    st.rerun() # Rafraîchit la page pour voir les changements
+                except Exception as e:
+                    st.error(f"Erreur : {e}")
 
     # --- BLOC SUPPRESSION ---
     elif admin_action == "Supprimer une fiche":

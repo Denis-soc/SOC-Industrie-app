@@ -63,8 +63,8 @@ with tab5:
             
             soumis_verif = st.checkbox("Soumis à contrôle/étalonnage ?")
             
-            if st.form_submit_button("Enregistrer"):
-                # Requête SQL utilisant uniquement les colonnes existantes
+            if st.form_submit_button("Enregistrer et générer QR Code"):
+                # Requête SQL mise à jour avec les colonnes existantes
                 query = """
                 INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur)
                 VALUES (:id, :nom, :cat, :ref, :serie, :fourn)
@@ -72,13 +72,16 @@ with tab5:
                 try:
                     with engine.begin() as conn:
                         conn.execute(sqlalchemy.text(query), {
-                            "id": num_interne, 
-                            "nom": nom, 
-                            "cat": categorie, 
-                            "ref": ref, 
-                            "serie": num_serie, 
-                            "fourn": fournisseur
+                            "id": num_interne, "nom": nom, "cat": categorie, 
+                            "ref": ref, "serie": num_serie, "fourn": fournisseur
                         })
-                    st.success(f"Fiche {nom} enregistrée avec succès !")
+                    
+                    st.success(f"Fiche {nom} enregistrée !")
+                    
+                    # Génération du QR Code
+                    qr_data = f"ID: {num_interne} | Nom: {nom} | Série: {num_serie}"
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(qr_data)}"
+                    st.image(qr_url, caption="QR Code généré")
+                    
                 except Exception as e:
                     st.error(f"Erreur technique : {e}")

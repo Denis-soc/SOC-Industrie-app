@@ -1,7 +1,10 @@
 import streamlit as st
 import pandas as pd
 import sqlalchemy
-from datetime import datetime # Correction pour l'erreur datetime
+import base64
+import numpy as np
+import urllib.parse
+from datetime import datetime, timedelta
 
 st.set_page_config(page_title="SOC Industrie", layout="wide")
 

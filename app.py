@@ -65,7 +65,7 @@ OUTILLAGE_PRO = [
     {"id": "OUT-01", "type": "🛠️ Outillage", "nom": "Meuleuse Bosch Pro", "marque": "Bosch", "ref": "GWS-18V", "tailles": ["Machine nue", "Pack batterie"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80", "desc": "Sans fil, haute performance."},
 ]
 
-# 1. Définition des catalogues individuels
+# 1. Définition des listes de base
 CATALOGUE = [
     {"id": "EPI-01", "type": "EPI", "nom": "Gants de soudure Haute Protection", "marque": "Singer Safety", "ref": "TIG-500", "tailles": ["M (8)", "L (9)", "XL (10)", "XXL (11)"], "photo": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&q=80", "desc": "Cuir de chèvre supérieur, coutures Kevlar."},
     {"id": "EPI-02", "type": "EPI", "nom": "Chaussures de Sécurité S3 Basse", "marque": "Caterpillar", "ref": "CAT-LITE", "tailles": ["41", "42", "43", "44", "45"], "photo": "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=150&q=80", "desc": "Coque composite sans métal."},
@@ -78,7 +78,7 @@ CATALOGUE_OUTILLAGE = [
     {"id": "OUT-02", "type": "🛠️ Outillage", "nom": "Meuleuse d'angle 125mm", "marque": "Makita", "ref": "DGA504", "tailles": ["Standard", "Variateur"], "photo": "https://images.unsplash.com/photo-1534224039826-c7a0dea0e66a?w=150&q=80", "desc": "Performance professionnelle."}
 ]
 
-# 2. Fusion
+# 2. Fusion (DOIT être après les deux définitions ci-dessus)
 CATALOGUE_COMPLET = CATALOGUE + CATALOGUE_OUTILLAGE
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "👑 ESPACE OLIVIER : Centralisation & Logistique",

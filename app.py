@@ -78,9 +78,9 @@ with tab5:
                 """
                 try:
                     # Vérification si l'ID existe déjà
-check_query = sqlalchemy.text("SELECT id FROM materiel WHERE id = :id")
-with engine.connect() as conn:
-    result = conn.execute(check_query, {"id": num_interne}).fetchone()
+                    check_query = sqlalchemy.text("SELECT id FROM materiel WHERE id = :id")
+                    with engine.connect() as conn:
+                    result = conn.execute(check_query, {"id": num_interne}).fetchone()
 
 if result:
     st.warning(f"⚠️ Le numéro interne '{num_interne}' existe déjà. Veuillez en choisir un autre ou passer par l'onglet 'Modifier'.")

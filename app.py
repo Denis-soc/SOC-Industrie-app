@@ -5,8 +5,13 @@ import sqlalchemy
 # ==========================================
 # 1. CONNEXION GLOBALE SUPABASE (SQLAlchemy)
 # ==========================================
-# Remplacez bien "VotreMotDePasseSupabase" par votre vrai mot de passe
-engine = sqlalchemy.create_engine("postgresql://postgres:LesGaulois2026@spxrxmzeaybndgpmoslo.supabase.co:5432/postgres")
+import sqlalchemy
+
+# Connexion via le Transaction Pooler de Supabase (Port 6543)
+# REMPLACEZ "VotreMotDePasse" par votre vrai mot de passe (sans les crochets [ ])
+engine = sqlalchemy.create_engine(
+    "postgresql://postgres:LesGaulois2026@db.spxrxmzeaybndgpmoslo.supabase.co:6543/postgres?sslmode=require"
+)
 
 try:
     conn = engine.connect()

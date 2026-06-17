@@ -4,3 +4,4 @@ streamlit-folium
 qrcode
 geopy
 psycopg2-binary
+SQLAlchemy

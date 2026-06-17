@@ -60,6 +60,13 @@ PHOTOS_SECOURS = {
 }
 
 # --- AJOUT DU CATALOGUE OUTILLAGE ---
+CATALOGUE = [ ... vos données ... ] # Votre liste actuelle
+OUTILLAGE_PRO = [
+    {"id": "OUT-01", "type": "🛠️ Outillage", "nom": "Meuleuse Bosch Pro", "marque": "Bosch", "ref": "GWS-18V", "tailles": ["Machine nue", "Pack batterie"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80", "desc": "Sans fil, haute performance."},
+]
+
+# CETTE LIGNE MANQUE DANS VOTRE CODE :
+CATALOGUE_COMPLET = CATALOGUE + OUTILLAGE_PRO
 CATALOGUE = [
     {"id": "EPI-01", "type": "EPI", "nom": "Gants de soudure Haute Protection", "marque": "Singer Safety", "ref": "TIG-500", "tailles": ["M (8)", "L (9)", "XL (10)", "XXL (11)"], "photo": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&q=80", "desc": "Cuir de chèvre supérieur, coutures Kevlar."},
     {"id": "EPI-02", "type": "EPI", "nom": "Chaussures de Sécurité S3 Basse", "marque": "Caterpillar", "ref": "CAT-LITE", "tailles": ["41", "42", "43", "44", "45"], "photo": "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=150&q=80", "desc": "Coque composite sans métal."},

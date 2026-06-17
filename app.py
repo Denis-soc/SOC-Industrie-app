@@ -58,12 +58,15 @@ with tab5:
                 ref = st.text_input("Référence")
                 num_serie = st.text_input("N° de Série")
                 
-            # Gestion Photo
-            photo_methode = st.radio("Photo :", ["Prendre en photo", "Importer une image"], horizontal=True)
-            if photo_methode == "Importer une image":
-                photo_file = st.file_uploader("Glisser l'image ici", type=['png', 'jpg', 'jpeg'])
-            else:
-                photo_file = st.camera_input("Prendre une photo")
+            # --- GESTION PHOTO SIMPLIFIÉE ---
+            st.subheader("📸 Photo du matériel")
+            # Au lieu de la caméra ou de l'uploader, on utilise un champ texte
+            # Cela permet de copier-coller un lien d'image (ex: depuis un cloud ou drive)
+            url_photo = st.text_input("URL de l'image (Lien web direct) :", placeholder="https://exemple.com/image.jpg")
+            
+            # Prévisualisation immédiate
+            if url_photo:
+                st.image(url_photo, width=200)
 
             # Suivi Maintenance
             soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?")

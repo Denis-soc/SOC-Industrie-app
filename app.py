@@ -50,11 +50,11 @@ if "materiel_id" in query_params:
 # ... Onglet N°5...
 with tab5:
     st.header("⚙️ Administration Matériel")
+    # Utilisation d'une clé unique pour éviter l'erreur de duplication
     admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"], key="admin_radio")
     
     if admin_action == "Créer une fiche":
         with st.form("form_creation_admin"):
-            # Ligne 1 : Infos de base
             col1, col2 = st.columns(2)
             with col1:
                 num_interne = st.text_input("Numéro interne")
@@ -65,7 +65,6 @@ with tab5:
                 ref = st.text_input("Référence")
                 num_serie = st.text_input("N° de Série")
             
-            # Ligne 2 : Maintenance
             st.subheader("📅 Suivi et Maintenance")
             soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?")
             date_c, perio = None, 0
@@ -74,7 +73,6 @@ with tab5:
                 date_c = c1.date_input("Date du dernier contrôle")
                 perio = c2.number_input("Périodicité (mois)", value=12)
 
-            # Ligne 3 : Photo
             st.subheader("📸 Photo du matériel")
             source_photo = st.radio("Source :", ["Aucune", "Fichier", "Caméra"], horizontal=True, key="photo_source")
             if source_photo == "Fichier":
@@ -84,7 +82,7 @@ with tab5:
 
             if st.form_submit_button("Enregistrer et générer QR Code"):
                 try:
-                    # Requête SQL alignée avec vos colonnes existantes
+                    # Requête SQL
                     query = sqlalchemy.text("""
                         INSERT INTO materiel (id, nom, categorie, reference, num_serie, fournisseur, date_controle, intervalle_mois)
                         VALUES (:id, :nom, :cat, :ref, :serie, :fourn, :date_c, :perio)
@@ -97,23 +95,13 @@ with tab5:
                             "date_c": date_c, "perio": perio
                         })
                     st.success(f"Fiche {num_interne} enregistrée !")
-
-                    st.success(f"Fiche {num_interne} enregistrée !")
-
-# 1. URL de votre app (Remplacez par votre vrai lien Streamlit)
-base_url = "https://votre-url-app.streamlit.app" 
-
-# 2. Création du lien direct vers la fiche
-lien_fiche = f"{base_url}/?materiel_id={num_interne}"
-
-# 3. Génération du QR Code avec ce lien
-qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(lien_fiche)}"
-st.image(qr_url, caption="QR Code : Scannez pour accéder à la fiche")
-                    # Génération du QR Code
-                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(num_interne)}"
-                    st.image(qr_url, caption="QR Code généré")
+                    
+                    # Génération URL pour QR Code
+                    # Remplacez par votre lien réel
+                    base_url = "https://votre-url-app.streamlit.app" 
+                    lien_fiche = f"{base_url}/?materiel_id={num_interne}"
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(lien_fiche)}"
+                    st.image(qr_url, caption="QR Code : Scannez pour accéder à la fiche")
                     
                 except Exception as e:
                     st.error(f"Erreur technique : {e}")
-                except Exception as e:
-                    st.error(f"Erreur SQL : {e}")

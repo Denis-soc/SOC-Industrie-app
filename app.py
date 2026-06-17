@@ -3,27 +3,30 @@ import pandas as pd
 import sqlalchemy
 import numpy as np
 
-# --- CONFIGURATION ---
-st.set_page_config(page_title="SOC Industrie", layout="wide")
+# ... (Après vos imports et st.set_page_config)
 
-# Ajout du logo dans la barre latérale
-st.sidebar.image("Logo SOC INDUSTRIE COULEUR - Copie.png", width=150) # Remplacez par l'URL de votre vrai logo si besoin
-st.sidebar.title("SOC Industrie")
-st.sidebar.info("Gestion interne du parc matériel.")
-
-st.title("🏗️ SOC Industrie — Gestion Interne")
-
-# --- CONNEXION BDD ---
-@st.cache_resource
-def init_connection():
-    try:
-        return sqlalchemy.create_engine(st.secrets["DB_URL"])
-    except:
-        return None
-
+# 1. Connexion (Engine)
 engine = init_connection()
 
-# --- ONGLETS ---
+# 2. Définition des fonctions de chargement
+def charger_materiel():
+    query = 'SELECT ... FROM materiel;' # Votre requête ici
+    return pd.read_sql(query, engine)
+
+def charger_demandes():
+    query = 'SELECT ... FROM demandes_collaborateurs;' # Votre requête ici
+    return pd.read_sql(query, engine)
+
+# 3. INITIALISATION DES DONNÉES (CRUCIAL)
+# Ces deux lignes doivent être placées ICI, avant la création des onglets
+try:
+    df_materiel_reel = charger_materiel()
+    df_demandes_reel = charger_demandes()
+except Exception as e:
+    st.error("Erreur lors du chargement des données. Vérifiez votre connexion SQL.")
+    st.stop()
+
+# 4. Création des onglets
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "👑 Tableau de Bord Olivier", 
     "🛒 Catalogues EPI/Consommables/Outillage", 
@@ -32,6 +35,12 @@ tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "📍 Carte de localisation du matériel"
 ])
 
+# 5. Contenu des onglets
+with tab0:
+    st.header("👑 Tableau de Bord Olivier")
+    # Maintenant, df_demandes_reel est bien défini et accessible
+    if not df_demandes_reel.empty:
+        st.dataframe(df_demandes_reel)
 # --- STRUCTURE DES ONGLETS ---
 with tab0:
     st.header("👑 Tableau de Bord Olivier")

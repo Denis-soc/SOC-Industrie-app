@@ -80,11 +80,11 @@ with tab5:
                     # Vérification si l'ID existe déjà
                     check_query = sqlalchemy.text("SELECT id FROM materiel WHERE id = :id")
                     with engine.connect() as conn:
-                    result = conn.execute(check_query, {"id": num_interne}).fetchone()
+                        result = conn.execute(check_query, {"id": num_interne}).fetchone()
 
-if result:
-    st.warning(f"⚠️ Le numéro interne '{num_interne}' existe déjà. Veuillez en choisir un autre ou passer par l'onglet 'Modifier'.")
-else:
+                    if result:
+                        st.warning(f"⚠️ Le numéro interne '{num_interne}' existe déjà. Veuillez en choisir un autre ou passer par l'onglet 'Modifier'.")
+                    else:
     # ... votre code d'insertion actuel ...
                     with engine.begin() as conn:
                         conn.execute(sqlalchemy.text(query), {

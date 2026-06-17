@@ -110,8 +110,48 @@ with tab0:
     else:
         st.success("✅ Aucun étalonnage critique à prévoir.")
 with tab1:
-    st.header("🛒 Catalogues EPI/Consommables/Outillage")
-    st.write("Gestion des commandes.")
+    st.header("🛒 Catalogue EPI / Consommables / Outillage")
+    
+    # Choix du mode : Catalogue ou Administration
+    mode = st.radio("Mode d'affichage :", ["Catalogue", "Administration"], horizontal=True)
+    
+    if mode == "Catalogue":
+        st.subheader("Nos produits disponibles")
+        # Ici, vous pourrez ajouter le filtre par type (EPI, Consommable, Outillage)
+        # et la boucle d'affichage de vos produits.
+        st.info("Visualisation du catalogue en cours...")
+        
+    elif mode == "Administration":
+        st.subheader("⚙️ Gestion des fiches")
+        action = st.selectbox("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
+        
+        if action == "Créer une fiche":
+            with st.form("form_creation"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    num_interne = st.text_input("Numéro interne (ex: SOC-001)")
+                    nom = st.text_input("Nom de l'article")
+                    ref = st.text_input("Référence interne")
+                with col2:
+                    fournisseur = st.text_input("Fournisseur")
+                    ref_fournisseur = st.text_input("Référence fournisseur")
+                
+                # Gestion photo : Upload ou Caméra
+                photo_option = st.radio("Photo :", ["Uploader un fichier", "Prendre en direct"], horizontal=True)
+                if photo_option == "Uploader un fichier":
+                    photo = st.file_uploader("Choisir une image", type=['png', 'jpg', 'jpeg'])
+                else:
+                    photo = st.camera_input("Prendre une photo")
+                
+                if st.form_submit_button("Enregistrer la fiche"):
+                    # Logique d'insertion SQL à prévoir ici
+                    st.success(f"Fiche {nom} créée !")
+        
+        elif action == "Modifier une fiche":
+            st.warning("Fonctionnalité de modification à venir.")
+        
+        elif action == "Supprimer une fiche":
+            st.error("Fonctionnalité de suppression à venir.")
 
 with tab2:
     st.header("📦 Matériels Commun")

@@ -6,7 +6,7 @@ import sqlalchemy
 # 1. CONNEXION GLOBALE SUPABASE (SQLAlchemy)
 # ==========================================
 # Remplacez bien "VotreMotDePasseSupabase" par votre vrai mot de passe
-engine = sqlalchemy.create_engine("postgresql://postgres:VotreMotDePasseSupabase@spxrxmzeaybndgpmoslo.supabase.co:5432/postgres")
+engine = sqlalchemy.create_engine("postgresql://postgres:@Les Gaulois2026@spxrxmzeaybndgpmoslo.supabase.co:5432/postgres")
 
 try:
     conn = engine.connect()

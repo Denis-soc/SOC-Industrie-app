@@ -3,7 +3,6 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 from datetime import datetime, date, timedelta
-import sqlite3
 import qrcode
 from io import BytesIO
 import urllib.parse
@@ -17,6 +16,9 @@ ADRESSE_SIEGE = "70 route de brissac - ZA la Jailletière - 49380 TERRANJOU"
 COORD_SIEGE = (47.2662, -0.4355)
 MAIL_OLIVIER = "owasse@soc.fr"
 PHOTO_DEFAUT = "https://cdn-icons-png.flaticon.com/512/4054/4054615.png"
+
+# --- CONNEXION GLOBALE SUPABASE ---
+conn = st.connection("postgresql", type="sql")
 
 # --- ENCODAGE DES IMAGES ---
 def convertir_image_en_base64(fichier_image):
@@ -40,71 +42,60 @@ def afficher_image_securisee(image_source, width=120):
         st.image(PHOTO_DEFAUT, width=width)
 
 # --- INITIALISATION DE LA BASE DE DONNÉES ---
-def connexion_db():
-    return sqlite3.connect('gestion_soc_v6.db')
-
 def initialiser_db():
-    conn = connexion_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS materiel (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nom TEXT, modele TEXT, num_serie TEXT,
-            statut TEXT DEFAULT 'A l''agence', photo_data TEXT,
-            dernier_controle TEXT, intervalle_mois INTEGER, prochain_controle TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS mouvements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            materiel_id INTEGER, technicien TEXT, num_affaire TEXT,
-            adresse_chantier TEXT, lat REAL, lon REAL, date_demande TEXT,
-            date_debut TEXT, date_fin TEXT, statut_mouvement TEXT, 
-            date_retrait_reel TEXT, date_retour_reel TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS stocks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nom TEXT, marque TEXT, reference TEXT, fournisseur TEXT,
-            quantite INTEGER DEFAULT 0, seuil_mini INTEGER DEFAULT 5, seuil_maxi INTEGER DEFAULT 50,
-            type_article TEXT DEFAULT 'Consommable', photo_data TEXT
-        )
-    ''')
-    
-    # NOUVELLE TABLE : Gestion des déclinaisons (Tailles, Dimensions...)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS variantes_stock (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            article_id INTEGER,
-            caracteristique TEXT,
-            quantite INTEGER DEFAULT 0,
-            FOREIGN KEY(article_id) REFERENCES stocks(id) ON DELETE CASCADE
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS sorties_stocks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            article_id INTEGER, variante_id INTEGER, technicien TEXT, num_affaire TEXT,
-            quantite_sortie INTEGER, caracteristique TEXT, date_sortie TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    with conn.session as session:
+        session.execute("""
+            CREATE TABLE IF NOT EXISTS materiel (
+                id SERIAL PRIMARY KEY,
+                nom TEXT, modele TEXT, num_serie TEXT,
+                statut TEXT DEFAULT 'A l''agence', photo_data TEXT,
+                dernier_controle TEXT, intervalle_mois INTEGER, prochain_controle TEXT
+            )
+        """)
+        session.execute("""
+            CREATE TABLE IF NOT EXISTS mouvements (
+                id SERIAL PRIMARY KEY,
+                materiel_id INTEGER, technicien TEXT, num_affaire TEXT,
+                adresse_chantier TEXT, lat REAL, lon REAL, date_demande TEXT,
+                date_debut TEXT, date_fin TEXT, statut_mouvement TEXT, 
+                date_retrait_reel TEXT, date_retour_reel TEXT
+            )
+        """)
+        session.execute("""
+            CREATE TABLE IF NOT EXISTS stocks (
+                id SERIAL PRIMARY KEY,
+                nom TEXT, marque TEXT, reference TEXT, fournisseur TEXT,
+                quantite INTEGER DEFAULT 0, seuil_mini INTEGER DEFAULT 5, seuil_maxi INTEGER DEFAULT 50,
+                type_article TEXT DEFAULT 'Consommable', photo_data TEXT
+            )
+        """)
+        session.execute("""
+            CREATE TABLE IF NOT EXISTS variantes_stock (
+                id SERIAL PRIMARY KEY,
+                article_id INTEGER,
+                caracteristique TEXT,
+                quantite INTEGER DEFAULT 0,
+                FOREIGN KEY(article_id) REFERENCES stocks(id) ON DELETE CASCADE
+            )
+        """)
+        session.execute("""
+            CREATE TABLE IF NOT EXISTS sorties_stocks (
+                id SERIAL PRIMARY KEY,
+                article_id INTEGER, variante_id INTEGER, technicien TEXT, num_affaire TEXT,
+                quantite_sortie INTEGER, caracteristique TEXT, date_sortie TEXT
+            )
+        """)
+        session.commit()
 
 initialiser_db()
 
 # Recalculer le total général dans la table stocks par sécurité
 def recalculer_total_stock(article_id):
-    conn = connexion_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT SUM(quantite) FROM variantes_stock WHERE article_id = ?", (article_id,))
-    total = cursor.fetchone()[0]
-    total = total if total is not None else 0
-    cursor.execute("UPDATE stocks SET quantite = ? WHERE id = ?", (total, article_id))
-    conn.commit()
-    conn.close()
+    with conn.session as session:
+        res = session.execute("SELECT SUM(quantite) FROM variantes_stock WHERE article_id = :article_id", {"article_id": article_id}).fetchone()
+        total = res[0] if res and res[0] is not None else 0
+        session.execute("UPDATE stocks SET quantite = :total WHERE id = :article_id", {"total": total, "article_id": article_id})
+        session.commit()
 
 # --- ENVOI DE MAIL ---
 def generer_lien_mail(sujet, corps):
@@ -113,11 +104,9 @@ def generer_lien_mail(sujet, corps):
     return f"mailto:{MAIL_OLIVIER}?subject={sujet_encode}&body={corps_encode}"
 
 # --- CHARGEMENT DES DONNÉES ---
-conn = connexion_db()
-df_mat = pd.read_sql_query("SELECT * FROM materiel", conn)
-df_stock_total = pd.read_sql_query("SELECT * FROM stocks", conn)
-df_variantes_toutes = pd.read_sql_query("SELECT * FROM variantes_stock", conn)
-conn.close()
+df_mat = conn.query("SELECT * FROM materiel ORDER BY id ASC;", ttl=0)
+df_stock_total = conn.query("SELECT * FROM stocks ORDER BY id ASC;", ttl=0)
+df_variantes_toutes = conn.query("SELECT * FROM variantes_stock ORDER BY id ASC;", ttl=0)
 
 # --- LECTURE SÉCURISÉE DES PARAMÈTRES ---
 id_scanne = None
@@ -138,29 +127,25 @@ if id_scanne and not df_mat.empty:
         st.warning(f"📱 **QR Code Flashé** : **{row_mat['nom']}** ({row_mat['modele']})")
         afficher_image_securisee(row_mat['photo_data'], width=200)
         
-        conn = connexion_db()
-        res_attente = pd.read_sql_query("SELECT * FROM mouvements WHERE materiel_id=? AND statut_mouvement='Réservé' ORDER BY date_debut ASC LIMIT 1", conn)
-        conn.close()
+        res_attente = conn.query("SELECT * FROM mouvements WHERE %s = :mat_id AND statut_mouvement='Réservé' ORDER BY date_debut ASC LIMIT 1;" % "materiel_id", params={"mat_id": id_scanne}, ttl=0)
         
         if row_mat['statut'] == "A l'agence" and not res_attente.empty:
             res = res_attente.iloc[0]
             st.info(f"👉 Réservation pour : **{res['technicien']}** (Affaire : {res['num_affaire']})")
             if st.button("✅ Valider mon Retrait de l'Agence"):
-                conn = connexion_db()
-                conn.execute("UPDATE materiel SET statut='En Chantier' WHERE id=?", (id_scanne,))
-                conn.execute("UPDATE mouvements SET statut_mouvement='Sorti (En Cours)', date_retrait_reel=? WHERE id=?", (date.today().strftime('%Y-%m-%d'), res['id']))
-                conn.commit()
-                conn.close()
+                with conn.session as session:
+                    session.execute("UPDATE materiel SET statut='En Chantier' WHERE id = :id_scanne", {"id_scanne": id_scanne})
+                    session.execute("UPDATE mouvements SET statut_mouvement='Sorti (En Cours)', date_retrait_reel = :date WHERE id = :res_id", {"date": date.today().strftime('%Y-%m-%d'), "res_id": int(res['id'])})
+                    session.commit()
                 st.success("Sortie validée ! Bon chantier.")
                 st.rerun()
                 
         elif row_mat['statut'] == "En Chantier":
             if st.button("🏢 Valider le Retour définitif à l'Agence"):
-                conn = connexion_db()
-                conn.execute("UPDATE materiel SET statut='A l''agence' WHERE id=?", (id_scanne,))
-                conn.execute("UPDATE mouvements SET statut_mouvement='Retourné', date_retour_reel=? WHERE materiel_id=? AND statut_mouvement='Sorti (En Cours)'", (date.today().strftime('%Y-%m-%d'), id_scanne))
-                conn.commit()
-                conn.close()
+                with conn.session as session:
+                    session.execute("UPDATE materiel SET statut='A l''agence' WHERE id = :id_scanne", {"id_scanne": id_scanne})
+                    session.execute("UPDATE mouvements SET statut_mouvement='Retourné', date_retour_reel = :date WHERE materiel_id = :id_scanne AND statut_mouvement='Sorti (En Cours)'", {"date": date.today().strftime('%Y-%m-%d'), "id_scanne": id_scanne})
+                    session.commit()
                 st.success("Matériel de retour au dépôt !")
                 st.rerun()
 
@@ -180,7 +165,7 @@ with tab1:
     st.write("### 📋 Statut Visuel du Parc Machine")
     if not df_mat.empty:
         cols_m = st.columns(4)
-        for idx, row in df_mat.iterrows():
+        for idx, row in df_mat.reset_index(drop=True).iterrows():
             with cols_m[idx % 4]:
                 afficher_image_securisee(row['photo_data'], width=140)
                 st.markdown(f"**{row['nom']}** ({row['modele']})")
@@ -204,10 +189,16 @@ with tab2:
             d_fi = st.date_input("Date de fin prévue", date.today() + timedelta(days=7))
             
             if st.form_submit_button("🔥 Valider l'affectation et le mouvement"):
-                conn = connexion_db()
-                conn.execute("INSERT INTO mouvements (materiel_id, technicien, num_affaire, adresse_chantier, lat, lon, date_demande, date_debut, date_fin, statut_mouvement) VALUES (?,?,?,?,?,?,?,?,?,'Réservé')", (mat_id, tech, n_affaire, adresse, COORD_SIEGE[0], COORD_SIEGE[1], date.today().strftime('%Y-%m-%d'), str(d_deb), str(d_fi)))
-                conn.commit()
-                conn.close()
+                with conn.session as session:
+                    session.execute("""
+                        INSERT INTO mouvements (materiel_id, technicien, num_affaire, adresse_chantier, lat, lon, date_demande, date_debut, date_fin, statut_mouvement) 
+                        VALUES (:mat_id, :tech, :n_affaire, :adresse, :lat, :lon, :date_demande, :date_debut, :date_fin, 'Réservé')
+                    """, {
+                        "mat_id": mat_id, "tech": tech, "n_affaire": n_affaire, "adresse": adresse,
+                        "lat": COORD_SIEGE[0], "lon": COORD_SIEGE[1], "date_demande": date.today().strftime('%Y-%m-%d'),
+                        "date_debut": str(d_deb), "date_fin": str(d_fi)
+                    })
+                    session.commit()
                 st.success("Mouvement enregistré avec succès ! La carte et le tableau sont à jour.")
                 st.rerun()
 
@@ -218,7 +209,7 @@ with tab3:
     
     if not df_conso.empty:
         c_index = st.columns(4)
-        for idx, row in df_conso.iterrows():
+        for idx, row in df_conso.reset_index(drop=True).iterrows():
             with c_index[idx % 4]:
                 afficher_image_securisee(row['photo_data'], width=120)
                 st.markdown(f"**{row['nom']}**")
@@ -263,20 +254,22 @@ with tab3:
             q_s = st.number_input("Quantité retirée", min_value=1, value=1)
             
             if st.form_submit_button("Déclarer la sortie") and var_id:
-                conn = connexion_db()
-                # 1. Prélèvement sur la variante
-                conn.execute("UPDATE variantes_stock SET quantite = quantite - ? WHERE id = ?", (q_s, var_id))
-                
-                # Récupération du nom de la caractéristique pour l'historique
-                carac_nom = df_v_dispos[df_v_dispos['id'] == var_id]['caracteristique'].values[0]
-                
-                # 2. Enregistrement dans l'historique
-                conn.execute("INSERT INTO sorties_stocks (article_id, variante_id, technicien, num_affaire, quantite_sortie, caracteristique, date_sortie) VALUES (?, ?, ?, ?, ?, ?, ?)", (art_id, var_id, t_nom, a_nom, q_s, carac_nom, datetime.now().strftime('%Y-%m-%d %H:%M')))
-                conn.commit()
-                conn.close()
+                with conn.session as session:
+                    # 1. Prélèvement sur la variante
+                    session.execute("UPDATE variantes_stock SET quantite = quantite - :q_s WHERE id = :var_id", {"q_s": q_s, "var_id": var_id})
+                    
+                    # Récupération du nom de la caractéristique pour l'historique
+                    carac_nom = df_v_dispos[df_v_dispos['id'] == var_id]['caracteristique'].values[0]
+                    
+                    # 2. Enregistrement dans l'historique
+                    session.execute("""
+                        INSERT INTO sorties_stocks (article_id, variante_id, technicien, num_affaire, quantite_sortie, caracteristique, date_sortie) 
+                        VALUES (:art_id, :var_id, :t_nom, :a_nom, :q_s, :carac_nom, :date)
+                    """, {"art_id": art_id, "var_id": var_id, "t_nom": t_nom, "a_nom": a_nom, "q_s": q_s, "carac_nom": carac_nom, "date": datetime.now().strftime('%Y-%m-%d %H:%M')})
+                    session.commit()
                 
                 # 3. Recalcul automatique du total
-                reculculer_total_stock(art_id)
+                recalculer_total_stock(art_id)
                 
                 st.success("Prélèvement enregistré !")
                 st.session_state["derniere_sortie_id"] = art_id
@@ -285,9 +278,7 @@ with tab3:
     # --- ALERTE MAIL AUTOMATIQUE SI SEUIL MINI ATTEINT ---
     if "derniere_sortie_id" in st.session_state:
         id_verif = st.session_state["derniere_sortie_id"]
-        conn = connexion_db()
-        art_verif = pd.read_sql_query("SELECT * FROM stocks WHERE id=?", conn, params=(id_verif,))
-        conn.close()
+        art_verif = conn.query("SELECT * FROM stocks WHERE id = :id_verif;", params={"id_verif": id_verif}, ttl=0)
         if not art_verif.empty:
             row_v = art_verif.iloc[0]
             if int(row_v['quantite']) <= int(row_v['seuil_mini']):
@@ -299,16 +290,14 @@ with tab3:
     # --- AFFICHAGE HISTORIQUE DES SORTIES ---
     st.write("---")
     st.write("### 📜 Historique complet des sorties (Consommables & EPI)")
-    conn = connexion_db()
-    df_historique = pd.read_sql_query('''
-        SELECT s.date_sortie as 'Date', st.type_article as 'Type', st.nom as 'Désignation', 
-               s.caracteristique as 'Taille / Dim', s.quantite_sortie as 'Quantité', 
-               s.technicien as 'Technicien', s.num_affaire as 'N° Affaire'
+    df_historique = conn.query("""
+        SELECT s.date_sortie as "Date", st.type_article as "Type", st.nom as "Désignation", 
+               s.caracteristique as "Taille / Dim", s.quantite_sortie as "Quantité", 
+               s.technicien as "Technicien", s.num_affaire as "N° Affaire"
         FROM sorties_stocks s
         JOIN stocks st ON s.article_id = st.id
         ORDER BY s.id DESC
-    ''', conn)
-    conn.close()
+    """, ttl=0)
     
     if not df_historique.empty:
         st.dataframe(df_historique, use_container_width=True)
@@ -322,7 +311,7 @@ with tab4:
     
     if not df_epi.empty:
         c_epi = st.columns(4)
-        for idx, row in df_epi.iterrows():
+        for idx, row in df_epi.reset_index(drop=True).iterrows():
             with c_epi[idx % 4]:
                 afficher_image_securisee(row['photo_data'], width=120)
                 st.markdown(f"**{row['nom']}**")
@@ -374,12 +363,14 @@ with tab4:
                 taille_selectionnee = df_v_epi[df_v_epi['id']==var_epi_id]['caracteristique'].values[0]
                 
                 if valider_sortie_epi_direct:
-                    conn = connexion_db()
-                    conn.execute("UPDATE variantes_stock SET quantite = quantite - ? WHERE id = ?", (qte_demandee, var_epi_id))
-                    conn.execute("INSERT INTO sorties_stocks (article_id, variante_id, technicien, num_affaire, quantite_sortie, caracteristique, date_sortie) VALUES (?, ?, ?, ?, ?, ?, ?)", (epi_id, var_epi_id, sal, motif, qte_demandee, taille_selectionnee, datetime.now().strftime('%Y-%m-%d %H:%M')))
-                    conn.commit()
-                    conn.close()
-                    reculculer_total_stock(epi_id)
+                    with conn.session as session:
+                        session.execute("UPDATE variantes_stock SET quantite = quantite - :qte WHERE id = :var_id", {"qte": qte_demandee, "var_id": var_epi_id})
+                        session.execute("""
+                            INSERT INTO sorties_stocks (article_id, variante_id, technicien, num_affaire, quantite_sortie, caracteristique, date_sortie) 
+                            VALUES (:epi_id, :var_id, :sal, :motif, :qte, :taille, :date)
+                        """, {"epi_id": epi_id, "var_id": var_epi_id, "sal": sal, "motif": motif, "qte": qte_demandee, "taille": taille_selectionnee, "date": datetime.now().strftime('%Y-%m-%d %H:%M')})
+                        session.commit()
+                    recalculer_total_stock(epi_id)
                 
                 s_mail = f"[EPI] Demande de matériel - {sal}"
                 c_mail = (
@@ -432,10 +423,10 @@ with tab6:
             
             if st.form_submit_button("Enregistrer Machine"):
                 p_base64 = convertir_image_en_base64(fichier_photo_m)
-                conn = connexion_db()
-                conn.execute("INSERT INTO materiel (nom, modele, num_serie, statut, photo_data) VALUES (?,?,?,'A l''agence',?)", (n, m, s, p_base64))
-                conn.commit()
-                conn.close()
+                with conn.session as session:
+                    session.execute("INSERT INTO materiel (nom, modele, num_serie, statut, photo_data) VALUES (:nom, :modele, :num_serie, 'A l''agence', :photo)", 
+                                    {"nom": n, "modele": m, "num_serie": s, "photo": p_base64})
+                    session.commit()
                 st.success("Machine ajoutée au parc !")
                 st.rerun()
                     
@@ -456,15 +447,15 @@ with tab6:
                 
             if st.form_submit_button("Enregistrer l'Article"):
                 p_base64_s = convertir_image_en_base64(fichier_photo_s)
-                conn = connexion_db()
-                # Stock initialisé à 0, il montera au fur et à mesure de la création des tailles
-                conn.execute("INSERT INTO stocks (nom, marque, reference, fournisseur, quantite, seuil_mini, seuil_maxi, type_article, photo_data) VALUES (?,?,?,?,?,?,100,?,?)", (n_s, m_s, r_s, f_s, 0, s_mini, t_s, p_base64_s))
-                conn.commit()
-                conn.close()
+                with conn.session as session:
+                    session.execute("""
+                        INSERT INTO stocks (nom, marque, reference, fournisseur, quantite, seuil_mini, seuil_maxi, type_article, photo_data) 
+                        VALUES (:nom, :marque, :ref, :fourn, 0, :seuil, 100, :type_art, :photo)
+                    """, {"nom": n_s, "marque": m_s, "ref": r_s, "fourn": f_s, "seuil": s_mini, "type_art": t_s, "photo": p_base64_s})
+                    session.commit()
                 st.success("Modèle d'article créé ! Pensez à lui ajouter ses tailles/dimensions dans le second onglet.")
                 st.rerun()
 
-    # NOUVEL ONGLET : Création, modification et réapprovisionnement des tailles/dimensions
     with subtab_variantes:
         st.write("### 📏 Gestion des Variantes (Tailles, Pointures, Dimensions)")
         if df_stock_total.empty:
@@ -476,7 +467,6 @@ with tab6:
                 format_func=lambda x: f"[{df_stock_total[df_stock_total['id']==x]['type_article'].values[0]}] {df_stock_total[df_stock_total['id']==x]['nom'].values[0]}"
             )
             
-            # Afficher les tailles déjà existantes pour cet article
             df_existantes = df_variantes_toutes[df_variantes_toutes['article_id'] == art_sel_id]
             if not df_existantes.empty:
                 st.write("**Variantes existantes pour cet article :**")
@@ -492,23 +482,17 @@ with tab6:
                     if carac_input == "":
                         st.error("La taille/dimension ne peut pas être vide.")
                     else:
-                        conn = connexion_db()
-                        cursor = conn.cursor()
-                        # Vérifier si cette variante précise existe déjà pour cet article
-                        cursor.execute("SELECT id FROM variantes_stock WHERE article_id = ? AND caracteristique = ?", (art_sel_id, carac_input))
-                        existe = cursor.fetchone()
+                        with conn.session as session:
+                            existe = session.execute("SELECT id FROM variantes_stock WHERE article_id = :art_id AND caracteristique = :carac", {"art_id": art_sel_id, "carac": carac_input}).fetchone()
+                            
+                            if existe:
+                                session.execute("UPDATE variantes_stock SET quantite = :qte WHERE id = :id_var", {"qte": qte_input, "id_var": existe[0]})
+                                st.success(f"Mise à jour de la taille `{carac_input}` enregistrée.")
+                            else:
+                                session.execute("INSERT INTO variantes_stock (article_id, caracteristique, quantite) VALUES (:art_id, :carac, :qte)", {"art_id": art_sel_id, "carac": carac_input, "qte": qte_input})
+                                st.success(f"Nouvelle variante `{carac_input}` ajoutée avec succès.")
+                            session.commit()
                         
-                        if existe:
-                            # Mise à jour directe
-                            cursor.execute("UPDATE variantes_stock SET quantite = ? WHERE id = ?", (qte_input, existe[0]))
-                            st.success(f"Mise à jour de la taille `{carac_input}` enregistrée.")
-                        else:
-                            # Nouvelle insertion
-                            cursor.execute("INSERT INTO variantes_stock (article_id, caracteristique, quantite) VALUES (?, ?, ?)", (art_sel_id, carac_input, qte_input))
-                            st.success(f"Nouvelle variante `{carac_input}` ajoutée avec succès.")
-                        
-                        conn.commit()
-                        conn.close()
                         recalculer_total_stock(art_sel_id)
                         st.rerun()
 
@@ -547,19 +531,19 @@ with tab6:
 
             if sauvegarder_changement:
                 nouveau_b64 = convertir_image_en_base64(fichier_photo_edit) if fichier_photo_edit is not None else art_actuel['photo_data']
-                conn = connexion_db()
-                conn.execute('UPDATE stocks SET nom=?, type_article=?, marque=?, reference=?, fournisseur=?, seuil_mini=?, photo_data=? WHERE id=?', (edit_nom, edit_type, edit_marque, edit_ref, edit_fourn, edit_seuil, nouveau_b64, id_article_choisi))
-                conn.commit()
-                conn.close()
+                with conn.session as session:
+                    session.execute("""
+                        UPDATE stocks SET nom = :nom, type_article = :type_art, marque = :marque, reference = :ref, fournisseur = :fourn, seuil_mini = :seuil, photo_data = :photo 
+                        WHERE id = :id_art
+                    """, {"nom": edit_nom, "type_art": edit_type, "marque": edit_marque, "ref": edit_ref, "fourn": edit_fourn, "seuil": edit_seuil, "photo": nouveau_b64, "id_art": id_article_choisi})
+                    session.commit()
                 st.success("Fiche article mise à jour avec succès !")
                 st.rerun()
                 
             if supprimer_definitivement:
-                conn = connexion_db()
-                # Supprime l'article ainsi que ses variantes associées grâce au ON DELETE CASCADE
-                conn.execute("DELETE FROM stocks WHERE id=?", (id_article_choisi,))
-                conn.execute("DELETE FROM variantes_stock WHERE article_id=?", (id_article_choisi,))
-                conn.commit()
-                conn.close()
+                with conn.session as session:
+                    session.execute("DELETE FROM stocks WHERE id = :id_art", {"id_art": id_article_choisi})
+                    session.execute("DELETE FROM variantes_stock WHERE article_id = :id_art", {"id_art": id_article_choisi})
+                    session.commit()
                 st.warning("Article et toutes ses déclinaisons supprimés.")
                 st.rerun()

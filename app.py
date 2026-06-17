@@ -64,9 +64,11 @@ CATALOGUE = [
     {"id": "EPI-02", "type": "🦺 EPI", "nom": "Chaussures de Sécurité S3 Basse", "marque": "Caterpillar", "ref": "CAT-LITE", "tailles": ["41", "42", "43", "44", "45"], "photo": "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=150&q=80", "desc": "Coque composite sans métal, semelle anti-perforation, imperméable."},
     {"id": "CON-01", "type": "🪵 Consommable", "nom": "Électrodes de Soudage Inox Ø2.5", "marque": "Gys", "ref": "E308L-16", "tailles": ["Étui de 50 pièces", "Blister de 10 pièces"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80", "desc": "Électrodes enrobées rutiles pour le soudage des aciers inoxydables."},
     {"id": "CON-02", "type": "🪵 Consommable", "nom": "Disque à tronçonner Acier/Inox Ø125", "marque": "Norton Abrasifs", "ref": "NOR-125-1", "tailles": ["Lot de 5 disques", "Boîte de 25 disques"], "photo": "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=150&q=80", "desc": "Épaisseur 1mm pour une coupe ultra-rapide et précise sans bavure."}{"id": "OUT-01", "type": "🛠️ Outillage", "nom": "Perceuse Visseuse Bosch Pro", "marque": "Bosch", "ref": "GSR-18V", "tailles": ["Machine nue", "Pack 2 batteries"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80", "desc": "Puissante et compacte."},
+]
+CATALOGUE_OUTILLAGE = [
+    {"id": "OUT-01", "type": "🛠️ Outillage", "nom": "Perceuse Visseuse Bosch Pro", "marque": "Bosch", "ref": "GSR-18V", "tailles": ["Machine nue", "Pack 2 batteries"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80", "desc": "Puissante et compacte."},
     {"id": "OUT-02", "type": "🛠️ Outillage", "nom": "Meuleuse d'angle 125mm", "marque": "Makita", "ref": "DGA504", "tailles": ["Standard", "Variateur"], "photo": "https://images.unsplash.com/photo-1534224039826-c7a0dea0e66a?w=150&q=80", "desc": "Performance professionnelle."}
 ]
-
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "👑 ESPACE OLIVIER : Centralisation & Logistique",
     "🛒 CATALOGUE MAGASIN (EPI / Consommables)",

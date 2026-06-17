@@ -59,11 +59,12 @@ PHOTOS_SECOURS = {
     "Manutention": "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=300&q=80"
 }
 
+# --- AJOUT DU CATALOGUE OUTILLAGE ---
 CATALOGUE = [
-    {"id": "EPI-01", "type": "🦺 EPI", "nom": "Gants de soudure Haute Protection", "marque": "Singer Safety", "ref": "TIG-500", "tailles": ["M (8)", "L (9)", "XL (10)", "XXL (11)"], "photo": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&q=80", "desc": "Cuir de chèvre supérieur, coutures Kevlar. Idéal pour soudure TIG/MIG."},
-    {"id": "EPI-02", "type": "🦺 EPI", "nom": "Chaussures de Sécurité S3 Basse", "marque": "Caterpillar", "ref": "CAT-LITE", "tailles": ["41", "42", "43", "44", "45"], "photo": "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=150&q=80", "desc": "Coque composite sans métal, semelle anti-perforation, imperméable."},
-    {"id": "CON-01", "type": "🪵 Consommable", "nom": "Électrodes de Soudage Inox Ø2.5", "marque": "Gys", "ref": "E308L-16", "tailles": ["Étui de 50 pièces", "Blister de 10 pièces"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80", "desc": "Électrodes enrobées rutiles pour le soudage des aciers inoxydables."},
-    {"id": "CON-02", "type": "🪵 Consommable", "nom": "Disque à tronçonner Acier/Inox Ø125", "marque": "Norton Abrasifs", "ref": "NOR-125-1", "tailles": ["Lot de 5 disques", "Boîte de 25 disques"], "photo": "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=150&q=80", "desc": "Épaisseur 1mm pour une coupe ultra-rapide et précise sans bavure."}{"id": "OUT-01", "type": "🛠️ Outillage", "nom": "Perceuse Visseuse Bosch Pro", "marque": "Bosch", "ref": "GSR-18V", "tailles": ["Machine nue", "Pack 2 batteries"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80", "desc": "Puissante et compacte."},
+    {"id": "EPI-01", "type": "EPI", "nom": "Gants de soudure Haute Protection", "marque": "Singer Safety", "ref": "TIG-500", "tailles": ["M (8)", "L (9)", "XL (10)", "XXL (11)"], "photo": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&q=80", "desc": "Cuir de chèvre supérieur, coutures Kevlar."},
+    {"id": "EPI-02", "type": "EPI", "nom": "Chaussures de Sécurité S3 Basse", "marque": "Caterpillar", "ref": "CAT-LITE", "tailles": ["41", "42", "43", "44", "45"], "photo": "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=150&q=80", "desc": "Coque composite sans métal."},
+    {"id": "CON-01", "type": "Consommable", "nom": "Électrodes de Soudage Inox Ø2.5", "marque": "Gys", "ref": "E308L-16", "tailles": ["Étui 50p", "Blister 10p"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80", "desc": "Électrodes rutiles."},
+    {"id": "CON-02", "type": "Consommable", "nom": "Disque à tronçonner Acier/Inox Ø125", "marque": "Norton Abrasifs", "ref": "NOR-125-1", "tailles": ["Lot 5", "Boîte 25"], "photo": "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=150&q=80", "desc": "Épaisseur 1mm."}
 ]
 CATALOGUE_OUTILLAGE = [
     {"id": "OUT-01", "type": "🛠️ Outillage", "nom": "Perceuse Visseuse Bosch Pro", "marque": "Bosch", "ref": "GSR-18V", "tailles": ["Machine nue", "Pack 2 batteries"], "photo": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150&q=80", "desc": "Puissante et compacte."},

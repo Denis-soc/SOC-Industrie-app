@@ -119,53 +119,43 @@ with tab1:
         # Ajout de "🛠️ Outillage" dans les options de filtre
         filtre_type = st.radio("Filtrer par type :", ["Tous", "🦺 EPI", "🪵 Consommable", "🛠️ Outillage"], horizontal=True)
         
-        # On utilise CATALOGUE_TOTAL
-     for prod in CATALOGUE_TOTAL:
+       # 1. Boucle pour afficher les produits (Tout ceci est décalé vers la droite)
+    for prod in CATALOGUE_TOTAL:
         if filtre_type != "Tous" and prod["type"] != filtre_type: 
             continue
-            
-        # Tout ce qui suit doit être aligné ici (8 espaces)
         with st.container(border=True):
             c_img, c_txt, c_form = st.columns([1, 2, 1.5])
-            
-            # Gestion de l'image
             photo_url = prod.get("photo")
             if photo_url:
                 c_img.image(photo_url, width=100)
             else:
                 c_img.write("Pas d'image")
-                
-            # Texte du produit
             with c_txt:
                 st.markdown(f"### {prod['nom']}")
                 st.caption(f"**Marque :** {prod['marque']} | **Ref :** {prod['ref']}\n\n{prod['desc']}")
-            
-            # Formulaire
             with c_form:
                 t_choisie = st.selectbox("Option / Taille", prod["tailles"], key=f"t_{prod['id']}")
                 q_choisie = st.number_input("Quantité", min_value=1, value=1, key=f"q_{prod['id']}")
                 if st.button("➕ Ajouter", key=f"b_{prod['id']}", use_container_width=True):
-                    st.session_state.panier.append({
-                        "type": prod["type"], 
-                        "designation": f"{prod['nom']} ({prod['marque']})", 
-                        "taille": t_choisie, 
-                        "qte": q_choisie
-                    })
+                    st.session_state.panier.append({"type": prod["type"], "designation": f"{prod['nom']} ({prod['marque']})", "taille": t_choisie, "qte": q_choisie})
                     st.rerun()
+
+    # 2. PANIER (Ici, le code revient à gauche, il n'est plus dans la boucle)
+    with col_panier:
+        st.subheader("🛒 Mon Panier")
+        if not st.session_state.panier: 
+            st.info("Panier vide.")
+        else:
+            st.dataframe(pd.DataFrame(st.session_state.panier), use_container_width=True, hide_index=True)
+            if st.button("🗑️ Vider", use_container_width=True):
+                st.session_state.panier = []
+                st.rerun()
             st.markdown("---")
             with st.form("form_panier"):
                 nom_c = st.text_input("Votre Nom")
                 code_i = st.text_input("Code Imputation Obligatoire")
                 if st.form_submit_button("🚀 Envoyer la commande", use_container_width=True):
-                    if nom_c.strip() and code_i.strip():
-                        with engine.begin() as conn_tx:
-                            for art in st.session_state.panier:
-                                conn_tx.execute(sqlalchemy.text("INSERT INTO demandes_collaborateurs (date_demande, collaborateur, type_demande, designation, code_imputation, details, statut) VALUES (:dt, :col, :ty, :des, :cod, :det, 'En attente');"),
-                                                {"dt": datetime.now().strftime("%d/%m/%Y"), "col": nom_c.strip(), "ty": art["type"], "des": art["designation"], "cod": code_i.upper().strip(), "det": f"Option: {art['taille']} | Qté: {art['qte']}"})
-                        st.session_state.panier = []
-                        st.success("Commande transmise à Olivier !")
-                        st.rerun()
-                 
+                    # ... (votre code d'insertion en base reste ici)
 # ==========================================
 # ONGLET 2 : CATALOGUE VISUEL & REGISTRE
 # ==========================================

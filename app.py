@@ -39,7 +39,6 @@ tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "📍 Carte de localisation du matériel"
 ])
 # ... après la définition de tab0, tab1...
-
 with tab0:
     st.header("👑 Tableau de Bord Olivier")
     

@@ -7,7 +7,7 @@ import numpy as np
 st.set_page_config(page_title="SOC Industrie", layout="wide")
 
 # Ajout du logo dans la barre latérale
-st.sidebar.image("https://img.icons8.com/clouds/100/000000/crane.png", width=100) # Remplacez par l'URL de votre vrai logo si besoin
+st.sidebar.image("logo_soc.png", width=150) # Remplacez par l'URL de votre vrai logo si besoin
 st.sidebar.title("SOC Industrie")
 st.sidebar.info("Gestion interne du parc matériel.")
 

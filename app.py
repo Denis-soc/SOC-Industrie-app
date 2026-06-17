@@ -58,8 +58,14 @@ with tab5:
                 ref = st.text_input("Référence")
                 num_serie = st.text_input("N° de Série")
                 
-            # Gestion Photo : Uploader simple
-            uploaded_file = st.file_uploader("Déposer une photo (PNG/JPG)", type=['png', 'jpg', 'jpeg'])
+           st.subheader("📸 Photo du matériel")
+            source_photo = st.radio("Source :", ["Prendre une photo", "Déposer un fichier"], horizontal=True)
+            
+            image_a_traiter = None
+            if source_photo == "Prendre une photo":
+                image_a_traiter = st.camera_input("Prendre une photo maintenant", label_visibility="collapsed")
+            else:
+                image_a_traiter = st.file_uploader("Glisser ou sélectionner un fichier", type=['png', 'jpg', 'jpeg'], label_visibility="collapsed")
 
             # Suivi Maintenance (on utilise les colonnes réelles de votre table)
             soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?")

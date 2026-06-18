@@ -44,43 +44,50 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("📋 Catalogue du Matériel")
     
-    # 1. Récupération des données
+    # 1. Chargement sécurisé
+    df = pd.DataFrame()
     try:
         response = supabase.table("materiel").select("*").execute()
-        df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+        if response.data:
+            df = pd.DataFrame(response.data)
     except Exception as e:
         st.error(f"Erreur de connexion : {e}")
-        df = pd.DataFrame()
 
+    # 2. Nettoyage des données (IMPORTANT : gère les erreurs de vos nouveaux articles)
     if not df.empty:
-        # 2. Sélecteur de catalogue
-        categories = ["Tous"] + df["categorie"].unique().tolist()
+        # On force les colonnes essentielles en texte pour éviter les plantages
+        cols_a_nettoyer = ["Nom du Matériel", "num_interne", "reference", "categorie"]
+        for col in cols_a_nettoyer:
+            if col in df.columns:
+                df[col] = df[col].astype(str).replace('nan', '')
+        
+        # Sélecteur de catalogue
+        categories = ["Tous"] + [c for c in df["categorie"].unique().tolist() if c]
         cat_choisie = st.selectbox("Choisir le catalogue :", categories)
+        
+        # Filtrage
         df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
         
-        # 3. Grille de 6 colonnes pour une vue dense (4x plus petit)
-        cols = st.columns(6) 
+        # 3. Affichage en grille (6 colonnes pour la compacité)
+        cols = st.columns(6)
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
             with cols[i % 6]:
-                # Nom du matériel en petit
+                # Affichage simple pour éviter le crash
                 st.caption(row.get("Nom du Matériel", "Sans nom"))
                 
-                # --- GESTION PHOTO RÉDUITE ---
                 url = row.get("photo_url")
                 if url and str(url).startswith("http"):
-                    # width=100 fixe la taille en pixels pour garantir la réduction
-                    st.image(url, width=100) 
+                    st.image(url, width=80)
                 else:
                     st.warning("📷")
                 
-                # Détails compacts
-                ref_val = str(row.get('reference') or '')
-                st.write(f"Ref: {ref_val[:5]}...")
+                # Détails sans couper les chaînes (évite le ValueError)
+                st.write(f"Ref: {row.get('reference', '')}")
                 
                 if st.button("Détails", key=f"btn_{idx}"):
-                    st.info(f"N°: {row.get('num_interne', '')}\nFourn: {row.get('fournisseur', '')}")
+                    st.info(f"N° Interne: {row.get('num_interne', '')}")
     else:
-        st.info("Le catalogue est vide.")
+        st.info("Le catalogue est vide ou inaccessible.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

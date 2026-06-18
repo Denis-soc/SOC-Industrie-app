@@ -71,3 +71,23 @@ with tab1: # Catalogue
     if st.button("Ajouter un nouvel équipement"):
         # Logique d'ajout ici
         st.write("Formulaire d'ajout à créer...")
+with tab5:
+    st.header("Administration du Matériel")
+    
+    with st.form("ajout_materiel_form"):
+        nom = st.text_input("Nom du matériel")
+        categorie = st.selectbox("Catégorie", ["EPI", "Consommable", "Outillage"])
+        quantite = st.number_input("Quantité", min_value=0)
+        
+        submitted = st.form_submit_button("Ajouter à la base")
+        
+        if submitted:
+            # Envoi vers Supabase
+            data = supabase.table("materiel").insert({
+                "nom": nom, 
+                "categorie": categorie, 
+                "quantite": quantite
+            }).execute()
+            
+            st.success(f"{nom} a bien été ajouté au catalogue !")
+            st.rerun() # Rafraîchit l'interface pour voir la mise à jour

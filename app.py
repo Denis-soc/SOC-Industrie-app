@@ -94,39 +94,55 @@ with tab2:
     st.subheader("Matériels en stock")
     df_materiel = supabase.table("materiel").select("*").execute()
     st.dataframe(pd.DataFrame(df_materiel.data))
-with tab5:
-    st.header("⚙️ Administration du Matériel")
-    
-    # 1. Choix du mode
-    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
-
-    # 2. LOGIQUE AJOUTER
+# --- SECTION AJOUTER ---
     if mode == "Ajouter":
         with st.form("ajout_form"):
-            st.subheader("Ajouter un nouveau matériel")
+            st.subheader("Informations générales")
             col1, col2 = st.columns(2)
+            
             with col1:
                 num_interne = st.text_input("N° Interne (unique)")
                 nom = st.text_input("Nom du matériel")
-            with col2:
                 categorie = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"])
+                taille = st.text_input("Taille (si EPI)")
             
-            # LE BOUTON DOIT ÊTRE DANS LE BLOC WITH
-            submit = st.form_submit_button("Ajouter au catalogue")
+            with col2:
+                ref = st.text_input("Référence matériel")
+                num_serie = st.text_input("N° de série")
+                fournisseur = st.text_input("Fournisseur")
+                periodicite = st.number_input("Périodicité contrôle (mois)", min_value=0)
+                photo = st.file_uploader("Prendre une photo", type=['png', 'jpg', 'jpeg'])
+            
+            submit = st.form_submit_button("Valider l'ajout")
 
-        # LA LOGIQUE DOIT ÊTRE APRÈS LE BLOC FORMULAIRE
         if submit:
             if num_interne:
-                # Votre code d'insertion supabase ici
-                st.success(f"Ajout de {nom} en cours...")
+                try:
+                    # 1. Gestion Photo
+                    url_photo = ""
+                    if photo:
+                        file_path = f"materiel/{num_interne}.png"
+                        supabase.storage.from_("photos_materiel").upload(file_path, photo.getvalue(), {"upsert": "true"})
+                        url_photo = supabase.storage.from_("photos_materiel").get_public_url(file_path)
+                    
+                    # 2. Préparation Data (Vérifiez bien que ces noms correspondent à votre table Supabase)
+                    data = {
+                        "num_interne": num_interne,
+                        "Nom du Matériel": nom,
+                        "categorie": categorie,
+                        "taille": taille,
+                        "reference": ref,
+                        "num_serie": num_serie,
+                        "fournisseur": fournisseur,
+                        "periodicite_controle": periodicite,
+                        "photo_url": url_photo
+                    }
+                    
+                    # 3. Insertion
+                    supabase.table("materiel").insert(data).execute()
+                    st.success(f"Matériel {nom} ajouté avec succès !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur lors de l'envoi : {e}")
             else:
-                st.error("Le N° Interne est obligatoire.")
-
-    # 3. LOGIQUE MODIFIER
-    elif mode == "Modifier":
-        st.write("Fonctionnalité en cours de développement.")
-        # Ajoutez ici votre code de modification avec une indentation cohérente
-
-    # 4. LOGIQUE SUPPRIMER
-    elif mode == "Supprimer":
-        st.write("Fonctionnalité en cours de développement.")
+                st.warning("Le N° Interne est obligatoire.")

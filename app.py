@@ -19,47 +19,7 @@ def afficher_catalogue(categorie_nom):
         st.error(f"Erreur catalogue : {e}")
 
 # --- FONCTION FORMULAIRE (SANS PHOTO POUR STABILISER) ---
-def afficher_formulaire(donnees=None):
-    # Gestion sécurisée des données par défaut
-    valeurs = {
-        'id': "", 'nom': "", 'fournisseur': "", 'reference': "", 'num_serie': "", 
-        'date_controle': None, 'intervalle_mois': 12, 'photo_data': None
-    }
-    if donnees is not None:
-        valeurs.update donnees.to_dict() # Convertit la ligne SQL en dict
-
-    with st.form("form_partage"):
-        col1, col2 = st.columns(2)
-        num_interne = col1.text_input("Numéro interne", value=valeurs['id'], disabled=(donnees is not None))
-        nom = col1.text_input("Nom de l'article", value=valeurs['nom'])
-        fournisseur = col1.text_input("Fournisseur", value=valeurs['fournisseur'])
-        categorie = col2.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"])
-        ref = col2.text_input("Référence / Modèle", value=valeurs['reference'])
-        num_serie = col2.text_input("N° de Série", value=valeurs['num_serie'])
-        
-        # Gestion Photo
-        st.subheader("📸 Photo du matériel")
-        if valeurs['photo_data']:
-            st.image(base64.b64decode(valeurs['photo_data']), width=150, caption="Photo actuelle")
-        uploaded_file = st.file_uploader("Modifier/Ajouter une image", type=['png', 'jpg'])
-        
-        # Bouton de soumission OBLIGATOIRE dans le form
-        if st.form_submit_button("Enregistrer"):
-            pdata = valeurs['photo_data']
-            if uploaded_file:
-                pdata = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
-            
-            with engine.begin() as conn:
-                if donnees is None:
-                    query = sqlalchemy.text("""INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, photo_data) 
-                                              VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :pdata)""")
-                    conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "pdata": pdata})
-                else:
-                    query = sqlalchemy.text("""UPDATE materiel SET nom=:nom, categorie=:cat, fournisseur=:fourn, reference=:ref, 
-                                              num_serie=:serie, photo_data=:pdata WHERE id=:id""")
-                    conn.execute(query, {"nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "pdata": pdata, "id": num_interne})
-            st.success("Enregistré !")
-            st.rerun()
+v
       # 1. CONFIGURATION
 st.set_page_config(page_title="SOC Industrie — Gestion", page_icon="🏗️", layout="wide")
 

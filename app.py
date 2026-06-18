@@ -3,7 +3,6 @@ import sqlalchemy
 import pandas as pd
 from datetime import datetime
 import urllib.parse
-pip install supabase
 
 # 1. CONFIGURATION
 st.set_page_config(page_title="SOC Industrie — Gestion", page_icon="🏗️", layout="wide")

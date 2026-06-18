@@ -5,3 +5,4 @@ qrcode
 geopy
 psycopg2-binary
 SQLAlchemy
+supabase

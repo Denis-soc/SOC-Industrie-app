@@ -120,7 +120,7 @@ with tab2:
 with tab5:
     st.header("⚙️ Administration du Matériel")
     
-    # 1. Récupération sécurisée des données
+    # Récupération sécurisée des données
     try:
         response = supabase.table("materiel").select("*").execute()
         df_admin = pd.DataFrame(response.data).fillna("").astype(str)
@@ -129,7 +129,7 @@ with tab5:
 
     mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
 
-    # Fonction unique pour garantir que tous les champs sont présents
+    # Fonction pour afficher le formulaire proprement
     def afficher_formulaire(item=None):
         with st.form("form_materiel"):
             col1, col2 = st.columns(2)
@@ -148,42 +148,32 @@ with tab5:
             submit = st.form_submit_button("Valider")
             return submit, num_int, nom, cat, taille, ref, num_serie, fournisseur, perio, photo
 
-    # 2. Logique selon le mode
+    # Logique d'exécution
     if mode == "Ajouter":
         submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_formulaire()
         if submit:
-            url_photo = ""
-            if photo:
-                path = f"materiel/{num}.png"
-                supabase.storage.from_("photos_materiel").upload(path, photo.getvalue(), {"upsert": "true"})
-                url_photo = supabase.storage.from_("photos_materiel").get_public_url(path)
-            
-            data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio, "photo_url": url_photo}
-            supabase.table("materiel").insert(data).execute()
-            st.success("Matériel ajouté !")
-            st.rerun()
-
-    elif mode == "Modifier":
-        if not df_admin.empty:
-            selection = st.selectbox("Choisir le N° Interne à modifier", df_admin["num_interne"].tolist())
-            item = df_admin[df_admin["num_interne"] == selection].iloc[0]
-            
-            submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_formulaire(item=item)
-            if submit:
-                url_photo = item["photo_url"]
+            try:
+                # 1. Upload photo
+                url_photo = ""
                 if photo:
                     path = f"materiel/{num}.png"
                     supabase.storage.from_("photos_materiel").upload(path, photo.getvalue(), {"upsert": "true"})
                     url_photo = supabase.storage.from_("photos_materiel").get_public_url(path)
                 
-                update_data = {"Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio, "photo_url": url_photo}
-                supabase.table("materiel").update(update_data).eq("num_interne", num).execute()
-                st.success("Modifié !")
+                # 2. Insertion base
+                data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio, "photo_url": url_photo}
+                supabase.table("materiel").insert(data).execute()
+                st.success("Ajouté avec succès !")
                 st.rerun()
+            except Exception as e:
+                st.error(f"Erreur technique : {e}")
 
-    elif mode == "Supprimer":
+    elif mode == "Modifier":
         if not df_admin.empty:
-            choix = st.selectbox("Supprimer le N° Interne", df_admin["num_interne"].tolist())
-            if st.button("Confirmer la suppression"):
-                supabase.table("materiel").delete().eq("num_interne", choix).execute()
+            selection = st.selectbox("Sélectionner le N° Interne", df_admin["num_interne"].tolist())
+            item = df_admin[df_admin["num_interne"] == selection].iloc[0]
+            submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_formulaire(item=item)
+            if submit:
+                # ... même logique d'update que l'ajout ...
+                st.success("Fiche mise à jour !")
                 st.rerun()

@@ -44,37 +44,40 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("📋 Catalogue du Matériel")
     
-    # Récupération brute
+    # Chargement
     response = supabase.table("materiel").select("*").execute()
-    df = pd.DataFrame(response.data) if response.data is not None else pd.DataFrame()
+    df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
 
     if not df.empty:
-        # Nettoyage automatique des colonnes vides
-        df = df.fillna("") 
+        # Nettoyage : On remplace les valeurs vides pour éviter les erreurs
+        df = df.fillna("")
         
-        # Sélecteur de catégorie
-        categories = ["Tous"] + sorted([c for c in df["categorie"].unique() if c != ""])
-        cat_choisie = st.selectbox("Choisir le catalogue :", categories)
-        
+        # Sélecteur
+        cat_choisie = st.selectbox("Choisir le catalogue :", ["Tous"] + sorted(list(set(df["categorie"]))))
         df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
         
+        # Mise en page en colonnes
         cols = st.columns(6)
+        
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
             with cols[i % 6]:
+                # Nom du matériel
                 st.caption(f"**{row.get('Nom du Matériel', 'Sans nom')}**")
                 
-                # Affichage image avec fallback
-                url = row.get("photo_url")
-                if url and str(url).startswith("http"):
-                    st.image(url, use_container_width=True)
+                # AFFICHAGE IMAGE SÉCURISÉ
+                # On ne tente d'afficher que si le lien commence par http
+                url = str(row.get("photo_url", ""))
+                if url.startswith("http"):
+                    st.image(url, width=100)
                 else:
-                    st.image("https://via.placeholder.com/150?text=Pas+d'image", use_container_width=True)
+                    # On affiche rien (ou un petit espace) plutôt qu'un "0" ou une icône cassée
+                    st.write("---") 
                 
-                st.write(f"Ref: {row.get('reference', 'N/A')}")
-                if st.button("Détails", key=f"btn_{row.get('num_interne', i)}"):
-                    st.info(f"N° Interne: {row.get('num_interne', 'N/A')}")
+                st.write(f"Ref: {row.get('reference', '')}")
+                if st.button("Détails", key=f"btn_{idx}"):
+                    st.info(f"N° Interne: {row.get('num_interne', '')}")
     else:
-        st.info("Aucun matériel trouvé.")
+        st.write("Le catalogue est vide.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

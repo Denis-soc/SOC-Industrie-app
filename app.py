@@ -44,40 +44,44 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("📋 Catalogue du Matériel")
     
-    # Chargement
+    # Récupération
     response = supabase.table("materiel").select("*").execute()
     df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
 
     if not df.empty:
-        # Nettoyage : On remplace les valeurs vides pour éviter les erreurs
+        # 1. NETTOYAGE STRICT : On ne garde que les lignes qui ont un Nom
+        df = df[df["Nom du Matériel"].notna() & (df["Nom du Matériel"] != "")]
         df = df.fillna("")
         
         # Sélecteur
         cat_choisie = st.selectbox("Choisir le catalogue :", ["Tous"] + sorted(list(set(df["categorie"]))))
         df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
         
-        # Mise en page en colonnes
+        # 2. AFFICHAGE EN GRILLE FIXE
+        # On utilise une liste de colonnes pour forcer un alignement strict
         cols = st.columns(6)
         
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
             with cols[i % 6]:
-                # Nom du matériel
-                st.caption(f"**{row.get('Nom du Matériel', 'Sans nom')}**")
+                # Nom
+                st.markdown(f"**{row['Nom du Matériel']}**")
                 
-                # AFFICHAGE IMAGE SÉCURISÉ
-                # On ne tente d'afficher que si le lien commence par http
+                # IMAGE : Affichage conditionnel strict
                 url = str(row.get("photo_url", ""))
                 if url.startswith("http"):
-                    st.image(url, width=100)
+                    st.image(url, use_container_width=True)
                 else:
-                    # On affiche rien (ou un petit espace) plutôt qu'un "0" ou une icône cassée
-                    st.write("---") 
+                    # Espace réservé invisible pour garder l'alignement
+                    st.write("") 
                 
-                st.write(f"Ref: {row.get('reference', '')}")
+                # Référence
+                st.caption(f"Ref: {row.get('reference', 'N/A')}")
+                
+                # Bouton
                 if st.button("Détails", key=f"btn_{idx}"):
                     st.info(f"N° Interne: {row.get('num_interne', '')}")
     else:
-        st.write("Le catalogue est vide.")
+        st.info("Le catalogue est en cours de chargement ou vide.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

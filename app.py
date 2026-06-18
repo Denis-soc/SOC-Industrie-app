@@ -10,6 +10,7 @@ st.set_page_config(page_title="SOC Industrie — Gestion", page_icon="🏗️", 
 # 2. CONNEXION BDD
 from supabase import create_client
 
+# 1. Initialisation avec les secrets (que vous venez de configurer)
 @st.cache_resource
 def init_supabase():
     url = st.secrets["SUPABASE_URL"]
@@ -17,6 +18,15 @@ def init_supabase():
     return create_client(url, key)
 
 supabase = init_supabase()
+
+# 2. Chargement des données simplifié
+def charger_materiel():
+    # C'est ici que le client Supabase remplace le SQL complexe
+    response = supabase.table("materiel").select("*").execute()
+    return pd.DataFrame(response.data)
+
+# Chargement initial
+df_materiel_reel = charger_materiel()
 
 # 3. CHARGEMENT DONNÉES
 def charger_materiel():

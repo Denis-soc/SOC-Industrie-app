@@ -90,6 +90,33 @@ with tab1:
             
     except Exception as e:
         st.error(f"Erreur : {e}")
+with tab2:
+    st.header("📋 Suivi des Contrôles & Étalonnages")
+    
+    try:
+        response = supabase.table("materiel").select("*").execute()
+        df = pd.DataFrame(response.data)
+        
+        if not df.empty:
+            df = df.fillna(0) # Remplace les cases vides par 0
+            
+            # Filtre : Matériel avec une périodicité définie
+            df_suivi = df[df['periodicite_controle'].astype(int) > 0]
+            
+            st.write("Voici la liste du matériel nécessitant un suivi régulier :")
+            
+            # Affichage sous forme de tableau
+            st.dataframe(
+                df_suivi[['num_interne', 'Nom du Matériel', 'reference', 'periodicite_controle']],
+                use_container_width=True
+            )
+            
+            st.info("💡 Les alertes de contrôle automatique seront bientôt ajoutées ici.")
+        else:
+            st.info("Aucun matériel dans la base.")
+            
+    except Exception as e:
+        st.error(f"Erreur lors du chargement : {e}")
 with tab5:
     st.header("⚙️ Administration du Matériel")
     

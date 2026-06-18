@@ -20,79 +20,46 @@ def afficher_catalogue(categorie_nom):
 
 # --- FONCTION FORMULAIRE (SANS PHOTO POUR STABILISER) ---
 def afficher_formulaire(donnees=None):
+    # Gestion sécurisée des données par défaut
+    valeurs = {
+        'id': "", 'nom': "", 'fournisseur': "", 'reference': "", 'num_serie': "", 
+        'date_controle': None, 'intervalle_mois': 12, 'photo_data': None
+    }
+    if donnees is not None:
+        valeurs.update(donnees.to_dict()) # Convertit la ligne SQL en dict
+
     with st.form("form_partage"):
         col1, col2 = st.columns(2)
+        num_interne = col1.text_input("Numéro interne", value=valeurs['id'], disabled=(donnees is not None))
+        nom = col1.text_input("Nom de l'article", value=valeurs['nom'])
+        fournisseur = col1.text_input("Fournisseur", value=valeurs['fournisseur'])
+        categorie = col2.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"])
+        ref = col2.text_input("Référence / Modèle", value=valeurs['reference'])
+        num_serie = col2.text_input("N° de Série", value=valeurs['num_serie'])
         
-        # Valeurs par défaut
-        id_v = donnees['id'] if donnees is not None else ""
-        nom_v = donnees['nom'] if donnees is not None else ""
-        fourn_v = donnees['fournisseur'] if donnees is not None else ""
-        ref_v = donnees['reference'] if donnees is not None else ""
-        serie_v = donnees['num_serie'] if donnees is not None else ""
-        
-        num_interne = col1.text_input("Numéro interne", value=donnees['id'] if donnees else "", disabled=(donnees is not None))
-        nom = col1.text_input("Nom de l'article", value=donnees['nom'] if donnees else "")
-        fournisseur = col1.text_input("Fournisseur", value=fourn_v)
-        
-        categorie = col2.selectbox("Catégorie :", ["Catalogue EPI", "Catalogue Consommables", "Catalogue Outillage", "Catalogue Matériel Commun"], index=0)
-        ref = col2.text_input("Référence / Modèle", value=ref_v)
-        num_serie = col2.text_input("N° de Série", value=serie_v)
-        
-        st.subheader("📅 Suivi et Maintenance")
-        soumis_verif = st.checkbox("Soumis à contrôle ou étalonnage ?", key="maint_check")
-        date_c, perio = None, 12
-        if soumis_verif:
-            c_m1, c_m2 = st.columns(2)
-            date_c = c_m1.date_input("Date dernier contrôle")
-            perio = c_m2.number_input("Périodicité (mois)", value=12)
-# --- SECTION PHOTO ---
+        # Gestion Photo
         st.subheader("📸 Photo du matériel")
-        uploaded_file = st.file_uploader("Ajouter une image", type=['png', 'jpg'])
+        if valeurs['photo_data']:
+            st.image(base64.b64decode(valeurs['photo_data']), width=150, caption="Photo actuelle")
+        uploaded_file = st.file_uploader("Modifier/Ajouter une image", type=['png', 'jpg'])
         
-        # Affiche la photo existante si on modifie
-        if donnees is not None and donnees.get('photo_data'):
-            st.image(base64.b64decode(donnees['photo_data']), width=200, caption="Photo actuelle en base")
-
-        btn_label = "Mettre à jour" if donnees is not None else "Enregistrer"
-        if st.form_submit_button(btn_label):
-            # Conversion de l'image en base64
-            pdata = None
+        # Bouton de soumission OBLIGATOIRE dans le form
+        if st.form_submit_button("Enregistrer"):
+            pdata = valeurs['photo_data']
             if uploaded_file:
                 pdata = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
-            elif donnees is not None:
-                pdata = donnees.get('photo_data') # Conserve l'ancienne si pas de nouvelle
-
-            try:
-                with engine.begin() as conn:
-                    if donnees is None:
-                        query = sqlalchemy.text("""
-                            INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, date_controle, intervalle_mois, photo_data) 
-                            VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :date_c, :perio, :pdata)
-                        """)
-                        conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "pdata": pdata})
-                    else:
-                        query = sqlalchemy.text("""
-                            UPDATE materiel SET nom=:nom, categorie=:cat, fournisseur=:fourn, reference=:ref, num_serie=:serie, 
-                            date_controle=:date_c, intervalle_mois=:perio, photo_data=:pdata WHERE id=:id
-                        """)
-                        conn.execute(query, {"nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "pdata": pdata, "id": num_interne})
-                st.success("Fiche et photo enregistrées !")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erreur : {e}")
-        # BOUTON SOUMISSION
-        btn_label = "Mettre à jour" if donnees is not None else "Enregistrer"
-        if st.form_submit_button(btn_label):
+            
             with engine.begin() as conn:
                 if donnees is None:
-                    query = sqlalchemy.text("INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, date_controle, intervalle_mois) VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :date_c, :perio)")
-                    conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio})
+                    query = sqlalchemy.text("""INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, photo_data) 
+                                              VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :pdata)""")
+                    conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "pdata": pdata})
                 else:
-                    query = sqlalchemy.text("UPDATE materiel SET nom=:nom, categorie=:cat, fournisseur=:fourn, reference=:ref, num_serie=:serie, date_controle=:date_c, intervalle_mois=:perio WHERE id=:id")
-                    conn.execute(query, {"nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne})
-            st.success("Opération réussie !")
+                    query = sqlalchemy.text("""UPDATE materiel SET nom=:nom, categorie=:cat, fournisseur=:fourn, reference=:ref, 
+                                              num_serie=:serie, photo_data=:pdata WHERE id=:id""")
+                    conn.execute(query, {"nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "pdata": pdata, "id": num_interne})
+            st.success("Enregistré !")
             st.rerun()
-
       # 1. CONFIGURATION
 st.set_page_config(page_title="SOC Industrie — Gestion", page_icon="🏗️", layout="wide")
 

@@ -3,17 +3,21 @@ import sqlalchemy
 import pandas as pd
 from datetime import datetime
 import urllib.parse
+pip install supabase
 
 # 1. CONFIGURATION
 st.set_page_config(page_title="SOC Industrie — Gestion", page_icon="🏗️", layout="wide")
 
 # 2. CONNEXION BDD
-@st.cache_resource
-def init_connection():
-    db_url = st.secrets["DB_URL"]
-    return sqlalchemy.create_engine(db_url)
+from supabase import create_client
 
-engine = init_connection()
+@st.cache_resource
+def init_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+supabase = init_supabase()
 
 # 3. CHARGEMENT DONNÉES
 def charger_materiel():

@@ -29,3 +29,20 @@ df_demandes_reel = charger_demandes()
 
 # 4. INTERFACE
 st.title("🏗️ SOC Industrie – Gestion Interne")
+# 5. CONTENU DES ONGLES
+with tab1: # Catalogue
+    st.subheader("Catalogue Équipements")
+    
+    # On récupère les données
+    try:
+        response = supabase.table("materiel").select("*").execute()
+        df = pd.DataFrame(response.data)
+        
+        if not df.empty:
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("Aucun matériel trouvé dans la base.")
+    except Exception as e:
+        st.error(f"Erreur lors du chargement : {e}")
+
+# Répétez ce modèle pour tab2, tab3, etc. en changeant le nom de la table

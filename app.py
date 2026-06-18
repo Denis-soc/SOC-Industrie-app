@@ -103,10 +103,10 @@ with tab5:
     # Récupération des données pour les listes déroulantes
     try:
         response = supabase.table("materiel").select("*").execute()
-        df_admin = pd.DataFrame(response.data)
+        df = pd.DataFrame(response.data)
         # Gestion des données vides
         if not df_admin.empty:
-            df_admin = df_admin.fillna("").astype(str)
+            df = df.fillna("").astype(str)
             liste_materiel = df_admin["Nom du Matériel"].tolist()
         else:
             liste_materiel = []

@@ -120,7 +120,7 @@ with tab2:
 with tab5:
     st.header("⚙️ Administration du Matériel")
     
-    # 1. Récupération sécurisée
+    # 1. Récupération des données avec gestion d'erreur
     try:
         response = supabase.table("materiel").select("*").execute()
         df_admin = pd.DataFrame(response.data).fillna("").astype(str)
@@ -129,31 +129,69 @@ with tab5:
 
     mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
 
-    # Fonction pour afficher les champs proprement
+    # Fonction pour générer le formulaire de manière unifiée
     def afficher_formulaire(item=None):
-        with st.form("form_materiel"): # Le formulaire commence ici
+        with st.form("form_materiel"):
             col1, col2 = st.columns(2)
             with col1:
                 num_int = st.text_input("N° Interne", value=item["num_interne"] if item else "", disabled=(item is not None))
                 nom = st.text_input("Nom du matériel", value=item["Nom du Matériel"] if item else "")
                 cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"], index=0)
-                taille = st.text_input("Taille (si EPI)", value=item["taille"] if item and "taille" in item else "")
+                taille = st.text_input("Taille (si EPI)", value=item.get("taille", "") if item else "")
             with col2:
                 ref = st.text_input("Référence", value=item["reference"] if item else "")
-                num_serie = st.text_input("N° de série", value=item["num_serie"] if item and "num_serie" in item else "")
-                fournisseur = st.text_input("Fournisseur", value=item["fournisseur"] if item and "fournisseur" in item else "")
+                num_serie = st.text_input("N° de série", value=item.get("num_serie", "") if item else "")
+                fournisseur = st.text_input("Fournisseur", value=item.get("fournisseur", "") if item else "")
                 perio = st.number_input("Périodicité contrôle (mois)", value=int(float(item["periodicite_controle"])) if item and item.get("periodicite_controle") else 0)
                 photo = st.file_uploader("Photo", type=['png', 'jpg', 'jpeg'])
             
-            # LE BOUTON EST DANS LE FORMULAIRE
-            submit = st.form_submit_button("Valider") 
+            submit = st.form_submit_button("Valider")
             return submit, num_int, nom, cat, taille, ref, num_serie, fournisseur, perio, photo
 
-    # 2. Logique d'action
+    # 2. Logique d'exécution selon le mode
     if mode == "Ajouter":
         submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_formulaire()
         if submit:
-            data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio}
-            supabase.table("materiel").insert(data).execute()
-            st.success("Matériel ajouté !")
-            st.rerun()
+            try:
+                url_photo = ""
+                if photo:
+                    path = f"materiel/{num}.png"
+                    supabase.storage.from_("photos_materiel").upload(path, photo.getvalue(), {"upsert": "true"})
+                    url_photo = supabase.storage.from_("photos_materiel").get_public_url(path)
+                
+                data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio, "photo_url": url_photo}
+                supabase.table("materiel").insert(data).execute()
+                st.success("Matériel ajouté !")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erreur technique : {e}")
+
+    elif mode == "Modifier":
+        if not df_admin.empty:
+            selection = st.selectbox("Choisir le N° Interne", df_admin["num_interne"].tolist())
+            item = df_admin[df_admin["num_interne"] == selection].iloc[0]
+            
+            submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_formulaire(item=item)
+            if submit:
+                try:
+                    url_photo = item["photo_url"]
+                    if photo:
+                        path = f"materiel/{num}.png"
+                        supabase.storage.from_("photos_materiel").upload(path, photo.getvalue(), {"upsert": "true"})
+                        url_photo = supabase.storage.from_("photos_materiel").get_public_url(path)
+                    
+                    update_data = {"Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio, "photo_url": url_photo}
+                    supabase.table("materiel").update(update_data).eq("num_interne", num).execute()
+                    st.success("Fiche mise à jour !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur : {e}")
+        else:
+            st.info("Aucun matériel disponible.")
+
+    elif mode == "Supprimer":
+        if not df_admin.empty:
+            choix = st.selectbox("Supprimer le N° Interne", df_admin["num_interne"].tolist())
+            if st.button("Confirmer la suppression"):
+                supabase.table("materiel").delete().eq("num_interne", choix).execute()
+                st.rerun()

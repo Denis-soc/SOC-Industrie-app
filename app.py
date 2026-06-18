@@ -120,7 +120,7 @@ with tab2:
 with tab5:
     st.header("⚙️ Administration du Matériel")
     
-    # Récupération sécurisée des données
+    # 1. Récupération sécurisée
     try:
         response = supabase.table("materiel").select("*").execute()
         df_admin = pd.DataFrame(response.data).fillna("").astype(str)
@@ -129,9 +129,9 @@ with tab5:
 
     mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
 
-    # Fonction pour afficher le formulaire proprement
+    # Fonction pour afficher les champs proprement
     def afficher_formulaire(item=None):
-        with st.form("form_materiel"):
+        with st.form("form_materiel"): # Le formulaire commence ici
             col1, col2 = st.columns(2)
             with col1:
                 num_int = st.text_input("N° Interne", value=item["num_interne"] if item else "", disabled=(item is not None))
@@ -145,35 +145,15 @@ with tab5:
                 perio = st.number_input("Périodicité contrôle (mois)", value=int(float(item["periodicite_controle"])) if item and item.get("periodicite_controle") else 0)
                 photo = st.file_uploader("Photo", type=['png', 'jpg', 'jpeg'])
             
-            submit = st.form_submit_button("Valider")
+            # LE BOUTON EST DANS LE FORMULAIRE
+            submit = st.form_submit_button("Valider") 
             return submit, num_int, nom, cat, taille, ref, num_serie, fournisseur, perio, photo
 
-    # Logique d'exécution
+    # 2. Logique d'action
     if mode == "Ajouter":
         submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_formulaire()
         if submit:
-            try:
-                # 1. Upload photo
-                url_photo = ""
-                if photo:
-                    path = f"materiel/{num}.png"
-                    supabase.storage.from_("photos_materiel").upload(path, photo.getvalue(), {"upsert": "true"})
-                    url_photo = supabase.storage.from_("photos_materiel").get_public_url(path)
-                
-                # 2. Insertion base
-                data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio, "photo_url": url_photo}
-                supabase.table("materiel").insert(data).execute()
-                st.success("Ajouté avec succès !")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erreur technique : {e}")
-
-    elif mode == "Modifier":
-        if not df_admin.empty:
-            selection = st.selectbox("Sélectionner le N° Interne", df_admin["num_interne"].tolist())
-            item = df_admin[df_admin["num_interne"] == selection].iloc[0]
-            submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_formulaire(item=item)
-            if submit:
-                # ... même logique d'update que l'ajout ...
-                st.success("Fiche mise à jour !")
-                st.rerun()
+            data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio}
+            supabase.table("materiel").insert(data).execute()
+            st.success("Matériel ajouté !")
+            st.rerun()

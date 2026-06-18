@@ -108,52 +108,64 @@ with tab2:
 with tab5:
     st.header("⚙️ Administration du Matériel")
     
-    # 1. Chargement des données pour le selectbox
-    response = supabase.table("materiel").select("num_interne, 'Nom du Matériel'").execute()
-    liste_materiel = {item['num_interne']: item['Nom du Matériel'] for item in response.data}
-    
-    action = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
+    # 1. Récupération des données
+    try:
+        response = supabase.table("materiel").select("*").execute()
+        df_admin = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erreur base : {e}")
+        df_admin = pd.DataFrame()
 
-    with st.form("form_admin"):
-        if action == "Ajouter":
-            num = st.text_input("N° Interne (Unique)")
-        else:
-            num = st.selectbox("Choisir le matériel à gérer", list(liste_materiel.keys()), format_func=lambda x: f"{x} - {liste_materiel[x]}")
-        
-        nom = st.text_input("Nom du matériel")
-        cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Soudage", "Autre"])
-        ref = st.text_input("Référence")
-        url_photo = st.text_input("URL de la photo")
-        
-        submit = st.form_submit_button("Valider l'action")
+    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
 
-    if submit and num:
-        # Préparation du dictionnaire de données
-        # Note: Nous utilisons le nom exact de la colonne dans votre base
-        data = {
-            "num_interne": num,
-            "Nom du Matériel": nom,
-            "categorie": cat,
-            "reference": ref,
-            "photo_url": url_photo
-        }
+    # 2. Fonction de formulaire robuste
+    def afficher_form_complet(item=None):
+        # Conversion sécurisée : on gère la ligne de DataFrame comme un dict
+        item_dict = item.to_dict() if hasattr(item, 'to_dict') else (item if isinstance(item, dict) else {})
         
-        try:
-            if action == "Ajouter":
-                supabase.table("materiel").insert(data).execute()
-                st.success(f"Article {num} ajouté avec succès !")
+        with st.form("form_gestion"):
+            col1, col2 = st.columns(2)
+            with col1:
+                # 'disabled' permet de verrouiller le N° interne en mode modification
+                num = st.text_input("N° Interne", value=item_dict.get("num_interne", ""), disabled=(item is not None))
+                nom = st.text_input("Nom du matériel", value=item_dict.get("Nom du Matériel", ""))
+                cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"], 
+                                   index=0)
+                taille = st.text_input("Taille (si EPI)", value=item_dict.get("taille", ""))
+            with col2:
+                ref = st.text_input("Référence", value=item_dict.get("reference", ""))
+                ns = st.text_input("N° de série", value=item_dict.get("num_serie", ""))
+                fourn = st.text_input("Fournisseur", value=item_dict.get("fournisseur", ""))
+                perio = st.number_input("Périodicité contrôle (mois)", value=int(item_dict.get("periodicite_controle", 0) or 0))
+                photo = st.file_uploader("Photo", type=['png', 'jpg', 'jpeg'])
             
-            elif action == "Modifier":
-                supabase.table("materiel").update(data).eq("num_interne", num).execute()
-                st.success(f"Article {num} modifié avec succès !")
-            
-            elif action == "Supprimer":
-                supabase.table("materiel").delete().eq("num_interne", num).execute()
-                st.success(f"Article {num} supprimé !")
-            
-            # Rafraîchissement pour voir les changements
+            submit = st.form_submit_button("Valider")
+            return submit, num, nom, cat, taille, ref, ns, fourn, perio, photo
+
+    # 3. Logique d'exécution
+    if mode == "Ajouter":
+        submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_form_complet()
+        if submit and num:
+            data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio}
+            supabase.table("materiel").insert(data).execute()
+            st.success("Matériel ajouté !")
             st.rerun()
+
+    elif mode == "Modifier":
+        if not df_admin.empty:
+            sel = st.selectbox("Choisir le N° Interne", df_admin["num_interne"].tolist())
+            item = df_admin[df_admin["num_interne"] == sel].iloc[0]
             
-        except Exception as e:
-            st.error(f"Erreur lors de l'opération : {e}")
-            st.write("Vérifiez que le nom de la colonne 'Nom du Matériel' correspond bien à la base.")
+            submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_form_complet(item=item)
+            if submit:
+                upd = {"Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio}
+                supabase.table("materiel").update(upd).eq("num_interne", num).execute()
+                st.success("Modifié !")
+                st.rerun()
+
+    elif mode == "Supprimer":
+        if not df_admin.empty:
+            choix = st.selectbox("Supprimer le N° Interne", df_admin["num_interne"].tolist())
+            if st.button("Confirmer la suppression"):
+                supabase.table("materiel").delete().eq("num_interne", choix).execute()
+                st.rerun()

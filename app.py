@@ -85,9 +85,9 @@ with tab1:
                     "categorie": "Type"
                 }
             )
-for index, row in df_cat.iterrows():
-    col_img, col_data = st.columns([1, 3])
-    with col_img:
+        for index, row in df_cat.iterrows():
+        col_img, col_data = st.columns([1, 3])
+        with col_img:
         # On vérifie si une URL de photo existe
         if row['photo_url']:
             st.image(row['photo_url'], use_container_width=True)

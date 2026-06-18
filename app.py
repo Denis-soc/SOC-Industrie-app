@@ -42,42 +42,50 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 # 5. CONTENU DES ONGLES
 with tab1:
-    st.header("Catalogue du Matériel")
+    st.header("📋 Catalogue du Matériel")
     
+    # 1. Récupération des données depuis Supabase
     try:
         response = supabase.table("materiel").select("*").execute()
-        df = pd.DataFrame(response.data)
-    except:
+        df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erreur de connexion : {e}")
         df = pd.DataFrame()
 
     if not df.empty:
-        # 1. Sélection du catalogue (Filtre par catégorie)
+        # 2. Sélecteur de catalogue (Filtre par catégorie)
+        # On ajoute "Tous" pour voir tout le matériel
         categories = ["Tous"] + df["categorie"].unique().tolist()
         cat_choisie = st.selectbox("Choisir le catalogue :", categories)
         
-        # Filtrage des données
+        # Filtrage
         df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
         
-        # 2. Affichage propre en grille
+        # 3. Affichage en grille (3 colonnes)
         cols = st.columns(3)
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
             with cols[i % 3]:
                 st.subheader(row.get("Nom du Matériel", "Sans nom"))
                 
-                # --- GESTION PHOTO REDIMENSIONNÉE ---
+                # --- GESTION PHOTO (Redimensionnée) ---
                 url = row.get("photo_url")
+                # use_container_width=True force l'image à s'adapter à la largeur de la colonne
                 if url and str(url).startswith("http"):
-                    # use_container_width=True force l'image à tenir dans la colonne
-                    st.image(url, use_container_width=True) 
+                    st.image(url, use_container_width=True)
                 else:
                     st.warning("📷 Pas de photo")
                 
-                st.write(f"**N° :** {row.get('num_interne', '')}")
+                st.write(f"**N° Interne :** {row.get('num_interne', '')}")
+                st.write(f"**Catégorie :** {row.get('categorie', '')}")
+                
                 with st.expander("Voir détails"):
-                    st.write(f"Ref: {row.get('reference', '')}")
-                    st.write(f"Fournisseur: {row.get('fournisseur', '')}")
+                    st.write(f"Référence : {row.get('reference', '')}")
+                    st.write(f"Série : {row.get('num_serie', '')}")
+                    st.write(f"Fournisseur : {row.get('fournisseur', '')}")
+                
+                st.divider() # Séparation visuelle entre les éléments
     else:
-        st.info("Le catalogue est vide.")
+        st.info("Le catalogue est actuellement vide.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

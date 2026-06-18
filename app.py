@@ -54,5 +54,9 @@ with tab1: # Catalogue
             st.info("Aucun matériel trouvé dans la base.")
     except Exception as e:
         st.error(f"Erreur lors du chargement : {e}")
+with tab2:
+    st.subheader("Matériels en stock")
+    df_materiel = supabase.table("materiel").select("*").execute()
+    st.dataframe(pd.DataFrame(df_materiel.data))
 
 # Répétez ce modèle pour tab2, tab3, etc. en changeant le nom de la table

@@ -26,7 +26,7 @@ def afficher_formulaire(donnees=None):
         'date_controle': None, 'intervalle_mois': 12, 'photo_data': None
     }
     if donnees is not None:
-        valeurs.update(donnees.to_dict()) # Convertit la ligne SQL en dict
+        valeurs.update donnees.to_dict() # Convertit la ligne SQL en dict
 
     with st.form("form_partage"):
         col1, col2 = st.columns(2)

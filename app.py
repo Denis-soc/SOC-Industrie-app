@@ -43,37 +43,18 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # 5. CONTENU DES ONGLES
 with tab1:
     st.header("🛒 Catalogue des Équipements")
-    
     try:
         response = supabase.table("materiel").select("*").execute()
         df = pd.DataFrame(response.data)
-        
         if not df.empty:
-            # Nettoyage : on convertit en string pour éviter les erreurs de type
+            # Nettoyage crucial pour éviter l'erreur "float"
+            df = df.fillna("") 
             df = df.astype(str)
-            
-            # Filtre de recherche
-            search = st.text_input("🔍 Rechercher un matériel")
-            if search:
-                # Recherche sur la colonne 'Nom du Matériel'
-                df = df[df['Nom du Matériel'].str.contains(search, case=False, na=False)]
-            
-            # Affichage propre avec sélection de colonnes
-            # On ne garde que les colonnes importantes pour l'utilisateur
-            cols_to_show = ['num_interne', 'Nom du Matériel', 'categorie', 'statut', 'date_controle']
-            st.dataframe(df[cols_to_show], use_container_width=True)
-            response = supabase.table("materiel").select("*").execute()
-df = pd.DataFrame(response.data)
-            
-            # Affichage des photos (si url présente)
-            for _, row in df.iterrows():
-                if 'photo_url' in row and row['photo_url'] not in ['None', 'nan', '']:
-                    st.image(row['photo_url'], width=150, caption=row['Nom du Matériel'])
+            st.dataframe(df, use_container_width=True)
         else:
             st.info("Aucun matériel trouvé.")
-            
     except Exception as e:
-        st.error(f"Erreur d'affichage : {e}")
+        st.error(f"Erreur : {e}")
 with tab2:
     st.subheader("Matériels en stock")
     df_materiel = supabase.table("materiel").select("*").execute()

@@ -44,61 +44,47 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("🛒 Catalogue des Équipements")
 
-    # 1. Récupération des données depuis Supabase
     try:
         response = supabase.table("materiel").select("*").execute()
         df_cat = pd.DataFrame(response.data)
 
         if not df_cat.empty:
-            # 2. Barre de recherche et Filtres en colonnes
+            # Recherche et filtres
             col_search, col_filter = st.columns([2, 1])
-            
             with col_search:
-                recherche = st.text_input("🔍 Rechercher un article (Nom, Marque...)", "")
-            
+                recherche = st.text_input("🔍 Rechercher un article", "")
             with col_filter:
-                # On récupère les catégories uniques présentes dans la base
                 categories = ["Toutes"] + sorted(df_cat["categorie"].unique().tolist())
                 choix_cat = st.selectbox("Filtrer par catégorie", categories)
 
-            # 3. Application des filtres
+            # Application filtres
             df_filtre = df_cat.copy()
-            
             if choix_cat != "Toutes":
                 df_filtre = df_filtre[df_filtre["categorie"] == choix_cat]
-            
             if recherche:
-                # Recherche insensible à la casse dans la colonne 'nom'
                 df_filtre = df_filtre[df_filtre["nom"].str.contains(recherche, case=False, na=False)]
 
-            # 4. Affichage du résultat
             st.write(f"**{len(df_filtre)}** articles trouvés")
             
-            # Configuration de l'affichage (on cache les colonnes techniques comme l'ID si besoin)
-            st.dataframe(
-                df_filtre, 
-                use_container_width=True,
-                column_config={
-                    "id": None, # Cache l'ID
-                    "quantite": st.column_config.NumberColumn("Stock", format="%d 📦"),
-                    "nom": "Désignation",
-                    "categorie": "Type"
-                }
-            )
-        for index, row in df_cat.iterrows():
-        col_img, col_data = st.columns([1, 3])
-        with col_img:
-        # On vérifie si une URL de photo existe
-        if row['photo_url']:
-            st.image(row['photo_url'], use_container_width=True)
+            # Affichage du tableau
+            st.dataframe(df_filtre, use_container_width=True)
+
+            # --- CORRECTION ICI : Affichage des photos sous le tableau ---
+            st.subheader("Aperçu des articles")
+            for index, row in df_filtre.iterrows():
+                col_img, col_data = st.columns([1, 4])
+                with col_img:
+                    if 'photo_url' in row and row['photo_url']:
+                        st.image(row['photo_url'], width=100)
+                    else:
+                        st.write("📷 Pas de photo")
+                with col_data:
+                    st.write(f"**{row['nom']}** ({row['categorie']})")
         else:
-            # On peut afficher une image par défaut ou une icône
-            st.info("📷 Pas de photo")
-        else:
-            st.warning("Le catalogue est vide. Ajoutez du matériel dans l'onglet Administration.")
+            st.warning("Le catalogue est vide.")
 
     except Exception as e:
-        st.error(f"Erreur de chargement du catalogue : {e}")
+        st.error(f"Erreur de chargement : {e}")
 with tab2:
     st.subheader("Matériels en stock")
     df_materiel = supabase.table("materiel").select("*").execute()

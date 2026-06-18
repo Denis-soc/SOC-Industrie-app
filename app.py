@@ -95,21 +95,36 @@ with tab2:
     df_materiel = supabase.table("materiel").select("*").execute()
     st.dataframe(pd.DataFrame(df_materiel.data))
 with tab5:
-    st.header("⚙️ Administration du Matériel")
+    st.header("⚙️ Ajout de Matériel")
     
-    with st.form("ajout_materiel_form"):
-        nom = st.text_input("Nom du matériel")
-        categorie = st.selectbox("Catégorie", ["EPI", "Consommable", "Outillage"])
-        quantite = st.number_input("Quantité", min_value=0)
+    with st.form("ajout_complet", clear_on_submit=True):
+        col1, col2 = st.columns(2)
         
-        submitted = st.form_submit_button("Ajouter à la base")
+        with col1:
+            nom = st.text_input("Nom du matériel")
+            ref_materiel = st.text_input("Référence matériel")
+            num_interne = st.text_input("N° Interne (unique)")
+            taille = st.text_input("Taille (si EPI)")
+            
+        with col2:
+            num_serie = st.text_input("N° de Série")
+            date_achat = st.date_input("Date d'achat / dernier étalonnage")
+            periodicite = st.number_input("Périodicité contrôle (en mois)", min_value=0)
+            
+        photo_url = st.text_input("Lien de la photo (URL)") # Voir note ci-dessous
+        
+        submitted = st.form_submit_button("Ajouter au catalogue")
         
         if submitted:
-            # Envoi vers Supabase
-            data = {"nom": nom, "categorie": categorie, "quantite": quantite}
+            data = {
+                "nom": nom,
+                "ref_materiel": ref_materiel,
+                "num_interne": num_interne,
+                "taille": taille,
+                "num_serie": num_serie,
+                "date_achat_etalonnage": str(date_achat),
+                "periodicite_controle": periodicite,
+                "photo_url": photo_url
+            }
             supabase.table("materiel").insert(data).execute()
-            
-            st.success(f"{nom} a bien été ajouté au catalogue !")
-            st.rerun() # Rafraîchit l'interface pour voir la mise à jour
-
-# Répétez ce modèle pour tab2, tab3, etc. en changeant le nom de la table
+            st.success("Matériel enregistré avec succès !")

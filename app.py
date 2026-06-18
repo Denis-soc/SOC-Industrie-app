@@ -119,6 +119,7 @@ with tab5:
                 st.stop()
 
             # 2. Préparation des données textuelles
+            st.write("Données envoyées à Supabase :", data)
             data = {
                 "categorie": categorie,
                 "nom": nom,

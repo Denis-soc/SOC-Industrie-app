@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client
+import uuid # Mettez-le ici avec les autres imports
 
 # 1. CONFIGURATION
 st.set_page_config(page_title="SOC Industrie – Gestion", page_icon="🏗️", layout="wide")

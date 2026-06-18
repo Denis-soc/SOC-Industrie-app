@@ -59,20 +59,7 @@ def afficher_formulaire(donnees=None):
             st.success("Opération réussie !")
             st.rerun()
 
-        # BOUTON SOUMISSION
-        btn_label = "Mettre à jour" if donnees is not None else "Enregistrer"
-        if st.form_submit_button(btn_label):
-            with engine.begin() as conn:
-                if donnees is None:
-                    query = sqlalchemy.text("INSERT INTO materiel (id, nom, categorie, fournisseur, reference, num_serie, date_controle, intervalle_mois) VALUES (:id, :nom, :cat, :fourn, :ref, :serie, :date_c, :perio)")
-                    conn.execute(query, {"id": num_interne, "nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio})
-                else:
-                    query = sqlalchemy.text("UPDATE materiel SET nom=:nom, categorie=:cat, fournisseur=:fourn, reference=:ref, num_serie=:serie, date_controle=:date_c, intervalle_mois=:perio WHERE id=:id")
-                    conn.execute(query, {"nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne})
-            st.success("Opération réussie !")
-            st.rerun()
-
-# 1. CONFIGURATION
+      # 1. CONFIGURATION
 st.set_page_config(page_title="SOC Industrie — Gestion", page_icon="🏗️", layout="wide")
 
 # 2. CONNEXION BDD

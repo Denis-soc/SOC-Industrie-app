@@ -62,6 +62,8 @@ with tab1:
             # On ne garde que les colonnes importantes pour l'utilisateur
             cols_to_show = ['num_interne', 'Nom du Matériel', 'categorie', 'statut', 'date_controle']
             st.dataframe(df[cols_to_show], use_container_width=True)
+            response = supabase.table("materiel").select("*").execute()
+df = pd.DataFrame(response.data)
             
             # Affichage des photos (si url présente)
             for _, row in df.iterrows():

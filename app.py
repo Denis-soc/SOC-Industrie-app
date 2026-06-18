@@ -137,3 +137,12 @@ with tab5:
             supabase.table("materiel").delete().eq("num_interne", item_supp["num_interne"]).execute()
             st.warning(f"{choix_supp} a été supprimé.")
             st.rerun() # Rafraîchit l'interface pour voir la suppression
+            with st.form("ajout_form"):
+    # ... vos champs ...
+    
+    # CRITICAL : Cette ligne est obligatoire
+    submit = st.form_submit_button("Ajouter au catalogue")
+
+if submit:
+    # Votre logique d'envoi vers Supabase ici
+    st.success("Matériel ajouté !")

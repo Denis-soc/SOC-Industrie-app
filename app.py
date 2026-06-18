@@ -101,22 +101,26 @@ with tab5:
         col1, col2 = st.columns(2)
         
         with col1:
+            # Nouveau sélecteur de catalogue obligatoire
+            categorie = st.selectbox("Sélectionner le catalogue", 
+                                     ["EPI", "Consommable", "Outillage", "Électroportatif"])
             nom = st.text_input("Nom du matériel")
             ref_materiel = st.text_input("Référence matériel")
             num_interne = st.text_input("N° Interne (unique)")
-            taille = st.text_input("Taille (si EPI)")
             
         with col2:
+            taille = st.text_input("Taille (si EPI)")
             num_serie = st.text_input("N° de Série")
             date_achat = st.date_input("Date d'achat / dernier étalonnage")
             periodicite = st.number_input("Périodicité contrôle (en mois)", min_value=0)
             
-        photo_url = st.text_input("Lien de la photo (URL)") # Voir note ci-dessous
+        photo_url = st.text_input("Lien de la photo (URL)")
         
         submitted = st.form_submit_button("Ajouter au catalogue")
         
         if submitted:
             data = {
+                "categorie": categorie, # On enregistre bien la catégorie choisie
                 "nom": nom,
                 "ref_materiel": ref_materiel,
                 "num_interne": num_interne,
@@ -126,5 +130,9 @@ with tab5:
                 "periodicite_controle": periodicite,
                 "photo_url": photo_url
             }
-            supabase.table("materiel").insert(data).execute()
-            st.success("Matériel enregistré avec succès !")
+            # Insertion dans Supabase
+            try:
+                supabase.table("materiel").insert(data).execute()
+                st.success(f"Matériel ajouté avec succès dans la catégorie : {categorie} !")
+            except Exception as e:
+                st.error(f"Erreur : {e}")

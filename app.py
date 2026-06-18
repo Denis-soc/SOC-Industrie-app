@@ -42,54 +42,18 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 # 5. CONTENU DES ONGLES
 with tab1:
-    st.header("📋 Catalogue du Matériel")
+    st.header("📋 Catalogue (Test de visibilité)")
     
-    # 1. Chargement SANS cache pour garantir la mise à jour immédiate
-    # On utilise une fonction simple sans @st.cache_data
-    def load_data():
-        try:
-            response = supabase.table("materiel").select("*").execute()
-            return pd.DataFrame(response.data) if response.data is not None else pd.DataFrame()
-        except Exception as e:
-            st.error(f"Erreur de connexion : {e}")
-            return pd.DataFrame()
-
-    df = load_data()
-
-    if not df.empty:
-        # 2. Sélecteur de catégorie
-        # On filtre les valeurs vides pour éviter les problèmes d'affichage
-        categories = ["Tous"] + [c for c in df["categorie"].unique().tolist() if c]
-        cat_choisie = st.selectbox("Choisir le catalogue :", categories, key="cat_tab1")
-        
-        # Filtrage des données
-        df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
-        
-        # 3. Affichage en grille de 6 colonnes
-        cols = st.columns(6)
-        
-        # On itère sur les lignes du dataframe filtré
-        for i, (idx, row) in enumerate(df_filtre.iterrows()):
-            with cols[i % 6]:
-                # Nom du matériel
-                st.caption(row.get("Nom du Matériel", "Sans nom"))
-                
-                # Gestion photo avec taille fixe
-                url = row.get("photo_url")
-                if url and str(url).startswith("http"):
-                    st.image(url, width=100)
-                else:
-                    st.warning("📷")
-                
-                # Référence sécurisée
-                st.write(f"Ref: {row.get('reference', '')}")
-                
-                # Bouton détails
-                if st.button("Détails", key=f"btn_{row['num_interne']}"):
-                    st.info(f"N° Interne : {row.get('num_interne', '')}\n"
-                            f"Fournisseur : {row.get('fournisseur', '')}")
+    # Tentative de récupération brute
+    response = supabase.table("materiel").select("*").execute()
+    data = response.data
+    
+    st.write(f"Nombre d'articles trouvés dans la base : {len(data) if data else 0}")
+    
+    if data:
+        st.dataframe(pd.DataFrame(data)) # Affiche tout sous forme de tableau
     else:
-        st.info("Le catalogue est actuellement vide ou en cours de chargement.")
+        st.error("Aucune donnée retournée par Supabase. Vérifiez si vous êtes sur la bonne table !")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

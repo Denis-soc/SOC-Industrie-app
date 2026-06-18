@@ -40,20 +40,56 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "⚙️ Administration Matériel"
 ])
 # 5. CONTENU DES ONGLES
-with tab1: # Catalogue
-    st.subheader("Catalogue Équipements")
-    
-    # On récupère les données
+with tab1:
+    st.header("🛒 Catalogue des Équipements")
+
+    # 1. Récupération des données depuis Supabase
     try:
         response = supabase.table("materiel").select("*").execute()
-        df = pd.DataFrame(response.data)
-        
-        if not df.empty:
-            st.dataframe(df, use_container_width=True)
+        df_cat = pd.DataFrame(response.data)
+
+        if not df_cat.empty:
+            # 2. Barre de recherche et Filtres en colonnes
+            col_search, col_filter = st.columns([2, 1])
+            
+            with col_search:
+                recherche = st.text_input("🔍 Rechercher un article (Nom, Marque...)", "")
+            
+            with col_filter:
+                # On récupère les catégories uniques présentes dans la base
+                categories = ["Toutes"] + sorted(df_cat["categorie"].unique().tolist())
+                choix_cat = st.selectbox("Filtrer par catégorie", categories)
+
+            # 3. Application des filtres
+            df_filtre = df_cat.copy()
+            
+            if choix_cat != "Toutes":
+                df_filtre = df_filtre[df_filtre["categorie"] == choix_cat]
+            
+            if recherche:
+                # Recherche insensible à la casse dans la colonne 'nom'
+                df_filtre = df_filtre[df_filtre["nom"].str.contains(recherche, case=False, na=False)]
+
+            # 4. Affichage du résultat
+            st.write(f"**{len(df_filtre)}** articles trouvés")
+            
+            # Configuration de l'affichage (on cache les colonnes techniques comme l'ID si besoin)
+            st.dataframe(
+                df_filtre, 
+                use_container_width=True,
+                column_config={
+                    "id": None, # Cache l'ID
+                    "quantite": st.column_config.NumberColumn("Stock", format="%d 📦"),
+                    "nom": "Désignation",
+                    "categorie": "Type"
+                }
+            )
+
         else:
-            st.info("Aucun matériel trouvé dans la base.")
+            st.warning("Le catalogue est vide. Ajoutez du matériel dans l'onglet Administration.")
+
     except Exception as e:
-        st.error(f"Erreur lors du chargement : {e}")
+        st.error(f"Erreur de chargement du catalogue : {e}")
 with tab2:
     st.subheader("Matériels en stock")
     df_materiel = supabase.table("materiel").select("*").execute()

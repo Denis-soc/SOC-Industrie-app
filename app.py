@@ -43,16 +43,42 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # 5. CONTENU DES ONGLES
 with tab1:
     st.header("🛒 Catalogue des Équipements")
+    
+    # 1. Chargement et nettoyage
     try:
         response = supabase.table("materiel").select("*").execute()
         df = pd.DataFrame(response.data)
         if not df.empty:
-            # Nettoyage crucial pour éviter l'erreur "float"
-            df = df.fillna("") 
-            df = df.astype(str)
-            st.dataframe(df, use_container_width=True)
+            df = df.fillna("").astype(str)
+            
+            # 2. Recherche
+            recherche = st.text_input("🔍 Rechercher un matériel", "")
+            if recherche:
+                df = df[df['Nom du Matériel'].str.contains(recherche, case=False, na=False)]
+            
+            # 3. Affichage en Grille (3 colonnes)
+            st.write("---")
+            cols = st.columns(3) # Création de 3 colonnes pour la grille
+            
+            for index, row in df.iterrows():
+                # On utilise le modulo pour faire tourner les colonnes (col 0, 1, 2, 0, 1...)
+                with cols[index % 3]:
+                    # Affichage photo si disponible, sinon une icône par défaut
+                    if 'photo_url' in row and row['photo_url'] not in ['None', 'nan', '']:
+                        st.image(row['photo_url'], use_column_width=True)
+                    else:
+                        st.warning("📷 Pas de photo")
+                    
+                    # Infos sous la photo
+                    st.markdown(f"**{row['Nom du Matériel']}**")
+                    st.caption(f"Catégorie: {row['categorie']}")
+                    st.caption(f"ID: {row['num_interne']}")
+                    
+                    if st.button(f"Voir détail", key=f"btn_{index}"):
+                        st.info(f"Détails pour {row['Nom du Matériel']}...")
+                    st.write("---")
         else:
-            st.info("Aucun matériel trouvé.")
+            st.info("Le catalogue est vide.")
     except Exception as e:
         st.error(f"Erreur : {e}")
 with tab2:

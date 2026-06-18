@@ -45,46 +45,43 @@ with tab1:
     st.header("🛒 Catalogue des Équipements")
 
     try:
+        # 1. Chargement et conversion sécurisée
         response = supabase.table("materiel").select("*").execute()
         df_cat = pd.DataFrame(response.data)
 
         if not df_cat.empty:
-            # --- CORRECTION : Conversion forcée en string pour éviter l'erreur float/str ---
+            # Conversion forcée en string pour éviter les erreurs de type (NaN/float)
             df_cat = df_cat.astype(str) 
             
-            # Barre de recherche et Filtres
+            # 2. Filtres
             col_search, col_filter = st.columns([2, 1])
             with col_search:
                 recherche = st.text_input("🔍 Rechercher un article", "")
             with col_filter:
-                # Utilisez .unique() sur la colonne en string
                 categories = ["Toutes"] + sorted(df_cat["categorie"].unique().tolist())
                 choix_cat = st.selectbox("Filtrer par catégorie", categories)
 
-            # Application des filtres
+            # 3. Application des filtres
             df_filtre = df_cat.copy()
-            
             if choix_cat != "Toutes":
                 df_filtre = df_filtre[df_filtre["categorie"] == choix_cat]
-            
             if recherche:
-                # Recherche insensible à la casse
                 df_filtre = df_filtre[df_filtre["nom"].str.contains(recherche, case=False, na=False)]
 
             st.write(f"**{len(df_filtre)}** articles trouvés")
-            st.dataframe(df_filtre, use_container_width=True
+            
+            # 4. Affichage corrigé (parenthèses fermées correctement)
+            st.dataframe(df_filtre, use_container_width=True)
 
-            # --- CORRECTION ICI : Affichage des photos sous le tableau ---
-            st.subheader("Aperçu des articles")
+            # 5. Affichage des photos
+            st.subheader("Aperçu")
             for index, row in df_filtre.iterrows():
                 col_img, col_data = st.columns([1, 4])
                 with col_img:
-                    if 'photo_url' in row and row['photo_url']:
+                    if 'photo_url' in row and row['photo_url'] != 'None':
                         st.image(row['photo_url'], width=100)
                     else:
-                        st.write("📷 Pas de photo")
-                with col_data:
-                    st.write(f"**{row['nom']}** ({row['categorie']})")
+                        st.info("Pas de photo")
         else:
             st.warning("Le catalogue est vide.")
 

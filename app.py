@@ -106,37 +106,54 @@ with tab2:
     except Exception as e:
         st.error(f"Erreur lors du chargement : {e}")
 with tab5:
-    st.header("⚙️ Administration")
-    mode = st.radio("Action", ["Ajouter", "Modifier"], horizontal=True)
+    st.header("⚙️ Administration du Matériel")
     
-    # Formulaire simplifié
-    with st.form("form_admin"):
-        num = st.text_input("N° Interne")
-        nom = st.text_input("Nom du matériel")
-        cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Soudage"])
-        ref = st.text_input("Référence")
-        url_photo = st.text_input("URL de la photo (lien http)") # <--- Testez en collant un lien ici
-        
-        submit = st.form_submit_button("Enregistrer")
+    # 1. Chargement des données pour le selectbox
+    response = supabase.table("materiel").select("num_interne, 'Nom du Matériel'").execute()
+    liste_materiel = {item['num_interne']: item['Nom du Matériel'] for item in response.data}
+    
+    action = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
 
-    if submit:
+    with st.form("form_admin"):
+        if action == "Ajouter":
+            num = st.text_input("N° Interne (Unique)")
+        else:
+            num = st.selectbox("Choisir le matériel à gérer", list(liste_materiel.keys()), format_func=lambda x: f"{x} - {liste_materiel[x]}")
+        
+        nom = st.text_input("Nom du matériel")
+        cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Soudage", "Autre"])
+        ref = st.text_input("Référence")
+        url_photo = st.text_input("URL de la photo")
+        
+        submit = st.form_submit_button("Valider l'action")
+
+    if submit and num:
+        # Préparation du dictionnaire de données
+        # Note: Nous utilisons le nom exact de la colonne dans votre base
         data = {
             "num_interne": num,
             "Nom du Matériel": nom,
             "categorie": cat,
             "reference": ref,
-            "photo_url": url_photo  # <--- Indispensable pour que l'image apparaisse
+            "photo_url": url_photo
         }
         
-        if mode == "Ajouter":
-            supabase.table("materiel").insert(data).execute()
-        else:
-            supabase.table("materiel").update(data).eq("num_interne", num).execute()
-            
         try:
-            supabase.table("materiel").insert(data).execute()
-            st.success("Opération effectuée !")
+            if action == "Ajouter":
+                supabase.table("materiel").insert(data).execute()
+                st.success(f"Article {num} ajouté avec succès !")
+            
+            elif action == "Modifier":
+                supabase.table("materiel").update(data).eq("num_interne", num).execute()
+                st.success(f"Article {num} modifié avec succès !")
+            
+            elif action == "Supprimer":
+                supabase.table("materiel").delete().eq("num_interne", num).execute()
+                st.success(f"Article {num} supprimé !")
+            
+            # Rafraîchissement pour voir les changements
             st.rerun()
+            
         except Exception as e:
-            st.error(f"Erreur technique détaillée : {e}")
-            st.write("Contenu du dictionnaire envoyé :", data)
+            st.error(f"Erreur lors de l'opération : {e}")
+            st.write("Vérifiez que le nom de la colonne 'Nom du Matériel' correspond bien à la base.")

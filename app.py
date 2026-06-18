@@ -41,7 +41,7 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "⚙️ Administration Matériel"
 ])
 # 5. CONTENU DES ONGLES
-# Dans votre boucle d'affichage (tab1)
+
 for i, row in df.iterrows():
     # ... vos colonnes ...
     

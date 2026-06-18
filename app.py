@@ -42,45 +42,40 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 # 5. CONTENU DES ONGLES
 with tab1:
-    st.header("カタログ - Catalogue du Matériel")
+    st.header("Catalogue du Matériel")
     
-    # 1. Récupération des données
     try:
         response = supabase.table("materiel").select("*").execute()
         df = pd.DataFrame(response.data)
-    except Exception as e:
-        st.error(f"Erreur de connexion à la base : {e}")
+    except:
         df = pd.DataFrame()
 
     if not df.empty:
-        # Filtre optionnel (ex: barre de recherche)
-        search = st.text_input("Rechercher un matériel...")
-        if search:
-            df = df[df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
-            
-        # 2. Affichage en grille (3 colonnes)
+        # 1. Sélection du catalogue (Filtre par catégorie)
+        categories = ["Tous"] + df["categorie"].unique().tolist()
+        cat_choisie = st.selectbox("Choisir le catalogue :", categories)
+        
+        # Filtrage des données
+        df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
+        
+        # 2. Affichage propre en grille
         cols = st.columns(3)
-        for i, row in df.iterrows():
+        for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
             with cols[i % 3]:
                 st.subheader(row.get("Nom du Matériel", "Sans nom"))
-                st.write(f"**N° :** {row.get('num_interne', '')}")
-                st.write(f"**Cat :** {row.get('categorie', '')}")
                 
-                # 3. Gestion de l'affichage photo
+                # --- GESTION PHOTO REDIMENSIONNÉE ---
                 url = row.get("photo_url")
-                # On vérifie que l'url est bien une chaîne de caractères valide
-                if url and isinstance(url, str) and url.startswith("http"):
-                    try:
-                        st.image(url, use_container_width=True)
-                    except Exception:
-                        st.warning("Erreur chargement photo")
+                if url and str(url).startswith("http"):
+                    # use_container_width=True force l'image à tenir dans la colonne
+                    st.image(url, use_container_width=True) 
                 else:
                     st.warning("📷 Pas de photo")
                 
+                st.write(f"**N° :** {row.get('num_interne', '')}")
                 with st.expander("Voir détails"):
-                    st.write(f"Référence : {row.get('reference', '')}")
-                    st.write(f"Série : {row.get('num_serie', '')}")
-                    st.write(f"Fournisseur : {row.get('fournisseur', '')}")
+                    st.write(f"Ref: {row.get('reference', '')}")
+                    st.write(f"Fournisseur: {row.get('fournisseur', '')}")
     else:
         st.info("Le catalogue est vide.")
 with tab2:

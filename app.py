@@ -53,8 +53,14 @@ with tab1:
         df = pd.DataFrame()
 
     if not df.empty:
-        # Nettoyage pour éviter les problèmes d'affichage
-        df['categorie'] = df['categorie'].fillna("Sans catégorie")
+        # NETTOYAGE CRITIQUE : remplace les NULL/NaN par des valeurs vides ou par défaut
+        # Cela évite le 'ValueError' et les 'nan' dans votre interface
+        df = df.fillna({
+            "Nom du Matériel": "Sans nom",
+            "reference": "",
+            "categorie": "Sans catégorie",
+            "photo_url": ""
+        })
         
         # 2. Sélecteur de catégorie
         categories = ["Tous"] + sorted(df["categorie"].unique().tolist())
@@ -65,33 +71,30 @@ with tab1:
         
         st.write(f"Affichage de {len(df_filtre)} article(s).")
 
-        # 3. Affichage en grille de 6 colonnes
+        # 3. Affichage en grille
         cols = st.columns(6)
         
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
             with cols[i % 6]:
                 # Affichage du nom
-                st.caption(f"**{row.get('Nom du Matériel', 'Sans nom')}**")
+                st.caption(f"**{row['Nom du Matériel']}**")
                 
-                # --- GESTION DES PHOTOS ---
-                # Vérifiez bien que le nom de la colonne dans votre base est 'photo_url'
+                # --- GESTION ROBUSTE DES PHOTOS ---
                 url = row.get("photo_url")
-                
-                if url and isinstance(url, str) and url.startswith("http"):
+                if url and str(url).startswith("http"):
                     try:
                         st.image(url, use_container_width=True)
                     except:
-                        st.warning("Image non trouvée")
+                        st.warning("Photo invalide")
                 else:
-                    # Affichage d'un placeholder si pas de photo
+                    # Affichage d'un placeholder si pas de photo dans la base
                     st.image("https://via.placeholder.com/150?text=Pas+d'image", use_container_width=True)
                 
-                # Référence et détails
-                st.write(f"Ref: {row.get('reference', 'N/A')}")
+                # Référence
+                st.write(f"Ref: {row['reference'] if row['reference'] else 'N/A'}")
                 
-                if st.button("Détails", key=f"btn_{row.get('num_interne', i)}"):
-                    st.info(f"N° Interne : {row.get('num_interne', 'N/A')}\n\n"
-                            f"Fournisseur : {row.get('fournisseur', 'N/A')}")
+                if st.button("Détails", key=f"btn_{row['num_interne']}"):
+                    st.info(f"N° Interne : {row['num_interne']}\n\nFournisseur : {row.get('fournisseur', 'N/A')}")
     else:
         st.info("Le catalogue est vide.")
 with tab2:

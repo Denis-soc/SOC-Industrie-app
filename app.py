@@ -111,14 +111,15 @@ with tab5:
     if admin_action == "Créer une fiche":
         afficher_formulaire()
         
-    elif admin_action == "Modifier une fiche":
+ elif admin_action == "Modifier une fiche":
         ids = pd.read_sql("SELECT id FROM materiel", engine)['id'].tolist()
         if ids:
             id_select = st.selectbox("Choisir l'ID :", ids)
-            data = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_select}'", engine).iloc[0]
-            afficher_formulaire(donnees=data)
-        else:
-            st.warning("Aucune donnée.")
+            df_result = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_select}'", engine)
+            if not df_result.empty:
+                afficher_formulaire(donnees=df_result.iloc[0])
+            else:
+                st.error("Données introuvables.")
             
     elif admin_action == "Supprimer une fiche":
         ids = pd.read_sql("SELECT id FROM materiel", engine)['id'].tolist()

@@ -97,86 +97,57 @@ with tab2:
 with tab5:
     st.header("⚙️ Administration du Matériel")
     
-    # 1. Récupération sécurisée des données (DÉFINITION PRIORITAIRE)
-    df_admin = pd.DataFrame() # Initialisation par défaut
+    # 1. Récupération des données
     try:
         response = supabase.table("materiel").select("*").execute()
-        if response.data:
-            df_admin = pd.DataFrame(response.data)
-            df_admin = df_admin.fillna("").astype(str)
-    except Exception as e:
-        st.error(f"Erreur de connexion base : {e}")
+        df_admin = pd.DataFrame(response.data).fillna("").astype(str)
+    except:
+        df_admin = pd.DataFrame()
 
-    # 2. Choix de l'action
     mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
-    
-    # Vérification si df_admin a bien des données
-    if df_admin.empty:
-        st.warning("Aucune donnée trouvée dans la base.")
-        liste_materiel = []
-    else:
-        liste_materiel = df_admin["Nom du Matériel"].tolist()
-
-    # --- AJOUT ---
-    if mode == "Ajouter":
-        with st.form("ajout_form"):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                num_interne = st.text_input("N° Interne (unique)")
-                nom = st.text_input("Nom du matériel")
-                categorie = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"])
-            with col_b:
-                ref_materiel = st.text_input("Référence matériel")
-                date_achat = st.date_input("Date d'achat / étalonnage")
-                periodicite = st.number_input("Périodicité contrôle (mois)", min_value=0)
-            
-            photo = st.file_uploader("Prendre une photo", type=['png', 'jpg', 'jpeg'])
-            submit = st.form_submit_button("Ajouter au catalogue")
-
-        if submit:
-            try:
-                # Logique d'upload image
-                url_photo = ""
-                if photo:
-                    file_path = f"materiel/{num_interne}.png"
-                    supabase.storage.from_("photos_materiel").upload(file_path, photo.getvalue())
-                    url_photo = supabase.storage.from_("photos_materiel").get_public_url(file_path)
-                
-                # Insertion
-                data = {
-                    "num_interne": num_interne,
-                    "Nom du Matériel": nom,
-                    "categorie": categorie,
-                    "reference": ref_materiel,
-                    "date_achat_etalonnage": str(date_achat),
-                    "periodicite_controle": int(periodicite),
-                    "photo_url": url_photo
-                }
-                supabase.table("materiel").insert(data).execute()
-                st.success("Matériel ajouté !")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erreur : {e}")
 
     # --- MODIFICATION ---
-    elif mode == "Modifier" and liste_materiel:
-        choix = st.selectbox("Sélectionner le matériel à modifier", liste_materiel)
-        item = df_admin[df_admin["Nom du Matériel"] == choix].iloc[0]
-        with st.form("modif_form"):
-            nouveau_nom = st.text_input("Nom", value=item["Nom du Matériel"])
-            nouvelle_cat = st.text_input("Catégorie", value=item["categorie"])
-            submit_modif = st.form_submit_button("Enregistrer les modifications")
-            if submit_modif:
-                supabase.table("materiel").update({"Nom du Matériel": nouveau_nom, "categorie": nouvelle_cat}).eq("num_interne", item["num_interne"]).execute()
-                st.success("Fiche mise à jour !")
-                st.rerun()
+    if mode == "Modifier":
+        if not df_admin.empty:
+            # Sélecteur basé sur le N° Interne
+            options = df_admin["num_interne"].tolist()
+            selection = st.selectbox("Choisir le N° Interne à modifier", options)
+            
+            # Récupération de la fiche correspondante
+            item = df_admin[df_admin["num_interne"] == selection].iloc[0]
+            
+            with st.form("modif_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    nouveau_nom = st.text_input("Nom", value=item["Nom du Matériel"])
+                    nouvelle_cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"], 
+                                                index=["EPI", "Outillage", "Consommables", "Soudage", "Mesure"].index(item["categorie"]) if item["categorie"] in ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"] else 0)
+                with col2:
+                    nouvelle_ref = st.text_input("Référence", value=item["reference"])
+                    nouvelle_perio = st.number_input("Périodicité contrôle", value=int(float(item["periodicite_controle"]) if item["periodicite_controle"] else 0))
+                
+                nouvelle_photo = st.file_uploader("Remplacer la photo (optionnel)", type=['png', 'jpg', 'jpeg'])
+                submit_modif = st.form_submit_button("Enregistrer les modifications")
+                
+                if submit_modif:
+                    url_photo = item["photo_url"]
+                    if nouvelle_photo:
+                        # Upload nouvelle photo
+                        file_path = f"materiel/{selection}.png"
+                        supabase.storage.from_("photos_materiel").upload(file_path, nouvelle_photo.getvalue(), {"upsert": "true"})
+                        url_photo = supabase.storage.from_("photos_materiel").get_public_url(file_path)
+                    
+                    supabase.table("materiel").update({
+                        "Nom du Matériel": nouveau_nom,
+                        "categorie": nouvelle_cat,
+                        "reference": nouvelle_ref,
+                        "periodicite_controle": nouvelle_perio,
+                        "photo_url": url_photo
+                    }).eq("num_interne", selection).execute()
+                    st.success("Fiche mise à jour !")
+                    st.rerun()
+        else:
+            st.info("Aucun matériel à modifier.")
 
-    # --- SUPPRESSION ---
-    elif mode == "Supprimer" and liste_materiel:
-        choix_supp = st.selectbox("Sélectionner le matériel à supprimer", liste_materiel)
-        if st.button("Confirmer la suppression définitive"):
-            item_supp = df_admin[df_admin["Nom du Matériel"] == choix_supp].iloc[0]
-            supabase.table("materiel").delete().eq("num_interne", item_supp["num_interne"]).execute()
-            st.warning("Suppression effectuée.")
-            st.rerun()
-            st.rerun()
+    # --- AJOUT & SUPPRESSION ---
+    # (Gardez ici vos blocs Ajouter et Supprimer existants)

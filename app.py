@@ -42,51 +42,22 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 # 5. CONTENU DES ONGLES
 with tab1:
-    st.header("🛒 Catalogue des Équipements")
-
+    st.header("🛒 Catalogue des Équipements (Test)")
+    
     try:
-        # 1. Chargement et conversion sécurisée
+        # On récupère tout
         response = supabase.table("materiel").select("*").execute()
-        df_cat = pd.DataFrame(response.data)
-
-        if not df_cat.empty:
-            # Conversion forcée en string pour éviter les erreurs de type (NaN/float)
-            df_cat = df_cat.astype(str) 
-            
-            # 2. Filtres
-            col_search, col_filter = st.columns([2, 1])
-            with col_search:
-                recherche = st.text_input("🔍 Rechercher un article", "")
-            with col_filter:
-                categories = ["Toutes"] + sorted(df_cat["categorie"].unique().tolist())
-                choix_cat = st.selectbox("Filtrer par catégorie", categories)
-
-            # 3. Application des filtres
-            df_filtre = df_cat.copy()
-            if choix_cat != "Toutes":
-                df_filtre = df_filtre[df_filtre["categorie"] == choix_cat]
-            if recherche:
-                df_filtre = df_filtre[df_filtre["nom"].str.contains(recherche, case=False, na=False)]
-
-            st.write(f"**{len(df_filtre)}** articles trouvés")
-            
-            # 4. Affichage corrigé (parenthèses fermées correctement)
-            st.dataframe(df_filtre, use_container_width=True)
-
-            # 5. Affichage des photos
-            st.subheader("Aperçu")
-            for index, row in df_filtre.iterrows():
-                col_img, col_data = st.columns([1, 4])
-                with col_img:
-                    if 'photo_url' in row and row['photo_url'] != 'None':
-                        st.image(row['photo_url'], width=100)
-                    else:
-                        st.info("Pas de photo")
+        data = response.data
+        
+        st.write("Nombre d'éléments trouvés dans la base :", len(data))
+        
+        if len(data) > 0:
+            st.dataframe(pd.DataFrame(data)) # Affiche tout le contenu brut
         else:
-            st.warning("Le catalogue est vide.")
-
+            st.warning("La table 'materiel' semble vide dans Supabase.")
+            
     except Exception as e:
-        st.error(f"Erreur de chargement : {e}")
+        st.error(f"Erreur technique : {e}")
 with tab2:
     st.subheader("Matériels en stock")
     df_materiel = supabase.table("materiel").select("*").execute()

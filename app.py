@@ -97,13 +97,11 @@ with tab2:
 with tab5:
     st.header("⚙️ Ajout de Matériel")
     
-    with st.form("ajout_complet", clear_on_submit=True):
+    with st.form("ajout_complet_photo", clear_on_submit=True):
         col1, col2 = st.columns(2)
         
         with col1:
-            # Nouveau sélecteur de catalogue obligatoire
-            categorie = st.selectbox("Sélectionner le catalogue", 
-                                     ["EPI", "Consommable", "Outillage", "Électroportatif"])
+            categorie = st.selectbox("Sélectionner le catalogue", ["EPI", "Consommable", "Outillage", "Électroportatif"])
             nom = st.text_input("Nom du matériel")
             ref_materiel = st.text_input("Référence matériel")
             num_interne = st.text_input("N° Interne (unique)")
@@ -114,25 +112,65 @@ with tab5:
             date_achat = st.date_input("Date d'achat / dernier étalonnage")
             periodicite = st.number_input("Périodicité contrôle (en mois)", min_value=0)
             
-        photo_url = st.text_input("Lien de la photo (URL)")
+        # Nouveau champ : st.file_uploader permet de choisir un fichier ou de prendre une photo
+        photo_file = st.file_uploader("Prendre une photo ou télécharger une image", type=['png', 'jpg', 'jpeg'])
         
         submitted = st.form_submit_button("Ajouter au catalogue")
         
         if submitted:
+            # 1. Vérification du nom obligatoire
+            if not nom:
+                st.error("Le nom du matériel est obligatoire.")
+                st.stop()
+
+            # 2. Préparation des données textuelles
             data = {
-                "categorie": categorie, # On enregistre bien la catégorie choisie
+                "categorie": categorie,
                 "nom": nom,
                 "ref_materiel": ref_materiel,
                 "num_interne": num_interne,
                 "taille": taille,
                 "num_serie": num_serie,
                 "date_achat_etalonnage": str(date_achat),
-                "periodicite_controle": periodicite,
-                "photo_url": photo_url
+                "periodicite_controle": periodicite
             }
-            # Insertion dans Supabase
+
+            # 3. Logique d'envoi de l'image (si présente)
+            if photo_file is not None:
+                try:
+                    # On crée un nom de fichier unique (ex: materiel-123.jpg)
+                    import uuid
+                    file_extension = photo_file.name.split('.')[-1]
+                    file_name = f"materiel-{uuid.uuid4()}.{file_extension}"
+                    
+                    # Envoi du fichier vers le bucket 'photos_materiel'
+                    # (Vous devez créer ce bucket 'photos_materiel' dans Supabase !)
+                    with st.spinner("Téléchargement de l'image..."):
+                        # Lecture du fichier comme binaire
+                        file_data = photo_file.read()
+                        
+                        supabase.storage.from_("photos_materiel").upload(
+                            path=file_name,
+                            file=file_data,
+                            file_options={"content-type": f"image/{file_extension}"}
+                        )
+                        
+                        # On récupère l'URL publique pour la stocker dans la table
+                        # (N'oubliez pas d'ajouter une colonne 'photo_url' type text dans votre table 'materiel' !)
+                        photo_url = supabase.storage.from_("photos_materiel").get_public_url(file_name)
+                        data["photo_url"] = photo_url
+                        
+                except Exception as e:
+                    st.error(f"Erreur technique lors de l'upload de l'image : {e}")
+                    st.stop()
+
+            # 4. Insertion dans la table 'materiel'
             try:
                 supabase.table("materiel").insert(data).execute()
-                st.success(f"Matériel ajouté avec succès dans la catégorie : {categorie} !")
+                st.success(f"Matériel '{nom}' ajouté avec succès dans la catégorie : {categorie} !")
+                # Optionnel : pour afficher un petit aperçu si l'upload a réussi
+                if photo_file:
+                    st.image(photo_file, caption="Photo enregistrée", width=150)
+                st.rerun() # Rafraîchit l'interface pour vider le formulaire
             except Exception as e:
-                st.error(f"Erreur : {e}")
+                st.error(f"Erreur technique lors de l'insertion en base de données : {e}")

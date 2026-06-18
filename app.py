@@ -44,44 +44,40 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("📋 Catalogue du Matériel")
     
-    # Récupération
+    # 1. Chargement et Nettoyage immédiat
     response = supabase.table("materiel").select("*").execute()
     df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
-
+    
     if not df.empty:
-        # 1. NETTOYAGE STRICT : On ne garde que les lignes qui ont un Nom
-        df = df[df["Nom du Matériel"].notna() & (df["Nom du Matériel"] != "")]
+        # Remplacer tous les NULL par du texte vide pour stabiliser le DataFrame
         df = df.fillna("")
+        
+        # 2. Filtrage pour ne garder que les articles valides (Nom non vide)
+        df = df[df["Nom du Matériel"] != "Sans nom"]
         
         # Sélecteur
         cat_choisie = st.selectbox("Choisir le catalogue :", ["Tous"] + sorted(list(set(df["categorie"]))))
         df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
         
-        # 2. AFFICHAGE EN GRILLE FIXE
-        # On utilise une liste de colonnes pour forcer un alignement strict
+        # 3. Grille propre
         cols = st.columns(6)
-        
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
             with cols[i % 6]:
-                # Nom
                 st.markdown(f"**{row['Nom du Matériel']}**")
                 
-                # IMAGE : Affichage conditionnel strict
+                # Image seulement si URL valide
                 url = str(row.get("photo_url", ""))
                 if url.startswith("http"):
                     st.image(url, use_container_width=True)
                 else:
-                    # Espace réservé invisible pour garder l'alignement
+                    # On affiche une zone vide de taille fixe pour garder l'alignement
                     st.write("") 
                 
-                # Référence
                 st.caption(f"Ref: {row.get('reference', 'N/A')}")
-                
-                # Bouton
                 if st.button("Détails", key=f"btn_{idx}"):
                     st.info(f"N° Interne: {row.get('num_interne', '')}")
     else:
-        st.info("Le catalogue est en cours de chargement ou vide.")
+        st.write("Aucun matériel enregistré.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

@@ -97,22 +97,25 @@ with tab2:
 with tab5:
     st.header("⚙️ Administration du Matériel")
     
-    # 1. Choix du mode
-    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
-    
-    # Récupération des données pour les listes déroulantes
+    # 1. Récupération sécurisée des données (DÉFINITION PRIORITAIRE)
+    df_admin = pd.DataFrame() # Initialisation par défaut
     try:
         response = supabase.table("materiel").select("*").execute()
-        df = pd.DataFrame(response.data)
-        # Gestion des données vides
-        if not df_admin.empty:
-            df = df.fillna("").astype(str)
-            liste_materiel = df_admin["Nom du Matériel"].tolist()
-        else:
-            liste_materiel = []
+        if response.data:
+            df_admin = pd.DataFrame(response.data)
+            df_admin = df_admin.fillna("").astype(str)
     except Exception as e:
         st.error(f"Erreur de connexion base : {e}")
+
+    # 2. Choix de l'action
+    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
+    
+    # Vérification si df_admin a bien des données
+    if df_admin.empty:
+        st.warning("Aucune donnée trouvée dans la base.")
         liste_materiel = []
+    else:
+        liste_materiel = df_admin["Nom du Matériel"].tolist()
 
     # --- AJOUT ---
     if mode == "Ajouter":
@@ -132,12 +135,14 @@ with tab5:
 
         if submit:
             try:
+                # Logique d'upload image
                 url_photo = ""
                 if photo:
                     file_path = f"materiel/{num_interne}.png"
                     supabase.storage.from_("photos_materiel").upload(file_path, photo.getvalue())
                     url_photo = supabase.storage.from_("photos_materiel").get_public_url(file_path)
-
+                
+                # Insertion
                 data = {
                     "num_interne": num_interne,
                     "Nom du Matériel": nom,
@@ -149,32 +154,29 @@ with tab5:
                 }
                 supabase.table("materiel").insert(data).execute()
                 st.success("Matériel ajouté !")
+                st.rerun()
             except Exception as e:
-                st.error(f"Erreur lors de l'ajout : {e}")
+                st.error(f"Erreur : {e}")
 
     # --- MODIFICATION ---
-    elif mode == "Modifier":
+    elif mode == "Modifier" and liste_materiel:
         choix = st.selectbox("Sélectionner le matériel à modifier", liste_materiel)
-        if choix:
-            item = df_admin[df_admin["Nom du Matériel"] == choix].iloc[0]
-            with st.form("modif_form"):
-                nouveau_nom = st.text_input("Nom", value=item["Nom du Matériel"])
-                nouvelle_cat = st.text_input("Catégorie", value=item["categorie"])
-                submit_modif = st.form_submit_button("Enregistrer les modifications")
-                
-                if submit_modif:
-                    supabase.table("materiel").update({
-                        "Nom du Matériel": nouveau_nom, 
-                        "categorie": nouvelle_cat
-                    }).eq("num_interne", item["num_interne"]).execute()
-                    st.success("Fiche mise à jour !")
-                    st.rerun()
+        item = df_admin[df_admin["Nom du Matériel"] == choix].iloc[0]
+        with st.form("modif_form"):
+            nouveau_nom = st.text_input("Nom", value=item["Nom du Matériel"])
+            nouvelle_cat = st.text_input("Catégorie", value=item["categorie"])
+            submit_modif = st.form_submit_button("Enregistrer les modifications")
+            if submit_modif:
+                supabase.table("materiel").update({"Nom du Matériel": nouveau_nom, "categorie": nouvelle_cat}).eq("num_interne", item["num_interne"]).execute()
+                st.success("Fiche mise à jour !")
+                st.rerun()
 
     # --- SUPPRESSION ---
-    elif mode == "Supprimer":
+    elif mode == "Supprimer" and liste_materiel:
         choix_supp = st.selectbox("Sélectionner le matériel à supprimer", liste_materiel)
         if st.button("Confirmer la suppression définitive"):
             item_supp = df_admin[df_admin["Nom du Matériel"] == choix_supp].iloc[0]
             supabase.table("materiel").delete().eq("num_interne", item_supp["num_interne"]).execute()
-            st.warning(f"{choix_supp} a été supprimé.")
+            st.warning("Suppression effectuée.")
+            st.rerun()
             st.rerun()

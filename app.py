@@ -42,22 +42,36 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 # 5. CONTENU DES ONGLES
 with tab1:
-    st.header("🛒 Catalogue des Équipements (Test)")
+    st.header("🛒 Catalogue des Équipements")
     
     try:
-        # On récupère tout
         response = supabase.table("materiel").select("*").execute()
-        data = response.data
+        df = pd.DataFrame(response.data)
         
-        st.write("Nombre d'éléments trouvés dans la base :", len(data))
-        
-        if len(data) > 0:
-            st.dataframe(pd.DataFrame(data)) # Affiche tout le contenu brut
+        if not df.empty:
+            # Nettoyage : on convertit en string pour éviter les erreurs de type
+            df = df.astype(str)
+            
+            # Filtre de recherche
+            search = st.text_input("🔍 Rechercher un matériel")
+            if search:
+                # Recherche sur la colonne 'Nom du Matériel'
+                df = df[df['Nom du Matériel'].str.contains(search, case=False, na=False)]
+            
+            # Affichage propre avec sélection de colonnes
+            # On ne garde que les colonnes importantes pour l'utilisateur
+            cols_to_show = ['num_interne', 'Nom du Matériel', 'categorie', 'statut', 'date_controle']
+            st.dataframe(df[cols_to_show], use_container_width=True)
+            
+            # Affichage des photos (si url présente)
+            for _, row in df.iterrows():
+                if 'photo_url' in row and row['photo_url'] not in ['None', 'nan', '']:
+                    st.image(row['photo_url'], width=150, caption=row['Nom du Matériel'])
         else:
-            st.warning("La table 'materiel' semble vide dans Supabase.")
+            st.info("Aucun matériel trouvé.")
             
     except Exception as e:
-        st.error(f"Erreur technique : {e}")
+        st.error(f"Erreur d'affichage : {e}")
 with tab2:
     st.subheader("Matériels en stock")
     df_materiel = supabase.table("materiel").select("*").execute()

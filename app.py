@@ -105,55 +105,41 @@ with tab2:
 with tab5:
     st.header("⚙️ Ajout de Matériel")
     
-    with st.form("ajout_complet_photo", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            categorie = st.selectbox("Sélectionner le catalogue", ["EPI", "Consommable", "Outillage", "Électroportatif"])
-            nom = st.text_input("Nom du matériel")
-            ref_materiel = st.text_input("Référence matériel")
+    # Formulaire
+    with st.form("ajout_materiel"):
+        col_a, col_b = st.columns(2)
+        with col_a:
             num_interne = st.text_input("N° Interne (unique)")
-            
-        with col2:
-            taille = st.text_input("Taille (si EPI)")
-            num_serie = st.text_input("N° de Série")
+            nom = st.text_input("Nom du matériel")
+            categorie = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"])
+        with col_b:
+            ref_materiel = st.text_input("Référence matériel")
             date_achat = st.date_input("Date d'achat / dernier étalonnage")
             periodicite = st.number_input("Périodicité contrôle (en mois)", min_value=0)
             
-        photo_file = st.file_uploader("Prendre une photo ou télécharger une image", type=['png', 'jpg', 'jpeg'])
-        
-        submitted = st.form_submit_button("Ajouter au catalogue")
-        
-        if submitted:
-            # Préparation des données - ATTENTION : les clés doivent correspondre aux noms dans Supabase
+        photo = st.file_uploader("Prendre une photo", type=['png', 'jpg', 'jpeg'])
+        submit = st.form_submit_button("Ajouter au catalogue")
+
+    if submit:
+        try:
+            url_photo = None
+            if photo:
+                # Upload vers Supabase Storage
+                file_path = f"materiel/{num_interne}.png"
+                supabase.storage.from_("photos_materiel").upload(file_path, photo.getvalue())
+                url_photo = supabase.storage.from_("photos_materiel").get_public_url(file_path)
+
+            # Envoi dans la table 'materiel'
             data = {
-                "categorie": categorie,
-                "Nom du Matériel": nom, # D'après votre visualiseur, la colonne s'appelle "Nom du Matériel"
-                "reference": ref_materiel,
                 "num_interne": num_interne,
-                "taille": taille,
-                "num_serie": num_serie,
+                "Nom du Matériel": nom,
+                "categorie": categorie,
+                "reference": ref_materiel,
                 "date_achat_etalonnage": str(date_achat),
-                "periodicite_controle": periodicite
+                "periodicite_controle": int(periodicite),
+                "photo_url": url_photo
             }
-
-            # Gestion photo
-            if photo_file is not None:
-                try:
-                    import uuid
-                    file_extension = photo_file.name.split('.')[-1]
-                    file_name = f"materiel-{uuid.uuid4()}.{file_extension}"
-                    file_data = photo_file.read()
-                    
-                    supabase.storage.from_("photos_materiel").upload(file_name, file_data)
-                    data["photo_url"] = supabase.storage.from_("photos_materiel").get_public_url(file_name)
-                except Exception as e:
-                    st.error(f"Erreur image: {e}")
-                    st.stop()
-
-            # Insertion
-            try:
-                supabase.table("materiel").insert(data).execute()
-                st.success("Matériel ajouté avec succès !")
-            except Exception as e:
-                st.error(f"Erreur lors de l'insertion : {e}")
+            supabase.table("materiel").insert(data).execute()
+            st.success("Matériel ajouté avec succès !")
+        except Exception as e:
+            st.error(f"Erreur : {e}")

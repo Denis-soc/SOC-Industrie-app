@@ -44,40 +44,43 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("📋 Catalogue du Matériel")
     
-    # 1. Chargement et Nettoyage immédiat
+    # Récupération
     response = supabase.table("materiel").select("*").execute()
     df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
-    
+
     if not df.empty:
-        # Remplacer tous les NULL par du texte vide pour stabiliser le DataFrame
-        df = df.fillna("")
+        # Nettoyage global
+        df = df.fillna("") 
         
-        # 2. Filtrage pour ne garder que les articles valides (Nom non vide)
-        df = df[df["Nom du Matériel"] != "Sans nom"]
+        # --- MODIFICATION ICI ---
+        # Au lieu de supprimer les "Sans nom", on les garde mais on les affiche correctement.
+        # Cela empêche de masquer par erreur un article que vous venez de créer.
+        df['Nom du Matériel'] = df['Nom du Matériel'].replace("", "Article sans nom")
         
         # Sélecteur
-        cat_choisie = st.selectbox("Choisir le catalogue :", ["Tous"] + sorted(list(set(df["categorie"]))))
+        categories = ["Tous"] + sorted([c for c in df["categorie"].unique() if c != ""])
+        cat_choisie = st.selectbox("Choisir le catalogue :", categories)
+        
         df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
         
-        # 3. Grille propre
+        # Grille
         cols = st.columns(6)
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
             with cols[i % 6]:
                 st.markdown(f"**{row['Nom du Matériel']}**")
                 
-                # Image seulement si URL valide
+                # Image
                 url = str(row.get("photo_url", ""))
                 if url.startswith("http"):
                     st.image(url, use_container_width=True)
                 else:
-                    # On affiche une zone vide de taille fixe pour garder l'alignement
-                    st.write("") 
+                    st.write("---") 
                 
                 st.caption(f"Ref: {row.get('reference', 'N/A')}")
-                if st.button("Détails", key=f"btn_{idx}"):
-                    st.info(f"N° Interne: {row.get('num_interne', '')}")
+                if st.button("Détails", key=f"btn_{row.get('num_interne', i)}"):
+                    st.info(f"N° Interne: {row.get('num_interne', 'N/A')}")
     else:
-        st.write("Aucun matériel enregistré.")
+        st.write("Le catalogue est vide.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

@@ -58,3 +58,27 @@ def afficher_formulaire(donnees=None):
                     conn.execute(query, {"nom": nom, "cat": categorie, "fourn": fournisseur, "ref": ref, "serie": num_serie, "date_c": date_c, "perio": perio, "id": num_interne})
             st.success("Opération réussie !")
             st.rerun()
+            with tab5:
+    st.header("⚙️ Administration Matériel")
+    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
+
+    if admin_action == "Créer une fiche":
+        afficher_formulaire()
+        
+    elif admin_action == "Modifier une fiche":
+        ids = pd.read_sql("SELECT id FROM materiel", engine)['id'].tolist()
+        if ids:
+            id_select = st.selectbox("Choisir l'ID :", ids)
+            data = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_select}'", engine).iloc[0]
+            afficher_formulaire(donnees=data)
+        else:
+            st.warning("Aucune donnée.")
+            
+    elif admin_action == "Supprimer une fiche":
+        ids = pd.read_sql("SELECT id FROM materiel", engine)['id'].tolist()
+        if ids:
+            id_del = st.selectbox("ID à supprimer :", ids)
+            if st.button("Confirmer"):
+                with engine.begin() as conn:
+                    conn.execute(sqlalchemy.text("DELETE FROM materiel WHERE id = :id"), {"id": id_del})
+                st.rerun()

@@ -10,7 +10,7 @@ st.set_page_config(page_title="SOC Industrie — Gestion", page_icon="🏗️", 
 # 2. CONNEXION BDD
 @st.cache_resource
 def init_connection():
-    db_url = "postgresql://postgres.spxrxmzeaybndgpmoslo:LesGaulois2026@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
+    db_url = st.secrets["DB_URL"]
     return sqlalchemy.create_engine(db_url)
 
 engine = init_connection()

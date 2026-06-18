@@ -111,7 +111,7 @@ with tab5:
     if admin_action == "Créer une fiche":
         afficher_formulaire()
         
- elif admin_action == "Modifier une fiche":
+    elif admin_action == "Modifier une fiche":
         ids = pd.read_sql("SELECT id FROM materiel", engine)['id'].tolist()
         if ids:
             id_select = st.selectbox("Choisir l'ID :", ids)

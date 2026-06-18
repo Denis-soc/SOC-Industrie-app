@@ -44,59 +44,37 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("📋 Catalogue du Matériel")
     
-    # 1. Chargement des données
-    try:
-        response = supabase.table("materiel").select("*").execute()
-        df = pd.DataFrame(response.data) if response.data is not None else pd.DataFrame()
-    except Exception as e:
-        st.error(f"Erreur de connexion : {e}")
-        df = pd.DataFrame()
+    # Récupération brute
+    response = supabase.table("materiel").select("*").execute()
+    df = pd.DataFrame(response.data) if response.data is not None else pd.DataFrame()
 
     if not df.empty:
-        # NETTOYAGE CRITIQUE : remplace les NULL/NaN par des valeurs vides ou par défaut
-        # Cela évite le 'ValueError' et les 'nan' dans votre interface
-        df = df.fillna({
-            "Nom du Matériel": "Sans nom",
-            "reference": "",
-            "categorie": "Sans catégorie",
-            "photo_url": ""
-        })
+        # Nettoyage automatique des colonnes vides
+        df = df.fillna("") 
         
-        # 2. Sélecteur de catégorie
-        categories = ["Tous"] + sorted(df["categorie"].unique().tolist())
-        cat_choisie = st.selectbox("Choisir le catalogue :", categories, key="cat_tab1")
+        # Sélecteur de catégorie
+        categories = ["Tous"] + sorted([c for c in df["categorie"].unique() if c != ""])
+        cat_choisie = st.selectbox("Choisir le catalogue :", categories)
         
-        # Filtrage
         df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
         
-        st.write(f"Affichage de {len(df_filtre)} article(s).")
-
-        # 3. Affichage en grille
         cols = st.columns(6)
-        
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
             with cols[i % 6]:
-                # Affichage du nom
-                st.caption(f"**{row['Nom du Matériel']}**")
+                st.caption(f"**{row.get('Nom du Matériel', 'Sans nom')}**")
                 
-                # --- GESTION ROBUSTE DES PHOTOS ---
+                # Affichage image avec fallback
                 url = row.get("photo_url")
                 if url and str(url).startswith("http"):
-                    try:
-                        st.image(url, use_container_width=True)
-                    except:
-                        st.warning("Photo invalide")
+                    st.image(url, use_container_width=True)
                 else:
-                    # Affichage d'un placeholder si pas de photo dans la base
                     st.image("https://via.placeholder.com/150?text=Pas+d'image", use_container_width=True)
                 
-                # Référence
-                st.write(f"Ref: {row['reference'] if row['reference'] else 'N/A'}")
-                
-                if st.button("Détails", key=f"btn_{row['num_interne']}"):
-                    st.info(f"N° Interne : {row['num_interne']}\n\nFournisseur : {row.get('fournisseur', 'N/A')}")
+                st.write(f"Ref: {row.get('reference', 'N/A')}")
+                if st.button("Détails", key=f"btn_{row.get('num_interne', i)}"):
+                    st.info(f"N° Interne: {row.get('num_interne', 'N/A')}")
     else:
-        st.info("Le catalogue est vide.")
+        st.info("Aucun matériel trouvé.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     
@@ -125,85 +103,32 @@ with tab2:
     except Exception as e:
         st.error(f"Erreur lors du chargement : {e}")
 with tab5:
-    st.header("⚙️ Administration du Matériel")
+    st.header("⚙️ Administration")
+    mode = st.radio("Action", ["Ajouter", "Modifier"], horizontal=True)
     
-    # 1. Récupération des données avec gestion d'erreur
-    try:
-        response = supabase.table("materiel").select("*").execute()
-        df_admin = pd.DataFrame(response.data) if response.data is not None else pd.DataFrame()
-    except Exception as e:
-        st.error(f"Erreur de connexion base de données : {e}")
-        df_admin = pd.DataFrame()
-
-    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
-
-    # 2. Fonction de formulaire robuste et sécurisée
-    def afficher_form_complet(item=None):
-        # Conversion sécurisée de la ligne (pd.Series) en dictionnaire simple
-        if hasattr(item, 'to_dict'):
-            item_dict = item.to_dict()
-        elif isinstance(item, dict):
-            item_dict = item
-        else:
-            item_dict = {}
+    # Formulaire simplifié
+    with st.form("form_admin"):
+        num = st.text_input("N° Interne")
+        nom = st.text_input("Nom du matériel")
+        cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Soudage"])
+        ref = st.text_input("Référence")
+        url_photo = st.text_input("URL de la photo (lien http)") # <--- Testez en collant un lien ici
         
-        with st.form("form_gestion"):
-            col1, col2 = st.columns(2)
-            with col1:
-                # Le N° interne est verrouillé en mode modification
-                num = st.text_input("N° Interne", value=item_dict.get("num_interne", ""), disabled=(item is not None))
-                nom = st.text_input("Nom du matériel", value=item_dict.get("Nom du Matériel", ""))
-                cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"], index=0)
-                taille = st.text_input("Taille (si EPI)", value=item_dict.get("taille", ""))
-            with col2:
-                ref = st.text_input("Référence", value=item_dict.get("reference", ""))
-                ns = st.text_input("N° de série", value=item_dict.get("num_serie", ""))
-                fourn = st.text_input("Fournisseur", value=item_dict.get("fournisseur", ""))
-                # Conversion sécurisée en entier pour la périodicité
-                val_perio = item_dict.get("periodicite_controle", 0)
-                perio = st.number_input("Périodicité contrôle (mois)", value=int(val_perio) if str(val_perio).isdigit() else 0)
-                photo = st.file_uploader("Photo", type=['png', 'jpg', 'jpeg'])
-            
-            submit = st.form_submit_button("Valider")
-            return submit, num, nom, cat, taille, ref, ns, fourn, perio, photo
+        submit = st.form_submit_button("Enregistrer")
 
-    # 3. Logique d'exécution
-    if mode == "Ajouter":
-        submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_form_complet()
-        if submit and num:
-            data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio}
-            try:
-                supabase.table("materiel").insert(data).execute()
-                st.success("Matériel ajouté !")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erreur lors de l'ajout : {e}")
-
-    elif mode == "Modifier":
-        if not df_admin.empty:
-            # Force la conversion en string pour éviter les conflits de type
-            liste_ids = df_admin["num_interne"].astype(str).tolist()
-            sel = st.selectbox("Choisir le N° Interne", liste_ids)
+    if submit:
+        data = {
+            "num_interne": num,
+            "Nom du Matériel": nom,
+            "categorie": cat,
+            "reference": ref,
+            "photo_url": url_photo  # <--- Indispensable pour que l'image apparaisse
+        }
+        
+        if mode == "Ajouter":
+            supabase.table("materiel").insert(data).execute()
+        else:
+            supabase.table("materiel").update(data).eq("num_interne", num).execute()
             
-            # Récupération de la ligne sélectionnée
-            item = df_admin[df_admin["num_interne"].astype(str) == sel].iloc[0]
-            
-            submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_form_complet(item=item)
-            if submit:
-                upd = {"Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio}
-                try:
-                    supabase.table("materiel").update(upd).eq("num_interne", sel).execute()
-                    st.success("Modifié avec succès !")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur lors de la mise à jour : {e}")
-
-    elif mode == "Supprimer":
-        if not df_admin.empty:
-            choix = st.selectbox("Supprimer le N° Interne", df_admin["num_interne"].astype(str).tolist())
-            if st.button("Confirmer la suppression"):
-                try:
-                    supabase.table("materiel").delete().eq("num_interne", choix).execute()
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur lors de la suppression : {e}")
+        st.success("Opération effectuée !")
+        st.rerun()

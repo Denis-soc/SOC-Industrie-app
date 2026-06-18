@@ -146,15 +146,15 @@ with tab5:
     if mode == "Ajouter":
         submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_form_complet()
         if submit and num:
-        data = {
-            "num_interne": num,
-            "Nom du Matériel": nom,
-            "categorie": cat,
-            "taille": taille,
-            "reference": ref,
-            "num_serie": ns,
-            "fournisseur": fourn,
-            "periodicite_controle": int(perio) # Force le format entier
+            data = {
+                "num_interne": num,
+                "Nom du Matériel": nom,
+                "categorie": cat,
+                "taille": taille,
+                "reference": ref,
+                "num_serie": ns,
+                "fournisseur": fourn,
+                "periodicite_controle": int(perio) # Force le format entier
         }
         try:
             supabase.table("materiel").insert(data).execute()

@@ -44,50 +44,52 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("📋 Catalogue du Matériel")
     
-    # 1. Chargement sécurisé
-    df = pd.DataFrame()
-    try:
-        response = supabase.table("materiel").select("*").execute()
-        if response.data:
-            df = pd.DataFrame(response.data)
-    except Exception as e:
-        st.error(f"Erreur de connexion : {e}")
+    # 1. Chargement SANS cache pour garantir la mise à jour immédiate
+    # On utilise une fonction simple sans @st.cache_data
+    def load_data():
+        try:
+            response = supabase.table("materiel").select("*").execute()
+            return pd.DataFrame(response.data) if response.data is not None else pd.DataFrame()
+        except Exception as e:
+            st.error(f"Erreur de connexion : {e}")
+            return pd.DataFrame()
 
-    # 2. Nettoyage des données (IMPORTANT : gère les erreurs de vos nouveaux articles)
+    df = load_data()
+
     if not df.empty:
-        # On force les colonnes essentielles en texte pour éviter les plantages
-        cols_a_nettoyer = ["Nom du Matériel", "num_interne", "reference", "categorie"]
-        for col in cols_a_nettoyer:
-            if col in df.columns:
-                df[col] = df[col].astype(str).replace('nan', '')
-        
-        # Sélecteur de catalogue
+        # 2. Sélecteur de catégorie
+        # On filtre les valeurs vides pour éviter les problèmes d'affichage
         categories = ["Tous"] + [c for c in df["categorie"].unique().tolist() if c]
-        cat_choisie = st.selectbox("Choisir le catalogue :", categories)
+        cat_choisie = st.selectbox("Choisir le catalogue :", categories, key="cat_tab1")
         
-        # Filtrage
+        # Filtrage des données
         df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
         
-        # 3. Affichage en grille (6 colonnes pour la compacité)
+        # 3. Affichage en grille de 6 colonnes
         cols = st.columns(6)
-        for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
+        
+        # On itère sur les lignes du dataframe filtré
+        for i, (idx, row) in enumerate(df_filtre.iterrows()):
             with cols[i % 6]:
-                # Affichage simple pour éviter le crash
+                # Nom du matériel
                 st.caption(row.get("Nom du Matériel", "Sans nom"))
                 
+                # Gestion photo avec taille fixe
                 url = row.get("photo_url")
                 if url and str(url).startswith("http"):
-                    st.image(url, width=80)
+                    st.image(url, width=100)
                 else:
                     st.warning("📷")
                 
-                # Détails sans couper les chaînes (évite le ValueError)
+                # Référence sécurisée
                 st.write(f"Ref: {row.get('reference', '')}")
                 
-                if st.button("Détails", key=f"btn_{idx}"):
-                    st.info(f"N° Interne: {row.get('num_interne', '')}")
+                # Bouton détails
+                if st.button("Détails", key=f"btn_{row['num_interne']}"):
+                    st.info(f"N° Interne : {row.get('num_interne', '')}\n"
+                            f"Fournisseur : {row.get('fournisseur', '')}")
     else:
-        st.info("Le catalogue est vide ou inaccessible.")
+        st.info("Le catalogue est actuellement vide ou en cours de chargement.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

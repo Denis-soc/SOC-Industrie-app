@@ -74,7 +74,8 @@ with tab1:
                     st.warning("📷")
                 
                 # Détails compacts
-                st.write(f"Ref: {row.get('reference', '')[:5]}...") 
+                ref_val = str(row.get('reference') or '')
+                st.write(f"Ref: {ref_val[:5]}...")
                 
                 if st.button("Détails", key=f"btn_{idx}"):
                     st.info(f"N°: {row.get('num_interne', '')}\nFourn: {row.get('fournisseur', '')}")

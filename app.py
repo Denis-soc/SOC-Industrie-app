@@ -1,26 +1,10 @@
 import streamlit as st
-import pandas as pd
 import sqlalchemy
-import base64
+import pandas as pd
+from datetime import datetime
+import urllib.parse
 
-# --- FONCTION CATALOGUE ---
-def afficher_catalogue(categorie_nom):
-    try:
-        query = f"SELECT * FROM materiel WHERE categorie = '{categorie_nom}'"
-        df = pd.read_sql(query, engine)
-        if df.empty:
-            st.info(f"Aucun matériel trouvé dans : {categorie_nom}")
-        else:
-            for _, row in df.iterrows():
-                with st.container(border=True):
-                    st.subheader(row['nom'])
-                    st.write(f"**Réf :** {row['reference']} | **Fournisseur :** {row['fournisseur']}")
-    except Exception as e:
-        st.error(f"Erreur catalogue : {e}")
-
-# --- FONCTION FORMULAIRE (SANS PHOTO POUR STABILISER) ---
-v
-      # 1. CONFIGURATION
+# 1. CONFIGURATION
 st.set_page_config(page_title="SOC Industrie — Gestion", page_icon="🏗️", layout="wide")
 
 # 2. CONNEXION BDD
@@ -62,30 +46,3 @@ if "materiel_id" in query_params:
     st.info(f"Recherche automatique du matériel : {id_recherche}")
     # Ici, vous pourriez ajouter une logique pour ouvrir automatiquement 
     # une fenêtre modale ou filtrer le catalogue sur cet ID
-# ... Onglet N°1...
-# ... Onglet N°5...
-with tab5:
-    st.header("⚙️ Administration Matériel")
-    admin_action = st.radio("Action :", ["Créer une fiche", "Modifier une fiche", "Supprimer une fiche"])
-
-    if admin_action == "Créer une fiche":
-        afficher_formulaire()
-        
-    elif admin_action == "Modifier une fiche":
-        ids = pd.read_sql("SELECT id FROM materiel", engine)['id'].tolist()
-        if ids:
-            id_select = st.selectbox("Choisir l'ID :", ids)
-            df_result = pd.read_sql(f"SELECT * FROM materiel WHERE id = '{id_select}'", engine)
-            if not df_result.empty:
-                afficher_formulaire(donnees=df_result.iloc[0])
-            else:
-                st.error("Données introuvables.")
-            
-    elif admin_action == "Supprimer une fiche":
-        ids = pd.read_sql("SELECT id FROM materiel", engine)['id'].tolist()
-        if ids:
-            id_del = st.selectbox("ID à supprimer :", ids)
-            if st.button("Confirmer"):
-                with engine.begin() as conn:
-                    conn.execute(sqlalchemy.text("DELETE FROM materiel WHERE id = :id"), {"id": id_del})
-                st.rerun()

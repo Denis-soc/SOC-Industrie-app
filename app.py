@@ -50,3 +50,25 @@ if "materiel_id" in query_params:
     st.info(f"Recherche automatique du matériel : {id_recherche}")
     # Ici, vous pourriez ajouter une logique pour ouvrir automatiquement 
     # une fenêtre modale ou filtrer le catalogue sur cet ID
+with tab1: # Catalogue
+    st.subheader("Catalogue Équipements")
+    
+    # Récupération des données depuis Supabase
+    response = supabase.table("materiel").select("*").execute()
+    df = pd.DataFrame(response.data)
+    
+    # Affichage interactif avec possibilité de filtrer
+    st.dataframe(
+        df, 
+        column_config={
+            "nom": "Matériel",
+            "statut": st.column_config.SelectboxColumn("Statut", options=["Disponible", "En chantier", "Maintenance"]),
+            "quantite": st.column_config.NumberColumn("Stock", min_value=0)
+        },
+        use_container_width=True
+    )
+
+    # Bouton pour ajouter un nouvel élément (simplifié)
+    if st.button("Ajouter un nouvel équipement"):
+        # Logique d'ajout ici
+        st.write("Formulaire d'ajout à créer...")

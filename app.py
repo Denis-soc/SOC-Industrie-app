@@ -29,6 +29,16 @@ df_demandes_reel = charger_demandes()
 
 # 4. INTERFACE
 st.title("🏗️ SOC Industrie – Gestion Interne")
+
+# Définition des onglets
+tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📦 Tableau de Bord Olivier",
+    "🛒 Catalogues EPI/Consommables/Outillage",
+    "📦 Matériels Commun",
+    "📅 Réservation matériel",
+    "📍 Carte de localisation du matériel",
+    "⚙️ Administration Matériel"
+])
 # 5. CONTENU DES ONGLES
 with tab1: # Catalogue
     st.subheader("Catalogue Équipements")

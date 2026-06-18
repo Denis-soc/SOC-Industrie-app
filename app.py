@@ -44,7 +44,7 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("📋 Catalogue du Matériel")
     
-    # 1. Récupération des données depuis Supabase
+    # 1. Récupération des données
     try:
         response = supabase.table("materiel").select("*").execute()
         df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
@@ -53,39 +53,33 @@ with tab1:
         df = pd.DataFrame()
 
     if not df.empty:
-        # 2. Sélecteur de catalogue (Filtre par catégorie)
-        # On ajoute "Tous" pour voir tout le matériel
+        # 2. Sélecteur de catalogue
         categories = ["Tous"] + df["categorie"].unique().tolist()
         cat_choisie = st.selectbox("Choisir le catalogue :", categories)
-        
-        # Filtrage
         df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
         
-        # 3. Affichage en grille (3 colonnes)
-        cols = st.columns(3)
+        # 3. Grille de 6 colonnes pour une vue dense (4x plus petit)
+        cols = st.columns(6) 
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
-            with cols[i % 3]:
-                st.subheader(row.get("Nom du Matériel", "Sans nom"))
+            with cols[i % 6]:
+                # Nom du matériel en petit
+                st.caption(row.get("Nom du Matériel", "Sans nom"))
                 
-                # --- GESTION PHOTO (Redimensionnée) ---
+                # --- GESTION PHOTO RÉDUITE ---
                 url = row.get("photo_url")
-                # use_container_width=True force l'image à s'adapter à la largeur de la colonne
                 if url and str(url).startswith("http"):
-                    st.image(url, use_container_width=True)
+                    # width=100 fixe la taille en pixels pour garantir la réduction
+                    st.image(url, width=100) 
                 else:
-                    st.warning("📷 Pas de photo")
+                    st.warning("📷")
                 
-                st.write(f"**N° Interne :** {row.get('num_interne', '')}")
-                st.write(f"**Catégorie :** {row.get('categorie', '')}")
+                # Détails compacts
+                st.write(f"Ref: {row.get('reference', '')[:5]}...") 
                 
-                with st.expander("Voir détails"):
-                    st.write(f"Référence : {row.get('reference', '')}")
-                    st.write(f"Série : {row.get('num_serie', '')}")
-                    st.write(f"Fournisseur : {row.get('fournisseur', '')}")
-                
-                st.divider() # Séparation visuelle entre les éléments
+                if st.button("Détails", key=f"btn_{idx}"):
+                    st.info(f"N°: {row.get('num_interne', '')}\nFourn: {row.get('fournisseur', '')}")
     else:
-        st.info("Le catalogue est actuellement vide.")
+        st.info("Le catalogue est vide.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

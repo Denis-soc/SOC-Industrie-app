@@ -21,15 +21,20 @@ supabase = init_supabase()
 
 # 3. CHARGEMENT DONNÉES
 def charger_materiel():
-    # Utilisation du client supabase au lieu de pd.read_sql
+    # On interroge la table "materiel" directement via l'API Supabase
     response = supabase.table("materiel").select("*").execute()
-    # On transforme la réponse en DataFrame pandas
+    # On convertit le résultat en DataFrame Pandas
     return pd.DataFrame(response.data)
 
 def charger_demandes():
-    # Même chose pour la table des demandes
+    # On interroge la table "demandes_collaborateurs"
     response = supabase.table("demandes_collaborateurs").select("*").execute()
     return pd.DataFrame(response.data)
+
+# Initialisation des données
+# Ces variables appellent maintenant vos nouvelles fonctions
+df_materiel_reel = charger_materiel()
+df_demandes_reel = charger_demandes()
 
 # Initialisation sûre des données
 # Ces variables sont maintenant alimentées par Supabase

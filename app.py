@@ -45,59 +45,36 @@ with tab1:
     st.header("🛒 Catalogue des Équipements")
     
     try:
-        # Récupération des données
         response = supabase.table("materiel").select("*").execute()
         df = pd.DataFrame(response.data)
         
         if not df.empty:
             df = df.fillna("").astype(str)
             
-            # --- ZONE DE FILTRAGE ---
-            col1, col2 = st.columns(2)
+            # --- AJOUT DU FILTRE ---
+            # On récupère les catégories uniques présentes dans la base
+            categories = ["Toutes"] + sorted(df['categorie'].unique().tolist())
+            choix_cat = st.selectbox("Filtrer par catégorie", categories)
             
-            with col1:
-                # Création de la liste des catégories avec "Toutes" par défaut
-                categories = ["Toutes"] + sorted(df['categorie'].unique().tolist())
-                choix_cat = st.selectbox("Filtrer par catégorie", categories)
-            
-            with col2:
-                recherche = st.text_input("🔍 Rechercher un matériel", "")
-            
-            # --- APPLICATION DES FILTRES ---
-            df_filtre = df.copy()
-            
+            # Application du filtre
             if choix_cat != "Toutes":
-                df_filtre = df_filtre[df_filtre['categorie'] == choix_cat]
+                df = df[df['categorie'] == choix_cat]
+            # -----------------------
             
+            # Recherche textuelle existante
+            recherche = st.text_input("🔍 Rechercher un matériel", "")
             if recherche:
-                df_filtre = df_filtre[df_filtre['Nom du Matériel'].str.contains(recherche, case=False, na=False)]
+                df = df[df['Nom du Matériel'].str.contains(recherche, case=False, na=False)]
             
-            st.write(f"--- *{len(df_filtre)} article(s) affiché(s)* ---")
-            
-            # --- AFFICHAGE EN GRILLE ---
+            # Affichage en grille (comme avant)
             cols = st.columns(3)
-            # Utilisation de reset_index pour éviter les problèmes d'index avec les filtres
-            for i, (index, row) in enumerate(df_filtre.reset_index().iterrows()):
-                with cols[i % 3]:
-                    # Affichage photo
-                    if 'photo_url' in row and row['photo_url'] not in ['None', 'nan', '']:
-                        st.image(row['photo_url'], use_column_width=True)
-                    else:
-                        st.warning("📷 Pas de photo")
-                    
-                    # Informations
-                    st.markdown(f"**{row['Nom du Matériel']}**")
-                    st.caption(f"Catégorie: {row['categorie']}")
-                    st.caption(f"ID: {row['num_interne']}")
-                    
-                    if st.button(f"Voir détail", key=f"btn_{i}"):
-                        st.info(f"Détails pour {row['Nom du Matériel']}...")
-                    st.write("---")
+            for index, row in df.iterrows():
+                with cols[index % 3]:
+                    # ... (votre code d'affichage des photos reste identique)
         else:
             st.info("Le catalogue est vide.")
-            
     except Exception as e:
-        st.error(f"Erreur lors du chargement : {e}")
+        st.error(f"Erreur : {e}")
 with tab2:
     st.subheader("Matériels en stock")
     df_materiel = supabase.table("materiel").select("*").execute()

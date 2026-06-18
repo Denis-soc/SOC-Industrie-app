@@ -94,5 +94,22 @@ with tab2:
     st.subheader("Matériels en stock")
     df_materiel = supabase.table("materiel").select("*").execute()
     st.dataframe(pd.DataFrame(df_materiel.data))
+with tab5:
+    st.header("⚙️ Administration du Matériel")
+    
+    with st.form("ajout_materiel_form"):
+        nom = st.text_input("Nom du matériel")
+        categorie = st.selectbox("Catégorie", ["EPI", "Consommable", "Outillage"])
+        quantite = st.number_input("Quantité", min_value=0)
+        
+        submitted = st.form_submit_button("Ajouter à la base")
+        
+        if submitted:
+            # Envoi vers Supabase
+            data = {"nom": nom, "categorie": categorie, "quantite": quantite}
+            supabase.table("materiel").insert(data).execute()
+            
+            st.success(f"{nom} a bien été ajouté au catalogue !")
+            st.rerun() # Rafraîchit l'interface pour voir la mise à jour
 
 # Répétez ce modèle pour tab2, tab3, etc. en changeant le nom de la table

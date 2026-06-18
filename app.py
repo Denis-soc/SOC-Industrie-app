@@ -146,10 +146,22 @@ with tab5:
     if mode == "Ajouter":
         submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_form_complet()
         if submit and num:
-            data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio}
+        data = {
+            "num_interne": num,
+            "Nom du Matériel": nom,
+            "categorie": cat,
+            "taille": taille,
+            "reference": ref,
+            "num_serie": ns,
+            "fournisseur": fourn,
+            "periodicite_controle": int(perio) # Force le format entier
+        }
+        try:
             supabase.table("materiel").insert(data).execute()
             st.success("Matériel ajouté !")
             st.rerun()
+        except Exception as e:
+            st.error(f"Erreur Supabase : {e}")
 
     elif mode == "Modifier":
         if not df_admin.empty:

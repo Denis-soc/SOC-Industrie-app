@@ -41,55 +41,20 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "⚙️ Administration Matériel"
 ])
 # 5. CONTENU DES ONGLES
-with tab1:
-    st.header("🛒 Catalogue des Équipements")
+# Dans votre boucle d'affichage (tab1)
+for i, row in df.iterrows():
+    # ... vos colonnes ...
     
-    try:
-        response = supabase.table("materiel").select("*").execute()
-        df = pd.DataFrame(response.data)
-        
-        if not df.empty:
-            df = df.fillna("").astype(str)
-            
-            # Filtres
-            col1, col2 = st.columns(2)
-            with col1:
-                categories = ["Toutes"] + sorted(df['categorie'].unique().tolist())
-                choix_cat = st.selectbox("Filtrer par catégorie", categories)
-            with col2:
-                recherche = st.text_input("🔍 Rechercher un matériel", "")
-            
-            # Application des filtres
-            df_filtre = df.copy()
-            if choix_cat != "Toutes":
-                df_filtre = df_filtre[df_filtre['categorie'] == choix_cat]
-            if recherche:
-                df_filtre = df_filtre[df_filtre['Nom du Matériel'].str.contains(recherche, case=False, na=False)]
-            
-            st.write(f"--- *{len(df_filtre)} article(s) affiché(s)* ---")
-            
-            # Affichage Grille
-            cols = st.columns(3)
-            for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
-                with cols[i % 3]:
-                    # Affichage photo
-                    if 'photo_url' in row and row['photo_url'] not in ['None', 'nan', '']:
-                        st.image(row['photo_url'], use_column_width=True)
-                    else:
-                        st.warning("📷 Pas de photo")
-                    
-                    st.markdown(f"**{row['Nom du Matériel']}**")
-                    st.caption(f"Catégorie: {row['categorie']}")
-                    st.caption(f"ID: {row['num_interne']}")
-                    
-                    if st.button(f"Voir détail", key=f"btn_{i}"):
-                        st.info("Fonctionnalité en cours de développement.")
-                    st.write("---")
-        else:
-            st.info("Le catalogue est vide.")
-            
-    except Exception as e:
-        st.error(f"Erreur : {e}")
+    url = row.get("photo_url")
+    
+    # Vérification stricte : le lien doit exister et ne pas être vide/None
+    if url and str(url).strip() not in ["", "None", "nan"]:
+        try:
+            st.image(url, use_container_width=True)
+        except Exception:
+            st.warning("Image non trouvée")
+    else:
+        st.warning("📷 Pas de photo")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

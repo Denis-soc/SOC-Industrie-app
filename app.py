@@ -133,5 +133,10 @@ with tab5:
         else:
             supabase.table("materiel").update(data).eq("num_interne", num).execute()
             
-        st.success("Opération effectuée !")
-        st.rerun()
+        try:
+            supabase.table("materiel").insert(data).execute()
+            st.success("Opération effectuée !")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erreur technique détaillée : {e}")
+            st.write("Contenu du dictionnaire envoyé :", data)

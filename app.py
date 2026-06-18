@@ -120,46 +120,60 @@ with tab2:
 with tab5:
     st.header("⚙️ Administration du Matériel")
     
-    # Récupération propre
+    # 1. Récupération des données
     try:
         response = supabase.table("materiel").select("*").execute()
-        df_admin = pd.DataFrame(response.data)
-        if df_admin.empty: df_admin = pd.DataFrame()
-    except:
+        df_admin = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+        if not df_admin.empty:
+            df_admin = df_admin.fillna("").astype(str)
+    except Exception as e:
+        st.error(f"Erreur connexion base : {e}")
         df_admin = pd.DataFrame()
 
     mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
 
-    # Section Ajouter
-    if mode == "Ajouter":
-        with st.form("ajout_form"):
-            num = st.text_input("N° Interne")
-            nom = st.text_input("Nom")
+    # 2. Formulaire unique pour Ajouter et Modifier
+    def afficher_form_complet(item=None):
+        with st.form("form_gestion"):
+            col1, col2 = st.columns(2)
+            with col1:
+                num = st.text_input("N° Interne", value=item["num_interne"] if item else "", disabled=(item is not None))
+                nom = st.text_input("Nom du matériel", value=item["Nom du Matériel"] if item else "")
+                cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"], index=0)
+                taille = st.text_input("Taille (si EPI)", value=item.get("taille", "") if item else "")
+            with col2:
+                ref = st.text_input("Référence", value=item.get("reference", "") if item else "")
+                ns = st.text_input("N° de série", value=item.get("num_serie", "") if item else "")
+                fourn = st.text_input("Fournisseur", value=item.get("fournisseur", "") if item else "")
+                perio = st.number_input("Périodicité (mois)", value=int(float(item.get("periodicite_controle", 0))) if item else 0)
+                photo = st.file_uploader("Photo", type=['png', 'jpg', 'jpeg'])
+            
             submit = st.form_submit_button("Valider")
-        
-        if submit:
-            if num:
-                supabase.table("materiel").insert({"num_interne": num, "Nom du Matériel": nom}).execute()
-                st.success("Ajouté !")
-                st.rerun()
+            return submit, num, nom, cat, taille, ref, ns, fourn, perio, photo
 
-    # Section Modifier
+    # 3. Logique des actions
+    if mode == "Ajouter":
+        submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_form_complet()
+        if submit and num:
+            data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio}
+            supabase.table("materiel").insert(data).execute()
+            st.success("Matériel ajouté !")
+            st.rerun()
+
     elif mode == "Modifier":
         if not df_admin.empty:
-            sel = st.selectbox("Choisir", df_admin["num_interne"].tolist())
-            with st.form("modif_form"):
-                nouveau_nom = st.text_input("Nouveau nom")
-                submit_mod = st.form_submit_button("Modifier")
-            
-            if submit_mod:
-                supabase.table("materiel").update({"Nom du Matériel": nouveau_nom}).eq("num_interne", sel).execute()
+            selection = st.selectbox("Choisir le N° Interne", df_admin["num_interne"].tolist())
+            item = df_admin[df_admin["num_interne"] == selection].iloc[0]
+            submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_form_complet(item=item)
+            if submit:
+                upd = {"Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio}
+                supabase.table("materiel").update(upd).eq("num_interne", num).execute()
                 st.success("Modifié !")
                 st.rerun()
 
-    # Section Supprimer
     elif mode == "Supprimer":
         if not df_admin.empty:
-            choix = st.selectbox("Supprimer", df_admin["num_interne"].tolist())
-            if st.button("Confirmer suppression"):
+            choix = st.selectbox("Supprimer le N° Interne", df_admin["num_interne"].tolist())
+            if st.button("Confirmer la suppression"):
                 supabase.table("materiel").delete().eq("num_interne", choix).execute()
                 st.rerun()

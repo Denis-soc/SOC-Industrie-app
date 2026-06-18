@@ -143,6 +143,6 @@ with tab5:
     # CRITICAL : Cette ligne est obligatoire
     submit = st.form_submit_button("Ajouter au catalogue")
 
-if submit:
-    # Votre logique d'envoi vers Supabase ici
-    st.success("Matériel ajouté !")
+    if submit:
+        # Votre logique d'envoi vers Supabase ici
+        st.success("Matériel ajouté !")

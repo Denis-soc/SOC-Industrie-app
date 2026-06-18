@@ -42,18 +42,34 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 # 5. CONTENU DES ONGLES
 with tab1:
-    st.header("📋 Catalogue (Test de visibilité)")
+    st.header("📋 Catalogue du Matériel")
     
-    # Tentative de récupération brute
+    # Récupération
     response = supabase.table("materiel").select("*").execute()
-    data = response.data
-    
-    st.write(f"Nombre d'articles trouvés dans la base : {len(data) if data else 0}")
-    
-    if data:
-        st.dataframe(pd.DataFrame(data)) # Affiche tout sous forme de tableau
-    else:
-        st.error("Aucune donnée retournée par Supabase. Vérifiez si vous êtes sur la bonne table !")
+    df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+
+    if not df.empty:
+        # On remplace les catégories vides par "Sans catégorie" pour ne rien perdre
+        df['categorie'] = df['categorie'].fillna("Sans catégorie")
+        
+        # Sélecteur
+        categories = ["Tous"] + sorted(df["categorie"].unique().tolist())
+        cat_choisie = st.selectbox("Choisir le catalogue :", categories)
+        
+        # Filtrage
+        if cat_choisie == "Tous":
+            df_filtre = df
+        else:
+            df_filtre = df[df["categorie"] == cat_choisie]
+            
+        st.write(f"Affichage de {len(df_filtre)} article(s) sur {len(df)} au total.")
+
+        # Affichage
+        cols = st.columns(6)
+        for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
+            with cols[i % 6]:
+                st.caption(row.get("Nom du Matériel", "Sans nom"))
+                # ... suite de votre affichage ...
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

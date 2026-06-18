@@ -142,26 +142,33 @@ with tab5:
             submit = st.form_submit_button("Valider")
             return submit, num, nom, cat, taille, ref, ns, fourn, perio, photo
 
-    # 3. Logique d'exécution
+   # 3. Logique d'exécution pour AJOUTER
     if mode == "Ajouter":
         submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_form_complet()
-        if submit and num:
-            data = {
-                "num_interne": num,
-                "Nom du Matériel": nom,
-                "categorie": cat,
-                "taille": taille,
-                "reference": ref,
-                "num_serie": ns,
-                "fournisseur": fourn,
-                "periodicite_controle": int(perio) # Force le format entier
-        }
-        try:
-            supabase.table("materiel").insert(data).execute()
-            st.success("Matériel ajouté !")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Supabase : {e}")
+        
+        if submit:
+            if not num:
+                st.warning("Le N° Interne est obligatoire.")
+            else:
+                # 1. DÉFINITION DE LA VARIABLE DATA (ICI ELLE EST DÉFINIE)
+                data = {
+                    "num_interne": num,
+                    "Nom du Matériel": nom,
+                    "categorie": cat,
+                    "taille": taille,
+                    "reference": ref,
+                    "num_serie": ns,
+                    "fournisseur": fourn,
+                    "periodicite_controle": int(perio)
+                }
+                
+                # 2. UTILISATION DANS LE TRY
+                try:
+                    supabase.table("materiel").insert(data).execute()
+                    st.success("Matériel ajouté avec succès !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur Supabase : {e}")
 
     elif mode == "Modifier":
         if not df_admin.empty:

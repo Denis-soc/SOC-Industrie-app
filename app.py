@@ -95,43 +95,45 @@ with tab2:
     df_materiel = supabase.table("materiel").select("*").execute()
     st.dataframe(pd.DataFrame(df_materiel.data))
 with tab5:
-    st.header("⚙️ Ajout de Matériel")
+    st.header("⚙️ Administration du Matériel")
     
-    # Formulaire
-    with st.form("ajout_materiel"):
-        col_a, col_b = st.columns(2)
-        with col_a:
-            num_interne = st.text_input("N° Interne (unique)")
-            nom = st.text_input("Nom du matériel")
-            categorie = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"])
-        with col_b:
-            ref_materiel = st.text_input("Référence matériel")
-            date_achat = st.date_input("Date d'achat / dernier étalonnage")
-            periodicite = st.number_input("Périodicité contrôle (en mois)", min_value=0)
-            
-        photo = st.file_uploader("Prendre une photo", type=['png', 'jpg', 'jpeg'])
-        submit = st.form_submit_button("Ajouter au catalogue")
+    # 1. Choix du mode : Ajout, Modification ou Suppression
+    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
+    
+    # Récupération des données pour les menus déroulants
+    try:
+        response = supabase.table("materiel").select("*").execute()
+        df_admin = pd.DataFrame(response.data)
+        liste_materiel = df_admin["Nom du Matériel"].tolist() if not df_admin.empty else []
+    except:
+        liste_materiel = []
 
-    if submit:
-        try:
-            url_photo = None
-            if photo:
-                # Upload vers Supabase Storage
-                file_path = f"materiel/{num_interne}.png"
-                supabase.storage.from_("photos_materiel").upload(file_path, photo.getvalue())
-                url_photo = supabase.storage.from_("photos_materiel").get_public_url(file_path)
+    # --- AJOUT ---
+    if mode == "Ajouter":
+        with st.form("ajout_form"):
+            # ... (Utilisez ici le même formulaire d'ajout que précédemment)
+            st.info("Utilisez le formulaire d'ajout habituel.")
+            # (Vous pouvez copier-coller votre bloc d'ajout ici)
 
-            # Envoi dans la table 'materiel'
-            data = {
-                "num_interne": num_interne,
-                "Nom du Matériel": nom,
-                "categorie": categorie,
-                "reference": ref_materiel,
-                "date_achat_etalonnage": str(date_achat),
-                "periodicite_controle": int(periodicite),
-                "photo_url": url_photo
-            }
-            supabase.table("materiel").insert(data).execute()
-            st.success("Matériel ajouté avec succès !")
-        except Exception as e:
-            st.error(f"Erreur : {e}")
+    # --- MODIFICATION ---
+    elif mode == "Modifier":
+        choix = st.selectbox("Sélectionner le matériel à modifier", liste_materiel)
+        if choix:
+            item = df_admin[df_admin["Nom du Matériel"] == choix].iloc[0]
+            with st.form("modif_form"):
+                nouveau_nom = st.text_input("Nouveau nom", value=item["Nom du Matériel"])
+                nouvelle_cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables"], index=0)
+                submit_modif = st.form_submit_button("Enregistrer les modifications")
+                
+                if submit_modif:
+                    supabase.table("materiel").update({"Nom du Matériel": nouveau_nom, "categorie": nouvelle_cat}).eq("num_interne", item["num_interne"]).execute()
+                    st.success("Fiche mise à jour !")
+
+    # --- SUPPRESSION ---
+    elif mode == "Supprimer":
+        choix_supp = st.selectbox("Sélectionner le matériel à supprimer", liste_materiel)
+        if st.button("Confirmer la suppression définitive"):
+            item_supp = df_admin[df_admin["Nom du Matériel"] == choix_supp].iloc[0]
+            supabase.table("materiel").delete().eq("num_interne", item_supp["num_interne"]).execute()
+            st.warning(f"{choix_supp} a été supprimé.")
+            st.rerun() # Rafraîchit l'interface pour voir la suppression

@@ -44,32 +44,56 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.header("📋 Catalogue du Matériel")
     
-    # Récupération
-    response = supabase.table("materiel").select("*").execute()
-    df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+    # 1. Chargement des données
+    try:
+        response = supabase.table("materiel").select("*").execute()
+        df = pd.DataFrame(response.data) if response.data is not None else pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erreur de connexion : {e}")
+        df = pd.DataFrame()
 
     if not df.empty:
-        # On remplace les catégories vides par "Sans catégorie" pour ne rien perdre
+        # Nettoyage pour éviter les problèmes d'affichage
         df['categorie'] = df['categorie'].fillna("Sans catégorie")
         
-        # Sélecteur
+        # 2. Sélecteur de catégorie
         categories = ["Tous"] + sorted(df["categorie"].unique().tolist())
-        cat_choisie = st.selectbox("Choisir le catalogue :", categories)
+        cat_choisie = st.selectbox("Choisir le catalogue :", categories, key="cat_tab1")
         
         # Filtrage
-        if cat_choisie == "Tous":
-            df_filtre = df
-        else:
-            df_filtre = df[df["categorie"] == cat_choisie]
-            
-        st.write(f"Affichage de {len(df_filtre)} article(s) sur {len(df)} au total.")
+        df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
+        
+        st.write(f"Affichage de {len(df_filtre)} article(s).")
 
-        # Affichage
+        # 3. Affichage en grille de 6 colonnes
         cols = st.columns(6)
+        
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
             with cols[i % 6]:
-                st.caption(row.get("Nom du Matériel", "Sans nom"))
-                # ... suite de votre affichage ...
+                # Affichage du nom
+                st.caption(f"**{row.get('Nom du Matériel', 'Sans nom')}**")
+                
+                # --- GESTION DES PHOTOS ---
+                # Vérifiez bien que le nom de la colonne dans votre base est 'photo_url'
+                url = row.get("photo_url")
+                
+                if url and isinstance(url, str) and url.startswith("http"):
+                    try:
+                        st.image(url, use_container_width=True)
+                    except:
+                        st.warning("Image non trouvée")
+                else:
+                    # Affichage d'un placeholder si pas de photo
+                    st.image("https://via.placeholder.com/150?text=Pas+d'image", use_container_width=True)
+                
+                # Référence et détails
+                st.write(f"Ref: {row.get('reference', 'N/A')}")
+                
+                if st.button("Détails", key=f"btn_{row.get('num_interne', i)}"):
+                    st.info(f"N° Interne : {row.get('num_interne', 'N/A')}\n\n"
+                            f"Fournisseur : {row.get('fournisseur', 'N/A')}")
+    else:
+        st.info("Le catalogue est vide.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

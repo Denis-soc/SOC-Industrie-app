@@ -127,13 +127,42 @@ with tab5:
             return submit, num_int, nom, cat, taille, ref, num_serie, fournisseur, perio, photo
 
     # --- LOGIQUE D'ACTION ---
-    if mode == "Ajouter":
+   if mode == "Ajouter":
         submit, num, nom, cat, taille, ref, ns, fourn, perio, photo = afficher_formulaire()
         if submit:
-            data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": perio}
-            supabase.table("materiel").insert(data).execute()
-            st.success("Matériel ajouté !")
-            st.rerun()
+            if not num:
+                st.error("Le N° interne est obligatoire.")
+            else:
+                try:
+                    url_photo = ""
+                    # 1. Traitement de la photo
+                    if photo is not None:
+                        file_path = f"materiel/{num}.png"
+                        # Upload
+                        supabase.storage.from_("photos_materiel").upload(file_path, photo.getvalue(), {"upsert": "true"})
+                        # Récupération de l'URL publique
+                        url_photo = supabase.storage.from_("photos_materiel").get_public_url(file_path)
+                        st.write(f"DEBUG: URL générée = {url_photo}") # À retirer une fois que ça marche
+                    
+                    # 2. Préparation des données
+                    data = {
+                        "num_interne": num,
+                        "Nom du Matériel": nom,
+                        "categorie": cat,
+                        "taille": taille,
+                        "reference": ref,
+                        "num_serie": ns,
+                        "fournisseur": fourn,
+                        "periodicite_controle": perio,
+                        "photo_url": url_photo  # Cette fois-ci, c'est bien transmis !
+                    }
+                    
+                    # 3. Insertion
+                    response = supabase.table("materiel").insert(data).execute()
+                    st.success("Matériel ajouté avec succès !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur lors de l'ajout : {e}")
 
     elif mode == "Modifier":
         if not df_admin.empty:

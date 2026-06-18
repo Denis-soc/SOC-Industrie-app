@@ -49,25 +49,30 @@ with tab1:
         df_cat = pd.DataFrame(response.data)
 
         if not df_cat.empty:
-            # Recherche et filtres
+            # --- CORRECTION : Conversion forcée en string pour éviter l'erreur float/str ---
+            df_cat = df_cat.astype(str) 
+            
+            # Barre de recherche et Filtres
             col_search, col_filter = st.columns([2, 1])
             with col_search:
                 recherche = st.text_input("🔍 Rechercher un article", "")
             with col_filter:
+                # Utilisez .unique() sur la colonne en string
                 categories = ["Toutes"] + sorted(df_cat["categorie"].unique().tolist())
                 choix_cat = st.selectbox("Filtrer par catégorie", categories)
 
-            # Application filtres
+            # Application des filtres
             df_filtre = df_cat.copy()
+            
             if choix_cat != "Toutes":
                 df_filtre = df_filtre[df_filtre["categorie"] == choix_cat]
+            
             if recherche:
+                # Recherche insensible à la casse
                 df_filtre = df_filtre[df_filtre["nom"].str.contains(recherche, case=False, na=False)]
 
             st.write(f"**{len(df_filtre)}** articles trouvés")
-            
-            # Affichage du tableau
-            st.dataframe(df_filtre, use_container_width=True)
+            st.dataframe(df_filtre, use_container_width=True
 
             # --- CORRECTION ICI : Affichage des photos sous le tableau ---
             st.subheader("Aperçu des articles")

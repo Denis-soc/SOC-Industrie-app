@@ -42,45 +42,56 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 # 5. CONTENU DES ONGLES
 with tab1:
-    st.header("📋 Catalogue du Matériel")
+    st.header("🛒 Catalogue du Matériel")
     
-    # Récupération
+    # Initialisation du panier dans la session
+    if 'panier' not in st.session_state:
+        st.session_state.panier = {}
+
     response = supabase.table("materiel").select("*").execute()
-    df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+    df = pd.DataFrame(response.data).fillna("") if response.data else pd.DataFrame()
 
     if not df.empty:
-        # Nettoyage global
-        df = df.fillna("") 
-        
-        # --- MODIFICATION ICI ---
-        # Au lieu de supprimer les "Sans nom", on les garde mais on les affiche correctement.
-        # Cela empêche de masquer par erreur un article que vous venez de créer.
-        df['Nom du Matériel'] = df['Nom du Matériel'].replace("", "Article sans nom")
-        
-        # Sélecteur
-        categories = ["Tous"] + sorted([c for c in df["categorie"].unique() if c != ""])
-        cat_choisie = st.selectbox("Choisir le catalogue :", categories)
-        
+        cat_choisie = st.selectbox("Catégorie :", ["Tous"] + sorted(list(set(df["categorie"]))))
         df_filtre = df if cat_choisie == "Tous" else df[df["categorie"] == cat_choisie]
-        
-        # Grille
-        cols = st.columns(6)
+
+        cols = st.columns(4) # Grille sur 4 colonnes pour des images plus grandes
         for i, (idx, row) in enumerate(df_filtre.reset_index().iterrows()):
-            with cols[i % 6]:
+            with cols[i % 4]:
                 st.markdown(f"**{row['Nom du Matériel']}**")
                 
-                # Image
+                # Image divisée par 2 (st.image width ajusté)
                 url = str(row.get("photo_url", ""))
                 if url.startswith("http"):
-                    st.image(url, use_container_width=True)
-                else:
-                    st.write("---") 
+                    st.image(url, width=150) 
                 
-                st.caption(f"Ref: {row.get('reference', 'N/A')}")
-                if st.button("Détails", key=f"btn_{row.get('num_interne', i)}"):
-                    st.info(f"N° Interne: {row.get('num_interne', 'N/A')}")
+                # Sélection quantité/taille
+                qte = st.number_input(f"Qté {row['num_interne']}", 0, 10, key=f"qte_{row['num_interne']}")
+                taille = st.selectbox("Taille", ["", "S", "M", "L", "XL"], key=f"t_{row['num_interne']}")
+                
+                if st.button("Ajouter au panier", key=f"add_{row['num_interne']}"):
+                    st.session_state.panier[row['num_interne']] = {"nom": row['Nom du Matériel'], "qte": qte, "taille": taille}
+                    st.success("Ajouté !")
+
+    # --- PARTIE PANIER ---
+    st.divider()
+    st.subheader("📦 Votre Panier")
+    if st.session_state.panier:
+        df_panier = pd.DataFrame.from_dict(st.session_state.panier, orient='index')
+        st.table(df_panier)
+        
+        num_affaire = st.text_input("Entrez votre numéro d'affaire :")
+        
+        if num_affaire and st.button("Envoyer la commande à Olivier"):
+            # Préparation du contenu du mail
+            corps = f"Commande pour l'affaire {num_affaire} :\n\n" + df_panier.to_string()
+            subject = f"Commande Matériel - Affaire {num_affaire}"
+            
+            # Génération du lien mailto
+            mailto = f"mailto:owasse@soc.fr?subject={subject}&body={corps.replace(chr(10), '%0D%0A')}"
+            st.markdown(f'<a href="{mailto}" style="padding: 10px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">Cliquer ici pour envoyer le mail</a>', unsafe_allow_html=True)
     else:
-        st.write("Le catalogue est vide.")
+        st.info("Le panier est vide.")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

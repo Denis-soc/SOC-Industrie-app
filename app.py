@@ -500,12 +500,15 @@ with tab5:
                         "periodicite_controle": int(perio), 
                         "photo_url": url_photo,
                         "date_achat": str(date_achat) if date_achat else None,
-                        "date_prochain_controle": str(date_prochain) if date_prochain else None
+                        "date_prochain_controle": str(date_prochain) if date_prochain else None,
+                        # --- VALEURS PAR DÉFAUT POUR LA RÉSERVATION ---
+                        "est_a_l_agence": True,
+                        "affectation_actuelle": ""
                     }
                     try:
                         supabase.table("materiel").insert(data).execute()
                         st.success("Matériel ajouté !")
-                        rafraichir_page()
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Erreur Supabase : {e}")
 

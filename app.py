@@ -126,13 +126,17 @@ with tab1:
         # Le bouton de téléchargement ne s'active que si les deux champs sont remplis
         if nom_demandeur and num_affaire:
             
-            # Fonction interne pour générer le PDF en mémoire avec le nom du demandeur
+            # Fonction interne pour générer le PDF avec Nom, Affaire et DATE automatique
             def generer_pdf(df, affaire, demandeur):
                 import io
+                from datetime import datetime
                 from reportlab.lib.pagesizes import letter
                 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
                 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
                 from reportlab.lib import colors
+                
+                # Récupération et formatage de la date du jour (ex: 22/06/2026)
+                date_aujourdhui = datetime.now().strftime("%d/%m/%Y")
                 
                 buffer = io.BytesIO()
                 doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -155,7 +159,8 @@ with tab1:
                 story.append(Paragraph(f"<b>Bon de Commande Matériel / EPI</b>", styles['Heading2']))
                 story.append(Spacer(1, 15))
                 
-                # Ajout des informations du demandeur et de l'affaire
+                # Ajout des informations : Date, Demandeur, Affaire
+                story.append(Paragraph(f"<b>Date de la demande :</b> {date_aujourdhui}", styles['Normal']))
                 story.append(Paragraph(f"<b>Demandeur :</b> {demandeur}", styles['Normal']))
                 story.append(Paragraph(f"<b>N° d'Affaire :</b> {affaire}", styles['Normal']))
                 story.append(Spacer(1, 20))
@@ -192,7 +197,7 @@ with tab1:
                 buffer.seek(0)
                 return buffer.getvalue()
 
-            # Génération du PDF avec les deux paramètres requis
+            # Génération du PDF
             pdf_data = generer_pdf(df_panier, num_affaire, nom_demandeur)
             
             # Bouton de téléchargement

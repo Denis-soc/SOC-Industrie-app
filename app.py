@@ -183,7 +183,7 @@ with tab5:
     elif mode == "Modifier" and not df_materiel_reel.empty:
         if "num_interne" in df_materiel_reel.columns:
             liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if n != ""]
-            sel = st.selectbox("Choisir le N° Interne à modifier", liste_numeros)
+            sel = st.selectbox("Choisir le matériel à modifier (par son N° Interne actuel)", liste_numeros)
             
             if sel:
                 item = df_materiel_reel[df_materiel_reel["num_interne"] == sel].iloc[0]
@@ -191,7 +191,12 @@ with tab5:
                 with st.form("form_modifier"):
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.info(f"Modification du N° Interne : {sel}")
+                        # On stocke l'ancien numéro dans une variable cachée ou sous forme de texte informatif
+                        st.info(f"Ancien N° Interne : {sel}")
+                        
+                        # Le champ est maintenant modifiable !
+                        nouveau_num = st.text_input("Nouveau N° Interne", value=str(item.get("num_interne", "")))
+                        
                         nom = st.text_input("Nom du matériel", value=str(item.get("Nom du Matériel", "")))
                         
                         cat_index = 0
@@ -216,13 +221,29 @@ with tab5:
                     submit = st.form_submit_button("Enregistrer les modifications")
                     
                     if submit:
-                        upd = {"Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": int(perio), "photo_url": url_photo}
-                        try:
-                            supabase.table("materiel").update(upd).eq("num_interne", sel).execute()
-                            st.success("Modifié avec succès !")
-                            rafraichir_page()
-                        except Exception as e:
-                            st.error(f"Erreur lors de la modification : {e}")
+                        if not nouveau_num.strip():
+                            st.error("Le N° Interne ne peut pas être vide.")
+                        else:
+                            # On prépare les données incluant le potentiel NOUVEAU numéro interne
+                            upd = {
+                                "num_interne": nouveau_num,
+                                "Nom du Matériel": nom, 
+                                "categorie": cat, 
+                                "taille": taille, 
+                                "reference": ref, 
+                                "num_serie": ns, 
+                                "fournisseur": fourn, 
+                                "periodicite_controle": int(perio), 
+                                "photo_url": url_photo
+                            }
+                            try:
+                                # CRUCIAL : On cherche l'ancienne ligne grâce à 'sel' (l'ancien numéro)
+                                # et on lui applique le dictionnaire 'upd' (qui contient le nouveau numéro)
+                                supabase.table("materiel").update(upd).eq("num_interne", sel).execute()
+                                st.success("Modifié avec succès !")
+                                rafraichir_page()
+                            except Exception as e:
+                                st.error(f"Erreur lors de la modification : {e}")
 
     elif mode == "Supprimer" and not df_materiel_reel.empty:
         if "num_interne" in df_materiel_reel.columns:

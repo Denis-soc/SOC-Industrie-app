@@ -23,6 +23,11 @@ except Exception as e:
 def charger_materiel():
     try:
         response = supabase.table("materiel").select("*").execute()
+        if not df_materiel_reel.empty:
+    if 'date_achat' not in df_materiel_reel.columns:
+        df_materiel_reel['date_achat'] = None
+    if 'date_prochain_controle' not in df_materiel_reel.columns:
+        df_materiel_reel['date_prochain_controle'] = None
         if response.data:
             # On remplace immédiatement les valeurs nulles/NaN par du texte vide ou 0
             df = pd.DataFrame(response.data)
@@ -260,107 +265,71 @@ with tab1:
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     if not df_materiel_reel.empty:
-        # 1. Vérification et préparation des colonnes de dates et périodicités
-        if 'periodicite_controle' in df_materiel_reel.columns:
+        # On ne garde que l'Outillage et le Matériel Commun pour ce suivi
+        df_suivi = df_materiel_reel[df_materiel_reel['categorie'].isin(["Outillage", "Matériel Commun"])].copy()
+        
+        if not df_suivi.empty:
+            # Conversion propre des dates pour faire les calculs
+            df_suivi['date_prochain_controle'] = pd.to_datetime(df_suivi['date_prochain_controle'], errors='coerce')
             
-            # Conversion propre de la périodicité en chiffre
-            df_materiel_reel['periodicite_num'] = pd.to_numeric(df_materiel_reel['periodicite_controle'], errors='coerce').fillna(0)
+            statuts = []
+            prochaines_dates = []
+            date_du_jour = datetime.now()
             
-            # On ne garde que le matériel soumis à contrôle
-            df_suivi = df_materiel_reel[df_materiel_reel['periodicite_num'] > 0].copy()
-            
-            if not df_suivi.empty:
+            for idx, row in df_suivi.iterrows():
+                dt_prochain = row['date_prochain_controle']
                 
-                # Gestion de la date du dernier contrôle (si absente, on prend une date par défaut ou vide)
-                if 'date_dernier_controle' in df_suivi.columns:
-                    df_suivi['date_dernier_controle'] = pd.to_datetime(df_suivi['date_dernier_controle'], errors='coerce')
+                if pd.isnull(dt_prochain):
+                    statuts.append("🔴 À renseigner")
+                    prochaines_dates.append("Non planifié")
                 else:
-                    # Si la colonne n'existe pas encore en base, on la crée vide pour l'instant
-                    df_suivi['date_dernier_controle'] = pd.NaT
-                
-                # 2. CALCULS DES ÉCHÉANCES
-                statuts = []
-                prochaines_dates = []
-                jours_restants_liste = []
-                
-                date_du_jour = datetime.now()
-                
-                for idx, row in df_suivi.iterrows():
-                    dt_dernier = row['date_dernier_controle']
-                    mois_perio = int(row['periodicite_num'])
+                    prochaines_dates.append(dt_prochain.strftime("%d/%m/%Y"))
+                    jours_restants = (dt_prochain - date_du_jour).days
                     
-                    if pd.isnull(dt_dernier):
-                        statuts.append("🔴 Date manquante")
-                        prochaines_dates.append("À renseigner")
-                        jours_restants_liste.append(-9999)
+                    if jours_restants < 0:
+                        statuts.append("🔴 EN RETARD")
+                    elif jours_restants <= 30:
+                        statuts.append("🟡 À PRÉVOIR (<30j)")
                     else:
-                        # Calcul théorique : date dernier contrôle + (X mois * 30 jours)
-                        dt_prochain = dt_dernier + timedelta(days=mois_perio * 30)
-                        prochaines_dates.append(dt_prochain.strftime("%d/%m/%Y"))
-                        
-                        jours_restants = (dt_prochain - date_du_jour).days
-                        jours_restants_liste.append(jours_restants)
-                        
-                        if jours_restants < 0:
-                            statuts.append("🔴 EN RETARD")
-                        elif jours_restants <= 30:
-                            statuts.append("🟡 À PRÉVOIR (<30j)")
-                        else:
-                            statuts.append("🟢 À JOUR")
-                
-                df_suivi['Prochain Contrôle'] = prochaines_dates
-                df_suivi['Statut'] = statuts
-                df_suivi['jours_restants'] = jours_restants_liste
-                
-                # 3. FILTRES D'AFFICHAGE TRÈS PRATIQUES POUR OLIVIER
-                col_f1, col_f2 = st.columns(2)
-                with col_f1:
-                    filtre_statut = st.multiselect(
-                        "Filtrer par état :", 
-                        ["🔴 EN RETARD", "🟡 À PRÉVOIR (<30j)", "🟢 À JOUR", "🔴 Date manquante"],
-                        default=["🔴 EN RETARD", "🟡 À PRÉVOIR (<30j)", "🟢 À JOUR", "🔴 Date manquante"]
-                    )
-                with col_f2:
-                    categories_suivi = ["Toutes"] + sorted(list(set(df_suivi['categorie'].dropna().tolist())))
-                    cat_suivi_choisie = st.selectbox("Filtrer par catégorie (Suivi) :", categories_suivi)
-                
-                # Application des filtres
-                df_suivi_filtre = df_suivi[df_suivi['Statut'].isin(filtre_statut)]
-                if cat_suivi_choisie != "Toutes":
-                    df_suivi_filtre = df_suivi_filtre[df_suivi_filtre['categorie'] == cat_suivi_choisie]
-                
-                # 4. AFFICHAGE DES RÉSULTATS
-                if not df_suivi_filtre.empty:
-                    # Formatage des dates du dernier contrôle pour l'affichage en tableau
-                    df_suivi_filtre['Dernier Contrôle'] = df_suivi_filtre['date_dernier_controle'].apply(
-                        lambda x: x.strftime("%d/%m/%Y") if pd.notnull(x) else "Non renseigné"
-                    )
-                    
-                    # Sélection et ordre des colonnes pour Olivier
-                    colonnes_finales = [
-                        'Statut', 'num_interne', 'Nom du Matériel', 'categorie', 
-                        'date achat', 'periodicite_controle', 'date Prochain Contrôle'
-                    ]
-                    
-                    # On renomme proprement les colonnes
-                    df_tab_final = df_suivi_filtre[colonnes_finales].rename(columns={
-                        'num_interne': 'N° Interne',
-                        'periodicite_controle': 'Périodicité (mois)'
-                    })
-                    
-                    st.dataframe(df_tab_final, use_container_width=True, hide_index=True)
-                    
-                else:
-                    st.info("Aucun matériel ne correspond aux filtres sélectionnés.")
-            else:
-                st.info("Aucun matériel ne possède de périodicité de contrôle dans la base.")
+                        statuts.append("🟢 À JOUR")
+            
+            df_suivi['Statut'] = statuts
+            df_suivi['Prochain Contrôle'] = prochaines_dates
+            
+            # Formater la date d'achat pour l'affichage
+            df_suivi['Date d\'achat'] = pd.to_datetime(df_suivi['date_achat'], errors='coerce').apply(
+                lambda x: x.strftime("%d/%m/%Y") if pd.notnull(x) else "Non renseignée"
+            )
+            
+            # Filtres rapides pour Olivier
+            filtre_statut = st.multiselect(
+                "Filtrer par état :", 
+                ["🔴 EN RETARD", "🟡 À PRÉVOIR (<30j)", "🟢 À JOUR", "🔴 À renseigner"],
+                default=["🔴 EN RETARD", "🟡 À PRÉVOIR (<30j)", "🟢 À JOUR", "🔴 À renseigner"]
+            )
+            
+            df_suivi_filtre = df_suivi[df_suivi['Statut'].isin(filtre_statut)]
+            
+            # Sélection et affichage des colonnes finales dans le tableau
+            colonnes_affichage = [
+                'Statut', 'num_interne', 'Nom du Matériel', 'categorie', 
+                'Date d\'achat', 'periodicite_controle', 'Prochain Contrôle'
+            ]
+            
+            df_tab_final = df_suivi_filtre[colonnes_affichage].rename(columns={
+                'num_interne': 'N° Interne',
+                'periodicite_controle': 'Intervalle (mois)',
+                'categorie': 'Catégorie'
+            })
+            
+            st.dataframe(df_tab_final, use_container_width=True, hide_index=True)
         else:
-            st.warning("La colonne 'periodicite_controle' est introuvable dans la table Supabase.")
+            st.info("Aucun outillage ou matériel commun enregistré pour le moment.")
     else:
-        st.info("Aucun matériel chargé.")
+        st.info("Aucun matériel trouvé dans la base de données.")
 with tab5:
     st.header("⚙️ Administration du Matériel")
     

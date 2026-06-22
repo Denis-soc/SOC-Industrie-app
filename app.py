@@ -488,46 +488,66 @@ from geopy.geocoders import Nominatim
 with tab4:
     st.header("📍 Carte interactive de localisation")
     
-    # 1. Récupération des données
-    res_actifs = supabase.table("reservations").select("*").eq("statut", "Active").execute()
-    df_res = pd.DataFrame(res_actifs.data)
-    data_mat = supabase.table("materiel").select("*").execute()
-    df_mat = pd.DataFrame(data_mat.data)
+    # 1. Récupération des données depuis Supabase
+    try:
+        res_actifs = supabase.table("reservations").select("*").eq("statut", "Active").execute()
+        df_res = pd.DataFrame(res_actifs.data)
+        data_mat = supabase.table("materiel").select("*").execute()
+        df_mat = pd.DataFrame(data_mat.data)
+    except Exception as e:
+        st.error(f"Erreur de récupération des données : {e}")
+        st.stop()
     
-    points_data = []
-    geolocator = Nominatim(user_agent="soc_industrie_app_debug")
+    geolocator = Nominatim(user_agent="soc_industrie_app_v3")
     
-    # 2. Préparation des données Dépôt
-    df_debug = df_mat[df_mat['est_a_l_agence'].astype(str).str.lower().isin(['true', '1'])]
-    liste_mat_depot = [f"{row['num_interne']} ({row['Nom du Matériel']})" for _, row in df_debug.iterrows()]
+    # 2. Préparation dictionnaire pour grouper par coordonnées
+    points_dict = {}
+
+    # A. Ajout du Dépôt
+    df_depot = df_mat[df_mat['est_a_l_agence'].astype(str).str.lower().isin(['true', '1'])]
+    liste_mat_depot = [f"{row['num_interne']} ({row['Nom du Matériel']})" for _, row in df_depot.iterrows()]
     
-    points_data.append({
-        'lat': 47.3486, 'lon': -0.4651,
-        'label': '📍 Agence SOC Industrie',
-        'matériel': " | ".join(liste_mat_depot) if liste_mat_depot else "Aucun matériel"
-    })
-    
-    # 3. Préparation des données Chantiers
+    # Coordonnées Agence (arrondies pour correspondre aux chantiers)
+    lat_ag, lon_ag = 47.3486, -0.4651
+    points_dict[(round(lat_ag, 4), round(lon_ag, 4))] = {
+        'lat': lat_ag, 'lon': lon_ag, 
+        'label': '📍 Agence SOC Industrie', 
+        'matériel': liste_mat_depot
+    }
+
+    # B. Ajout des Chantiers avec agrégation
     if not df_res.empty:
         for _, row in df_res.iterrows():
             try:
                 location = geolocator.geocode(row['adresse_chantier'])
                 if location:
-                    points_data.append({
-                        'lat': location.latitude, 
-                        'lon': location.longitude, 
-                        'label': f"🏗️ {row['num_affaire']}",
-                        'matériel': f"Matériel : {row['num_interne']}"
-                    })
+                    coords = (round(location.latitude, 4), round(location.longitude, 4))
+                    if coords in points_dict:
+                        # Si le point existe déjà (ex: plusieurs matériels sur le même chantier), on ajoute à la liste
+                        if row['num_interne'] not in points_dict[coords]['matériel']:
+                            points_dict[coords]['matériel'].append(str(row['num_interne']))
+                    else:
+                        # Sinon on crée le point
+                        points_dict[coords] = {
+                            'lat': location.latitude, 'lon': location.longitude, 
+                            'label': f"🏗️ {row['num_affaire']}", 
+                            'matériel': [str(row['num_interne'])]
+                        }
             except:
                 continue
+
+    # 3. Conversion du dictionnaire en liste finale pour Pydeck
+    points_data = []
+    for p in points_dict.values():
+        p['matériel_str'] = " | ".join(p['matériel']) if isinstance(p['matériel'], list) else p['matériel']
+        points_data.append(p)
 
     # 4. Affichage Pydeck
     if points_data:
         df_points = pd.DataFrame(points_data)
+        
         view_state = pdk.ViewState(latitude=47.3486, longitude=-0.4651, zoom=10)
         
-        # Le rendu final avec le bon nombre de parenthèses
         st.pydeck_chart(pdk.Deck(
             initial_view_state=view_state,
             layers=[pdk.Layer(
@@ -538,7 +558,7 @@ with tab4:
                 get_radius=300,
                 pickable=True
             )],
-            tooltip={"text": "{label}\n{matériel}"}
+            tooltip={"text": "{label}\nMatériel : {matériel_str}"}
         ))
     else:
         st.info("Aucune donnée de localisation disponible.")

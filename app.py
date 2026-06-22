@@ -20,6 +20,7 @@ except Exception as e:
     st.stop()
 
 # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
+# # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
 def charger_materiel():
     try:
         response = supabase.table("materiel").select("*").execute()
@@ -38,8 +39,9 @@ def charger_materiel():
             
             # --- TRI PAR N° INTERNE CROISSANT ---
             if 'num_interne' in df.columns:
-                # natsort permet de trier intelligemment (ex: OUT 2 passera avant OUT 10)
-                df = df.sort_values(by='num_interne', key=lambda x: x.str.alphanumeric if hasattr(x, 'str') else x)
+                # Tri alphabétique classique et efficace
+                df['num_interne_str'] = df['num_interne'].astype(str)
+                df = df.sort_values(by='num_interne_str', ascending=True).drop(columns=['num_interne_str'])
             
             return df
             
@@ -47,7 +49,6 @@ def charger_materiel():
     except Exception as e:
         st.error(f"Erreur lors du chargement de la table 'materiel' : {e}")
         return pd.DataFrame()
-
 def charger_demandes():
     try:
         response = supabase.table("demandes_collaborateurs").select("*").execute()

@@ -493,38 +493,42 @@ with tab5:
             
             # À remplacer dans le bloc "Ajouter" de votre Tab 5 :
 
-            if submit:
-                if not num.strip():
-                    st.warning("Le N° Interne est obligatoire.")
-                else:
-                    # Fonction locale pour nettoyer les saisies : si c'est vide, on envoie None (NULL)
-                    def sans_vide(val):
-                        if val is None:
-                            return None
-                        return val.strip() if str(val).strip() != "" else None
-            
-                    data = {
-                        "num_interne": num.strip(), 
-                        "Nom du Matériel": sans_vide(nom), 
-                        "categorie": cat, 
-                        "taille": sans_vide(taille), 
-                        "reference": sans_vide(ref), 
-                        "num_serie": sans_vide(ns), 
-                        "fournisseur": sans_vide(fourn), 
-                        "periodicite_controle": int(perio), 
-                        "photo_url": sans_vide(url_photo),
-                        "date_achat": str(date_achat) if date_achat else None,
-                        "date_prochain_controle": str(date_prochain) if date_prochain else None,
-                        "est_a_l_agence": True,
-                        "affectation_actuelle": None  # On initialise proprement à NULL en base
-                    }
+            # À remplacer sous le bouton "Valider l'ajout" (dans la condition if submit:)
+
+        if submit:
+            if not num.strip():
+                st.warning("Le N° Interne est obligatoire.")
+            else:
+                # Fonction pour transformer les textes vides en None (NULL)
+                def sans_vide(val):
+                    if val is None:
+                        return None
+                    return val.strip() if str(val).strip() != "" else None
         
-        try:
-            supabase.table("materiel").insert(data).execute()
-            st.success("🎉 Matériel ajouté avec succès ! Allons tester l'onglet Réservation.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Supabase : {e}")
+                # DÉFINITION EXPLICITE DE LA VARIABLE 'data'
+                data = {
+                    "num_interne": num.strip(), 
+                    "Nom du Matériel": sans_vide(nom), 
+                    "categorie": cat, 
+                    "taille": sans_vide(taille), 
+                    "reference": sans_vide(ref), 
+                    "num_serie": sans_vide(ns), 
+                    "fournisseur": sans_vide(fourn), 
+                    "periodicite_controle": int(perio), 
+                    "photo_url": sans_vide(url_photo),
+                    "date_achat": str(date_achat) if date_achat else None,
+                    "date_prochain_controle": str(date_prochain) if date_prochain else None,
+                    "est_a_l_agence": True,
+                    "affectation_actuelle": None
+                }
+                
+                try:
+                    # Envoi de la variable 'data' bien définie à Supabase
+                    supabase.table("materiel").insert(data).execute()
+                    st.success("🎉 Matériel ajouté avec succès !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur Supabase : {e}")
 
     elif mode == "Modifier" and not df_materiel_reel.empty:
         if "num_interne" in df_materiel_reel.columns:

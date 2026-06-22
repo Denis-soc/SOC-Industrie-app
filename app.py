@@ -375,8 +375,22 @@ with tab5:
             with col1:
                 num = st.text_input("N° Interne")
                 nom = st.text_input("Nom du matériel")
-                cat = st.selectbox("Catégorie", categories_officielles)
-                taille = st.text_input("Taille (si EPI)")
+                cat = st.selectbox("Catégorie", categories_officielles, key="add_cat")
+                
+                # Condition : Si EPI, on demande la taille
+                if cat == "EPI":
+                    taille = st.text_input("Taille")
+                else:
+                    taille = ""
+                    
+                # Condition : Si Outillage ou Matériel Commun, on demande les dates
+                if cat in ["Outillage", "Matériel Commun"]:
+                    date_achat = st.date_input("Date d'achat", value=None, key="add_achat")
+                    date_prochain = st.date_input("Date du prochain contrôle", value=None, key="add_prochain")
+                else:
+                    date_achat = None
+                    date_prochain = None
+
             with col2:
                 ref = st.text_input("Référence")
                 ns = st.text_input("N° de série")
@@ -399,7 +413,9 @@ with tab5:
                         "num_serie": ns, 
                         "fournisseur": fourn, 
                         "periodicite_controle": int(perio), 
-                        "photo_url": url_photo
+                        "photo_url": url_photo,
+                        "date_achat": str(date_achat) if date_achat else None,
+                        "date_prochain_controle": str(date_prochain) if date_prochain else None
                     }
                     try:
                         supabase.table("materiel").insert(data).execute()
@@ -423,14 +439,30 @@ with tab5:
                         nouveau_num = st.text_input("Nouveau N° Interne", value=str(item.get("num_interne", "")))
                         nom = st.text_input("Nom du matériel", value=str(item.get("Nom du Matériel", "")))
                         
-                        # Calcul de l'index par défaut pour la catégorie
                         cat_index = 0
                         item_cat = item.get("categorie")
                         if item_cat in categories_officielles:
                             cat_index = categories_officielles.index(item_cat)
                         
-                        cat = st.selectbox("Catégorie", categories_officielles, index=cat_index)
-                        taille = st.text_input("Taille (si EPI)", value=str(item.get("taille", "")))
+                        cat = st.selectbox("Catégorie", categories_officielles, index=cat_index, key="mod_cat")
+                        
+                        # Affichage conditionnel des champs pour la modification
+                        if cat == "EPI":
+                            taille = st.text_input("Taille", value=str(item.get("taille", "")))
+                        else:
+                            taille = ""
+                            
+                        if cat in ["Outillage", "Matériel Commun"]:
+                            # On récupère les dates existantes s'il y en a
+                            val_achat = pd.to_datetime(item.get("date_achat")).date() if item.get("date_achat") else None
+                            val_prochain = pd.to_datetime(item.get("date_prochain_controle")).date() if item.get("date_prochain_controle") else None
+                            
+                            date_achat = st.date_input("Date d'achat", value=val_achat, key="mod_achat")
+                            date_prochain = st.date_input("Date du prochain contrôle", value=val_prochain, key="mod_prochain")
+                        else:
+                            date_achat = None
+                            date_prochain = None
+
                     with col2:
                         ref = st.text_input("Référence", value=str(item.get("reference", "")))
                         ns = st.text_input("N° de série", value=str(item.get("num_serie", "")))
@@ -458,7 +490,9 @@ with tab5:
                                 "num_serie": ns, 
                                 "fournisseur": fourn, 
                                 "periodicite_controle": int(perio), 
-                                "photo_url": url_photo
+                                "photo_url": url_photo,
+                                "date_achat": str(date_achat) if date_achat else None,
+                                "date_prochain_controle": str(date_prochain) if date_prochain else None
                             }
                             try:
                                 supabase.table("materiel").update(upd).eq("num_interne", sel).execute()

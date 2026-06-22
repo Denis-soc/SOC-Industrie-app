@@ -91,32 +91,61 @@ def rafraichir_page():
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # 1. Sélecteur de catalogue
+    # Sélecteur de catalogue
     cat_choisi = st.selectbox("Choisir le catalogue", ["EPI", "Consommables", "Outillage"])
     
+    # Récupération des données depuis Supabase
     try:
-        # Récupération de TOUTES les données de la table
         response = supabase.table("stocks_catalogues").select("*").execute()
+        df_all = pd.DataFrame(response.data)
         
-        if not response.data:
-            st.warning("La table est connectée, mais aucune ligne n'est trouvée dans la base de données.")
-        else:
-            df_all = pd.DataFrame(response.data)
-            
-            # Nettoyage des chaînes de caractères pour comparaison (gestion des espaces)
+        if not df_all.empty:
+            # Filtrage local
             df_all['catalogue'] = df_all['catalogue'].astype(str).str.strip()
-            
-            # Filtrage en local (plus fiable)
             df_stock = df_all[df_all['catalogue'] == cat_choisi]
             
             if not df_stock.empty:
                 st.subheader(f"État du stock : {cat_choisi}")
-                # Affichage simple du contenu
-                st.dataframe(df_stock[['nom_article', 'quantite', 'stock_mini']], use_container_width=True)
+                
+                # Affichage avec alerte visuelle pour stock mini
+                def highlight_alert(row):
+                    color = '#ffcccc' if row['quantite'] <= row['stock_mini'] else ''
+                    return [f'background-color: {color}'] * len(row)
+                
+                st.dataframe(df_stock[['nom_article', 'quantite', 'stock_mini']].style.apply(highlight_alert, axis=1), use_container_width=True)
+                
+                # Formulaires Entrée / Sortie
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("📥 **Entrée Stock**")
+                    with st.form("entree_form"):
+                        article_in = st.selectbox("Article à ajouter", df_stock['nom_article'])
+                        qt_in = st.number_input("Quantité reçue", min_value=1, step=1)
+                        if st.form_submit_button("Valider Entrée"):
+                            # Mise à jour Supabase
+                            current_val = int(df_stock.loc[df_stock['nom_article'] == article_in, 'quantite'].values[0])
+                            new_val = current_val + int(qt_in)
+                            supabase.table("stocks_catalogues").update({"quantite": new_val}).eq("nom_article", article_in).execute()
+                            st.success("Stock mis à jour !")
+                            st.rerun()
+                            
+                with col2:
+                    st.write("📤 **Sortie Stock**")
+                    with st.form("sortie_form"):
+                        article_out = st.selectbox("Article à sortir", df_stock['nom_article'])
+                        qt_out = st.number_input("Quantité sortie", min_value=1, step=1)
+                        if st.form_submit_button("Valider Sortie"):
+                            # Mise à jour Supabase
+                            current_val = int(df_stock.loc[df_stock['nom_article'] == article_out, 'quantite'].values[0])
+                            new_val = current_val - int(qt_out)
+                            supabase.table("stocks_catalogues").update({"quantite": new_val}).eq("nom_article", article_out).execute()
+                            st.success("Stock mis à jour !")
+                            st.rerun()
             else:
                 st.info(f"Aucun article trouvé pour le catalogue '{cat_choisi}'.")
-                st.write("Contenu brut détecté :", df_all['catalogue'].unique()) # Aide au diagnostic
-                
+        else:
+            st.warning("La table 'stocks_catalogues' est vide.")
     except Exception as e:
         st.error(f"Erreur technique : {e}")
 with tab1:

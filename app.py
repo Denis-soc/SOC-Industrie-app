@@ -94,29 +94,32 @@ with tab0:
     # Sélecteur de catalogue
     cat_choisi = st.selectbox("Choisir le catalogue", ["EPI", "Consommables", "Outillage"])
     
-    # 1. Récupération globale pour déboguer
+    # Récupération sécurisée
     try:
         response = supabase.table("stocks_catalogues").select("*").execute()
         df_all = pd.DataFrame(response.data)
         
         if not df_all.empty:
-            # Nettoyage : suppression des espaces inutiles et mise en minuscules pour comparaison
-            df_all['catalogue_clean'] = df_all['catalogue'].astype(str).str.strip().str.lower()
-            cat_choisi_clean = cat_choisi.strip().lower()
+            # Nettoyage systématique des espaces et mise en majuscules pour comparaison
+            df_all['catalogue_clean'] = df_all['catalogue'].astype(str).str.strip().str.upper()
+            target = cat_choisi.strip().upper()
             
-            # Filtrage
-            df_stock = df_all[df_all['catalogue_clean'] == cat_choisi_clean]
+            df_stock = df_all[df_all['catalogue_clean'] == target]
             
             if not df_stock.empty:
-                st.subheader(f"État du stock actuel : {cat_choisi}")
-                # Affichage du DataFrame
-                st.dataframe(df_stock, use_container_width=True)
+                st.subheader(f"État du stock : {cat_choisi}")
+                # Affichage propre
+                st.dataframe(df_stock[['nom_article', 'quantite', 'stock_mini']], use_container_width=True)
                 
-                # ... (Votre section formulaires reste ici) ...
+                # --- Partie Formulaires (Entrée/Sortie) ---
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Rafraîchir les données"):
+                        st.rerun()
             else:
-                st.info(f"Aucun article trouvé dans le catalogue '{cat_choisi}'. Vérifiez l'orthographe dans Supabase.")
+                st.info(f"Aucun article trouvé pour le catalogue : {cat_choisi}. Vérifiez votre saisie dans Supabase.")
         else:
-            st.warning("La table 'stocks_catalogues' est vide.")
+            st.warning("La table 'stocks_catalogues' est actuellement vide.")
             
     except Exception as e:
         st.error(f"Erreur de connexion : {e}")

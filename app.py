@@ -487,7 +487,22 @@ with tab5:
 
     # Liste unique et harmonisée de vos 4 catégories
     categories_officielles = ["EPI", "Outillage", "Consommables", "Matériel Commun"]
-
+    data = supabase.table("materiel").select("*").execute()
+    df_admin = pd.DataFrame(data.data)
+    
+    if action == "Supprimer":
+        st.subheader("🗑️ Supprimer un article")
+        # Sélection du matériel à supprimer
+        mat_a_supprimer = st.selectbox("Choisir le matériel à supprimer :", df_admin['num_interne'].tolist())
+        
+        if st.button("Confirmer la suppression définitive"):
+            try:
+                # Suppression dans Supabase
+                supabase.table("materiel").delete().eq("num_interne", mat_a_supprimer).execute()
+                st.success(f"L'article {mat_a_supprimer} a été supprimé avec succès.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erreur lors de la suppression : {e}")
     if mode == "Ajouter":
         with st.form("form_ajouter"):
             col1, col2 = st.columns(2)

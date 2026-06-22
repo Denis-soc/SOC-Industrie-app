@@ -628,7 +628,7 @@ with tab5:
                                 rafraichir_page()
                             except Exception as e:
                                 st.error(f"Erreur lors de la modification : {e}")
-                                elif mode == "Supprimer" and not df_materiel_reel.empty:
+    elif mode == "Supprimer" and not df_materiel_reel.empty:
         if "num_interne" in df_materiel_reel.columns:
             liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if str(n).strip() != ""]
             choix = st.selectbox("Sélectionner le N° Interne à supprimer", liste_numeros)

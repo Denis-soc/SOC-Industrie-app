@@ -101,14 +101,14 @@ with tab1:
                     
                     qte = st.number_input(f"Qté {num_int}", 0, 10, key=f"qte_{num_int}")
                     liste_tailles = [
-                    "", 
-                    # Tailles Standards (EPI / Vêtements)
-                    "S", "M", "L", "XL", "XXL", "XXXL", "XXXXL", 
-                    # Tailles Numériques (Pantalons / Chaussures)
-                    "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52"
-                ]
+                        "", 
+                        # Tailles Standards (EPI / Vêtements)
+                        "S", "M", "L", "XL", "XXL", "XXXL", "XXXXL", 
+                        # Tailles Numériques (Pantalons / Chaussures)
+                        "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52"
+                    ]
 
-                taille = st.selectbox("Taille", liste_tailles, key=f"t_{num_int}")
+                    taille = st.selectbox("Taille", liste_tailles, key=f"t_{num_int}")
                     
                     if st.button("Ajouter au panier", key=f"add_{num_int}"):
                         st.session_state.panier[num_int] = {"nom": nom_mat, "qte": qte, "taille": taille}

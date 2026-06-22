@@ -6,4 +6,4 @@ geopy
 psycopg2-binary
 SQLAlchemy
 supabase
-pip install reportlab
+reportlab

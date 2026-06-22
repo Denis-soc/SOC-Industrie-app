@@ -480,7 +480,7 @@ with tab3:
                             st.error(f"Erreur lors de l'enregistrement : {e}")
     else:
         st.info("Aucun matériel disponible.") 
-        with tab4:
+with tab4:
     st.header("📍 Carte de localisation du matériel en chantier")
     
     from geopy.geocoders import Nominatim

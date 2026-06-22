@@ -91,63 +91,64 @@ def rafraichir_page():
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # Sélecteur de catalogue
+    # 1. Sélecteur de catalogue
     cat_choisi = st.selectbox("Choisir le catalogue", ["EPI", "Consommables", "Outillage"])
     
-    # Récupération des données depuis Supabase
+    # 2. Récupération des données depuis Supabase
     try:
         response = supabase.table("stocks_catalogues").select("*").execute()
         df_all = pd.DataFrame(response.data)
         
         if not df_all.empty:
-            # Filtrage local
             df_all['catalogue'] = df_all['catalogue'].astype(str).str.strip()
             df_stock = df_all[df_all['catalogue'] == cat_choisi]
-            
-            if not df_stock.empty:
-                st.subheader(f"État du stock : {cat_choisi}")
-                
-                # Affichage avec alerte visuelle pour stock mini
-                def highlight_alert(row):
-                    color = '#ffcccc' if row['quantite'] <= row['stock_mini'] else ''
-                    return [f'background-color: {color}'] * len(row)
-                
-                st.dataframe(df_stock[['nom_article', 'quantite', 'stock_mini']].style.apply(highlight_alert, axis=1), use_container_width=True)
-                
-                # Formulaires Entrée / Sortie
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.write("📥 **Entrée Stock**")
-                    with st.form("entree_form"):
-                        article_in = st.selectbox("Article à ajouter", df_stock['nom_article'])
-                        qt_in = st.number_input("Quantité reçue", min_value=1, step=1)
-                        if st.form_submit_button("Valider Entrée"):
-                            # Mise à jour Supabase
-                            current_val = int(df_stock.loc[df_stock['nom_article'] == article_in, 'quantite'].values[0])
-                            new_val = current_val + int(qt_in)
-                            supabase.table("stocks_catalogues").update({"quantite": new_val}).eq("nom_article", article_in).execute()
-                            st.success("Stock mis à jour !")
-                            st.rerun()
-                            
-                with col2:
-                    st.write("📤 **Sortie Stock**")
-                    with st.form("sortie_form"):
-                        article_out = st.selectbox("Article à sortir", df_stock['nom_article'])
-                        qt_out = st.number_input("Quantité sortie", min_value=1, step=1)
-                        if st.form_submit_button("Valider Sortie"):
-                            # Mise à jour Supabase
-                            current_val = int(df_stock.loc[df_stock['nom_article'] == article_out, 'quantite'].values[0])
-                            new_val = current_val - int(qt_out)
-                            supabase.table("stocks_catalogues").update({"quantite": new_val}).eq("nom_article", article_out).execute()
-                            st.success("Stock mis à jour !")
-                            st.rerun()
-            else:
-                st.info(f"Aucun article trouvé pour le catalogue '{cat_choisi}'.")
         else:
-            st.warning("La table 'stocks_catalogues' est vide.")
+            df_stock = pd.DataFrame()
+            
+        # --- Affichage du stock ---
+        if not df_stock.empty:
+            st.subheader(f"État du stock : {cat_choisi}")
+            st.dataframe(df_stock[['nom_article', 'quantite', 'stock_mini']], use_container_width=True)
+            
+            # --- Mouvements (Entrée / Sortie) ---
+            col1, col2 = st.columns(2)
+            with col1:
+                with st.form("entree_form"):
+                    article_in = st.selectbox("Article", df_stock['nom_article'])
+                    qt_in = st.number_input("Quantité reçue", min_value=1, step=1)
+                    if st.form_submit_button("Valider Entrée"):
+                        current_val = int(df_stock.loc[df_stock['nom_article'] == article_in, 'quantite'].values[0])
+                        supabase.table("stocks_catalogues").update({"quantite": current_val + int(qt_in)}).eq("nom_article", article_in).execute()
+                        st.rerun()
+            with col2:
+                with st.form("sortie_form"):
+                    article_out = st.selectbox("Article", df_stock['nom_article'])
+                    qt_out = st.number_input("Quantité sortie", min_value=1, step=1)
+                    if st.form_submit_button("Valider Sortie"):
+                        current_val = int(df_stock.loc[df_stock['nom_article'] == article_out, 'quantite'].values[0])
+                        supabase.table("stocks_catalogues").update({"quantite": current_val - int(qt_out)}).eq("nom_article", article_out).execute()
+                        st.rerun()
+        else:
+            st.info(f"Aucun article trouvé dans le catalogue '{cat_choisi}'.")
+
+        # --- Section Ajout Nouvel Article ---
+        st.divider()
+        with st.expander("➕ Ajouter un nouvel article au catalogue"):
+            with st.form("ajout_article_form"):
+                new_nom = st.text_input("Nom de l'article")
+                new_mini = st.number_input("Stock minimum", min_value=0, value=5)
+                if st.form_submit_button("Ajouter l'article"):
+                    supabase.table("stocks_catalogues").insert({
+                        "catalogue": cat_choisi,
+                        "nom_article": new_nom,
+                        "quantite": 0,
+                        "stock_mini": new_mini
+                    }).execute()
+                    st.success("Article ajouté avec succès !")
+                    st.rerun()
+                    
     except Exception as e:
-        st.error(f"Erreur technique : {e}")
+        st.error(f"Erreur de connexion : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

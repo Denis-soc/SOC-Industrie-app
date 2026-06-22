@@ -342,127 +342,105 @@ with tab2:
     else:
         st.info("Aucun matériel trouvé dans la base de données.")
 with tab3:
-    st.header("📅 Réservation & Planification du Matériel")
+    st.header("📅 Réservation & Affectation du Matériel Commun")
+    st.markdown("📍 **Zone d'affectation par défaut :** Agence SOC Industrie — *70 route de Brissac, 49380 TERRANJOU*")
     
-    from datetime import datetime
-    
-    # On ne filtre que le matériel réservable (Outillage et Matériel Commun)
     if not df_materiel_reel.empty:
-        df_reservable = df_materiel_reel[df_materiel_reel['categorie'].isin(["Outillage", "Matériel Commun"])].copy()
-    else:
-        df_reservable = pd.DataFrame()
+        # On filtre STRICTEMENT sur le Matériel Commun
+        df_commun = df_materiel_reel[df_materiel_reel['categorie'] == "Matériel Commun"].copy()
+        
+        if df_commun.empty:
+            st.info("Aucun matériel commun enregistré pour le moment.")
+        else:
+            # Sécurisation des colonnes d'état si elles n'existent pas encore dans le DataFrame
+            if 'est_a_l_agence' not in df_commun.columns:
+                df_commun['est_a_l_agence'] = True
+            if 'affectation_actuelle' not in df_commun.columns:
+                df_commun['affectation_actuelle'] = ""
 
-    if df_reservable.empty:
-        st.info("Aucun matériel (Outillage / Matériel Commun) disponible pour la réservation.")
-    else:
-        # Création de deux sous-onglets pour séparer l'action du suivi
-        choix_action = st.radio("Faites votre choix :", ["Créer une réservation", "Consulter le planning des chantiers"], horizontal=True, label_visibility="collapsed")
-        
-        st.divider()
-        
-        # ---------------------------------------------------------
-        # MODE 1 : CRÉER UNE NOUVELLE RÉSERVATION
-        # ---------------------------------------------------------
-        if choix_action == "Créer une réservation":
-            st.subheader("✍️ Enregistrer une nouvelle affectation")
+            # --- PARTIE 1 : STATUT EN DIRECT DU PARC ---
+            st.subheader("📋 État actuel du matériel")
             
-            with st.form("form_reservation"):
-                col_res1, col_res2 = st.columns(2)
+            # Préparation d'un affichage propre pour Olivier
+            visual_status = []
+            localisation_label = []
+            
+            for idx, row in df_commun.iterrows():
+                # Gestion du booléen (gestion du texte vide ou du vrai booléen Supabase)
+                au_depot = row['est_a_l_agence']
+                if au_depot is True or au_depot == "True" or au_depot == "":
+                    visual_status.append("🟢 Disponible")
+                    localisation_label.append("📍 Dépôt (Terranjou)")
+                else:
+                    visual_status.append("🔴 En chantier")
+                    qui = row['affectation_actuelle']
+                    localisation_label.append(f"👷 Sorti chez : {qui}" if qui else "🔴 Hors Agence")
+            
+            df_commun['Statut'] = visual_status
+            df_commun['Localisation / Affectation'] = localisation_label
+            
+            # Tableau récapitulatif
+            df_affichage_res = df_commun[['num_interne', 'Nom du Matériel', 'Statut', 'Localisation / Affectation']].rename(columns={
+                'num_interne': 'N° Interne'
+            })
+            st.dataframe(df_affichage_res, use_container_width=True, hide_index=True)
+            
+            st.divider()
+            
+            # --- PARTIE 2 : ACTION DE MISE À JOUR (MOUVEMENT) ---
+            st.subheader("🔄 Mettre à jour l'affectation d'un matériel")
+            
+            # Liste déroulante des matériels communs
+            df_commun['choix_label'] = df_commun['num_interne'].astype(str) + " - " + df_commun['Nom du Matériel'].astype(str)
+            liste_mat_commun = df_commun['choix_label'].tolist()
+            
+            mat_cible = st.selectbox("Sélectionner le matériel commun :", liste_mat_commun, key="sb_res_cible")
+            
+            if mat_cible:
+                # Récupération des infos actuelles de l'élément sélectionné
+                num_int_isole = mat_cible.split(" - ")[0]
+                item_courant = df_commun[df_commun['num_interne'] == num_int_isole].iloc[0]
                 
-                with col_res1:
-                    # Sélection du matériel par son N° Interne et son Nom
-                    df_reservable['affichage_choix'] = df_reservable['num_interne'].astype(str) + " - " + df_reservable['Nom du Matériel'].astype(str)
-                    liste_choix_mat = df_reservable['affichage_choix'].tolist()
+                # Récupération de l'état actuel pour pré-cocher la case
+                etat_initial = item_courant['est_a_l_agence']
+                bool_initial = True if (etat_initial is True or etat_initial == "True" or etat_initial == "") else False
+                
+                with st.form("form_mouvement_stock"):
+                    # Case à cocher principale
+                    a_l_agence = st.checkbox("Le matériel est présent à l'agence (Terranjou) et disponible", value=bool_initial)
                     
-                    mat_selectionne = st.selectbox("Sélectionner le matériel :", liste_choix_mat)
-                    nom_technicien = st.text_input("Nom du collaborateur / Technicien :")
-                    num_affaire_res = st.text_input("Numéro d'affaire / Chantier :")
-                
-                with col_res2:
-                    date_debut = st.date_input("Date de début d'affectation :", value=datetime.now().date())
-                    date_fin = st.date_input("Date de fin prévue :", value=datetime.now().date())
-                    notes_res = st.text_area("Notes particulières (état, accessoires requis...) :", placeholder="Ex: Livré avec sa mallette et batteries chargées.")
-                
-                submit_res = st.form_submit_button("🔨 Valider et bloquer le matériel")
-                
-                if submit_res:
-                    if not nom_technicien.strip() or not num_affaire_res.strip():
-                        st.warning("⚠️ Le nom du technicien et le numéro d'affaire sont obligatoires.")
-                    elif date_fin < date_debut:
-                        st.error("❌ Erreur : La date de fin ne peut pas être antérieure à la date de début.")
-                    else:
-                        # Extraction du N° Interne seul
-                        num_interne_isole = mat_selectionne.split(" - ")[0]
+                    # Champ texte pour dire qui l'a s'il n'est pas à l'agence
+                    qui_a_le_materiel = st.text_input(
+                        "Si NON présent à l'agence, qui détient le matériel ? (Nom / Chantier)", 
+                        value=str(item_courant['affectation_actuelle']) if not bool_initial else ""
+                    )
+                    
+                    btn_maj = st.form_submit_button("💾 Enregistrer le statut")
+                    
+                    if btn_maj:
+                        # Logique de nettoyage des données avant envoi
+                        if a_l_agence:
+                            nouvelle_affectation = "" # Retour au dépôt
+                        else:
+                            nouvelle_affectation = qui_a_le_materiel.strip()
+                            if not nouvelle_affectation:
+                                nouvelle_affectation = "Non spécifié"
                         
-                        data_reservation = {
-                            "num_interne": num_interne_isole,
-                            "technicien": nom_technicien.strip(),
-                            "num_affaire": num_affaire_res.strip(),
-                            "date_debut": str(date_debut),
-                            "date_fin": str(date_fin),
-                            "notes": notes_res.strip(),
-                            "statut": "Active"
+                        # Mise à jour dans Supabase
+                        upd_data = {
+                            "est_a_l_agence": a_l_agence,
+                            "affectation_actuelle": nouvelle_affectation
                         }
                         
                         try:
-                            # Tentative d'insertion dans la table 'reservations'
-                            supabase.table("reservations").insert(data_reservation).execute()
-                            st.success(f"🎉 Réservation enregistrée avec succès pour le matériel {num_interne_isole} !")
-                            st.balloons()
-                            # rafraichir_page() # Décommentez si vous avez défini cette fonction globalement
+                            supabase.table("materiel").update(upd_data).eq("num_interne", num_int_isole).execute()
+                            st.success(f"Le statut du matériel {num_int_isole} a bien été mis à jour !")
+                            st.rerun()
                         except Exception as e:
-                            st.error(f"Erreur Supabase : Vérifiez que la table 'reservations' existe dans votre base. Détails : {e}")
-
-        # ---------------------------------------------------------
-        # MODE 2 : CONSULTER LE PLANNING / HISTORIQUE
-        # ---------------------------------------------------------
-        else:
-            st.subheader("📋 Matériel actuellement sur les chantiers")
-            
-            try:
-                # Récupération des données de réservations actives depuis Supabase
-                res_response = supabase.table("reservations").select("*").execute()
-                
-                if res_response.data:
-                    df_res = pd.DataFrame(res_response.data)
-                    
-                    # Nettoyage et formatage des dates
-                    df_res['date_debut'] = pd.to_datetime(df_res['date_debut']).dt.strftime('%d/%m/%Y')
-                    df_res['date_fin'] = pd.to_datetime(df_res['date_fin']).dt.strftime('%d/%m/%Y')
-                    
-                    # Jointure optionnelle avec df_reservable pour récupérer le nom complet si besoin
-                    # Pour faire simple, on affiche directement les colonnes de la table réservation
-                    df_res_affichage = df_res.rename(columns={
-                        "num_interne": "N° Interne",
-                        "technicien": "Collaborateur",
-                        "num_affaire": "N° d'Affaire",
-                        "date_debut": "Date Début",
-                        "date_fin": "Fin Prévue",
-                        "notes": "Commentaires"
-                    })
-                    
-                    # Tri par date de fin ou par numéro d'affaire
-                    df_res_affichage = df_res_affichage.sort_values(by="N° d'Affaire")
-                    
-                    # Ordre des colonnes à l'écran
-                    colonnes_res = ["N° Interne", "Collaborateur", "N° d'Affaire", "Date Début", "Fin Prévue", "Commentaires"]
-                    st.dataframe(df_res_affichage[colonnes_res], use_container_width=True, hide_index=True)
-                    
-                    # Option rapide pour libérer/clôturer un matériel
-                    st.write("")
-                    with st.expander("🔄 Clôturer / Libérer un matériel de son chantier"):
-                        id_a_liberer = st.selectbox("Sélectionner la réservation à terminer :", df_res['id'].tolist(), 
-                                                    format_func=lambda x: f"ID {x} - Matériel {df_res[df_res['id']==x]['num_interne'].values[0]} sur Affaire {df_res[df_res['id']==x]['num_affaire'].values[0]}")
-                        
-                        if st.button("✔️ Marquer le matériel comme Retourné / Disponible", use_container_width=True):
-                            supabase.table("reservations").delete().eq("id", id_a_liberer).execute()
-                            st.success("Le matériel a été libéré et est à nouveau disponible.")
-                            # rafraichir_page()
-                else:
-                    st.info("💡 Aucun matériel n'est actuellement réservé ou sur un chantier. Tout est au dépôt !")
-                    
-            except Exception as e:
-                st.info("ℹ️ Pour afficher le planning, assurez-vous de créer la table 'reservations' dans votre interface Supabase.")        
+                            st.error(f"Erreur lors de la mise à jour : {e}")
+                            st.info("💡 Pensez à vérifier que les colonnes 'est_a_l_agence' (booléen) et 'affectation_actuelle' (texte) existent bien sur votre table 'materiel' dans Supabase.")
+    else:
+        st.info("Aucun matériel disponible.")       
 with tab5:
     st.header("⚙️ Administration du Matériel")
     

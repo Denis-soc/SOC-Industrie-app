@@ -505,11 +505,18 @@ with tab4:
     df_depot = df_mat[df_mat['est_a_l_agence'].astype(str).str.lower() == 'true'].copy()
     
     if not df_depot.empty:
-        liste_mat_depot = (df_depot['num_interne'].astype(str) + " (" + df_depot['Nom du Matériel'] + ")").tolist()
+        # On crée une liste des noms de matériel au dépôt
+        noms_materiels = df_depot['Nom du Matériel'].tolist()
+        # On crée une liste des numéros internes
+        nums_internes = df_depot['num_interne'].astype(str).tolist()
+        
+        # On combine pour être certain d'avoir tout le contenu
+        liste_totale = [f"{n} ({i})" for n, i in zip(noms_materiels, nums_internes)]
+        
         points_data.append({
             'lat': 47.279, 'lon': -0.402, 
             'label': '📍 Dépôt (Terranjou)',
-            'matériel': ", ".join(liste_mat_depot)
+            'matériel': " | ".join(liste_totale) # Utilisation d'un séparateur clair
         })
         
     # B. Ajout des Chantiers

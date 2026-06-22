@@ -103,7 +103,7 @@ with tab0:
             
             with st.form("mouvement_form"):
                 # Utilisez ici aussi le nom de la colonne correct (ex: 'nom_article')
-                article_select = st.selectbox("Article concerné", df['nom_article'])
+                num_interne = st.selectbox("Article concerné", df['nom_article'])
                 type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
                 quantite = st.number_input("Quantité", min_value=1, step=1)
                 

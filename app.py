@@ -354,19 +354,17 @@ with tab3:
     from datetime import datetime
 
     if not df_materiel_reel.empty:
-        # 1. On filtre STRICTEMENT sur le Matériel Commun
         df_commun = df_materiel_reel[df_materiel_reel['categorie'] == "Matériel Commun"].copy()
         
         if df_commun.empty:
             st.info("Aucun matériel commun enregistré pour le moment.")
         else:
-            # Sécurisation des colonnes d'état
             if 'est_a_l_agence' not in df_commun.columns:
                 df_commun['est_a_l_agence'] = True
             if 'affectation_actuelle' not in df_commun.columns:
                 df_commun['affectation_actuelle'] = None
 
-            # --- PARTIE 1 : TABLEAU DE BORD EN DIRECT ---
+            # --- PARTIE 1 : TABLEAU DE BORD ---
             st.subheader("📋 État actuel du parc")
             
             visual_status = []
@@ -380,7 +378,8 @@ with tab3:
                 else:
                     visual_status.append("🔴 En chantier")
                     qui = row['affectation_actuelle']
-                    localisation_label.append(f"👷 Sorti chez : {qui}" if qui else "🔴 Hors Agence")
+                    visual_status_str = f"👷 Sorti chez : {qui}" if qui else "🔴 Hors Agence"
+                    localisation_label.append(visual_status_str)
             
             df_commun['Statut'] = visual_status
             df_commun['Localisation / Affectation'] = localisation_label
@@ -392,7 +391,7 @@ with tab3:
             
             st.divider()
             
-            # --- PARTIE 2 : FORMULAIRE DE MOUVEMENT & RÉSERVATION ---
+            # --- PARTIE 2 : FORMULAIRE ---
             st.subheader("🔄 Enregistrer un mouvement (Retour ou Nouvelle Réservation)")
             
             df_commun['choix_label'] = df_commun['num_interne'].astype(str) + " - " + df_commun['Nom du Matériel'].astype(str)
@@ -402,20 +401,15 @@ with tab3:
                 num_int_isole = mat_cible.split(" - ")[0]
                 item_courant = df_commun[df_commun['num_interne'] == num_int_isole].iloc[0]
                 
-                # Récupération de l'état actuel en base
                 etat_initial = item_courant['est_a_l_agence']
                 bool_initial = True if (etat_initial is True or etat_initial == "True" or etat_initial == "") else False
                 
                 with st.form("form_mixte_reservation"):
-                    # OPTION A : RETOUR À L'AGENCE
                     st.markdown("##### 📥 Option A : Retour au dépôt")
                     a_l_agence = st.checkbox("Le matériel est de nouveau disponible à l'agence (Terranjou)", value=bool_initial)
                     
                     st.markdown("---")
-                    
-                    # OPTION B : DEMANDE DE RÉSERVATION / CHANTIER
                     st.markdown("##### 🚧 Option B : Planifier une nouvelle réservation (Chantier)")
-                    st.caption("Remplissez ces champs uniquement si le matériel part sur un chantier.")
                     
                     col_form1, col_form2 = st.columns(2)
                     with col_form1:
@@ -429,44 +423,44 @@ with tab3:
                     
                     if btn_valider:
                         try:
-                            # CAS 1 : On coche le retour à l'agence
-                            if a_l_agence and (not nom_demandeur.strip() and not nom_chantier.strip()):
-                                # Mise à jour de la table matériel principale
-                                supabase.table("materiel").update({
-                                    "est_a_l_agence": True,
-                                    "affectation_actuelle": None
-                                }).eq("num_interne", num_int_isole).execute()
-                                
-                                st.success(f"📥 Le matériel {num_int_isole} est marqué comme revenu au dépôt de Terranjou.")
-                                st.rerun()
+                            # Si des champs chantiers sont saisis, cela devient prioritaire sur le retour dépôt
+                            est_un_chantier = bool(nom_demandeur.strip() or nom_chantier.strip())
                             
-                            # CAS 2 : On fait une réservation chantier (cochée ou non, la présence d'un nom déclenche le planning)
-                            else:
+                            if est_un_chantier:
                                 if not nom_demandeur.strip() or not nom_chantier.strip():
-                                    st.error("❌ Pour réserver sur un chantier, vous devez renseigner le nom du demandeur ET le nom du chantier.")
+                                    st.error("❌ Pour réserver sur un chantier, vous devez renseigner le nom du demandeur ET le chantier.")
                                 elif date_fin < date_debut:
                                     st.error("❌ La date de fin ne peut pas être antérieure à la date de début.")
                                 else:
-                                    # 1. On met à jour le statut instantané dans la table matériel
                                     libelle_affectation = f"{nom_demandeur.strip()} ({nom_chantier.strip()})"
+                                    
+                                    # Mise à jour Table Matériel (Type TEXT)
                                     supabase.table("materiel").update({
                                         "est_a_l_agence": False,
                                         "affectation_actuelle": libelle_affectation
                                     }).eq("num_interne", num_int_isole).execute()
                                     
-                                    # 2. On consigne la réservation dans la table historique/planning
-                                    data_planning = {
+                                    # Enregistrement dans l'historique
+                                    supabase.table("reservations").insert({
                                         "num_interne": num_int_isole,
                                         "technicien": nom_demandeur.strip(),
                                         "num_affaire": nom_chantier.strip(),
                                         "date_debut": str(date_debut),
                                         "date_fin": str(date_fin),
                                         "statut": "Active"
-                                    }
-                                    supabase.table("reservations").insert(data_planning).execute()
+                                    }).execute()
                                     
-                                    st.success(f"🎉 Réservation enregistrée ! {num_int_isole} est affecté à {libelle_affectation} jusqu'au {date_fin.strftime('%d/%m/%Y')}.")
+                                    st.success(f"🎉 Réservation validée pour {libelle_affectation} !")
                                     st.rerun()
+                            else:
+                                # Retour classique à l'agence
+                                supabase.table("materiel").update({
+                                    "est_a_l_agence": True,
+                                    "affectation_actuelle": None
+                                }).eq("num_interne", num_int_isole).execute()
+                                
+                                st.success(f"📥 Le matériel {num_int_isole} est bien de retour à l'agence.")
+                                st.rerun()
                                     
                         except Exception as e:
                             st.error(f"Erreur lors de la validation : {e}")

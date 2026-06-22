@@ -383,20 +383,25 @@ with tab5:
                 else:
                     taille = ""
                     
-                # Condition : Si Outillage ou Matériel Commun, on demande les dates
+                # Condition : Si Outillage ou Matériel Commun, on demande les dates et l'intervalle
                 if cat in ["Outillage", "Matériel Commun"]:
                     date_achat = st.date_input("Date d'achat", value=None, key="add_achat")
+                    perio = st.number_input("Intervalle / Périodicité contrôle (mois)", min_value=0, value=0, key="add_perio")
                     date_prochain = st.date_input("Date du prochain contrôle", value=None, key="add_prochain")
                 else:
                     date_achat = None
+                    perio = 0
                     date_prochain = None
 
             with col2:
                 ref = st.text_input("Référence")
                 ns = st.text_input("N° de série")
                 fourn = st.text_input("Fournisseur")
-                perio = st.number_input("Périodicité contrôle (mois)", value=0)
                 url_photo = st.text_input("URL de la photo (lien http)")
+                
+                # Si ce n'est pas un outillage/matériel commun, on cache la périodicité ici
+                if cat not in ["Outillage", "Matériel Commun"]:
+                    perio = st.number_input("Périodicité contrôle (mois)", min_value=0, value=0, key="add_perio_autre")
             
             submit = st.form_submit_button("Valider l'ajout")
             
@@ -446,18 +451,22 @@ with tab5:
                         
                         cat = st.selectbox("Catégorie", categories_officielles, index=cat_index, key="mod_cat")
                         
-                        # Affichage conditionnel des champs pour la modification
                         if cat == "EPI":
                             taille = st.text_input("Taille", value=str(item.get("taille", "")))
                         else:
                             taille = ""
                             
+                        try:
+                            val_perio = int(item.get("periodicite_controle", 0))
+                        except:
+                            val_perio = 0
+                            
                         if cat in ["Outillage", "Matériel Commun"]:
-                            # On récupère les dates existantes s'il y en a
                             val_achat = pd.to_datetime(item.get("date_achat")).date() if item.get("date_achat") else None
                             val_prochain = pd.to_datetime(item.get("date_prochain_controle")).date() if item.get("date_prochain_controle") else None
                             
                             date_achat = st.date_input("Date d'achat", value=val_achat, key="mod_achat")
+                            perio = st.number_input("Intervalle / Périodicité contrôle (mois)", min_value=0, value=val_perio, key="mod_perio")
                             date_prochain = st.date_input("Date du prochain contrôle", value=val_prochain, key="mod_prochain")
                         else:
                             date_achat = None
@@ -467,13 +476,10 @@ with tab5:
                         ref = st.text_input("Référence", value=str(item.get("reference", "")))
                         ns = st.text_input("N° de série", value=str(item.get("num_serie", "")))
                         fourn = st.text_input("Fournisseur", value=str(item.get("fournisseur", "")))
-                        
-                        try:
-                            val_perio = int(item.get("periodicite_controle", 0))
-                        except:
-                            val_perio = 0
-                        perio = st.number_input("Périodicité contrôle (mois)", value=val_perio)
                         url_photo = st.text_input("URL de la photo (lien http)", value=str(item.get("photo_url", "")))
+                        
+                        if cat not in ["Outillage", "Matériel Commun"]:
+                            perio = st.number_input("Périodicité contrôle (mois)", min_value=0, value=val_perio, key="mod_perio_autre")
                     
                     submit = st.form_submit_button("Enregistrer les modifications")
                     
@@ -500,20 +506,3 @@ with tab5:
                                 rafraichir_page()
                             except Exception as e:
                                 st.error(f"Erreur lors de la modification : {e}")
-
-    elif mode == "Supprimer" and not df_materiel_reel.empty:
-        if "num_interne" in df_materiel_reel.columns:
-            liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if str(n).strip() != ""]
-            choix = st.selectbox("Sélectionner le N° Interne à supprimer", liste_numeros)
-            
-            if choix:
-                item_suppr = df_materiel_reel[df_materiel_reel["num_interne"] == choix].iloc[0]
-                st.warning(f"Attention, vous allez supprimer définitivement : {item_suppr.get('Nom du Matériel', 'Matériel inconnu')}")
-                
-                if st.button("Confirmer la suppression définitive"):
-                    try:
-                        supabase.table("materiel").delete().eq("num_interne", choix).execute()
-                        st.success(f"N° {choix} supprimé.")
-                        rafraichir_page()
-                    except Exception as e:
-                        st.error(f"Erreur lors de la suppression : {e}")

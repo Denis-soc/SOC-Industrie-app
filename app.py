@@ -279,7 +279,7 @@ with tab1:
             
     else:
         st.info("Le panier est vide.")
-        with tab1:
+with tab1:
     st.header("📦 Gestion des Stocks - Olivier")
     
     # Sélecteur de catalogue

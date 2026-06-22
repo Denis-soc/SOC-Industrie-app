@@ -479,7 +479,52 @@ with tab3:
                         except Exception as e:
                             st.error(f"Erreur lors de l'enregistrement : {e}")
     else:
-        st.info("Aucun matériel disponible.")      
+        st.info("Aucun matériel disponible.") 
+        with tab4:
+    st.header("📍 Carte de localisation du matériel en chantier")
+    
+    from geopy.geocoders import Nominatim
+    import pandas as pd
+    
+    # 1. Récupération des chantiers actifs
+    res_actifs = supabase.table("reservations").select("*").eq("statut", "Active").execute()
+    df_map = pd.DataFrame(res_actifs.data)
+    
+    if not df_map.empty:
+        # Fonction de géocodage simple
+        geolocator = Nominatim(user_agent="soc_industrie_app")
+        
+        lats = []
+        lons = []
+        
+        st.write("Chargement des coordonnées des chantiers...")
+        
+        for adresse in df_map['adresse_chantier']:
+            try:
+                location = geolocator.geocode(adresse)
+                if location:
+                    lats.append(location.latitude)
+                    lons.append(location.longitude)
+                else:
+                    lats.append(None)
+                    lons.append(None)
+            except:
+                lats.append(None)
+                lons.append(None)
+        
+        df_map['lat'] = lats
+        df_map['lon'] = lons
+        
+        # Filtrer les adresses non trouvées
+        df_map = df_map.dropna(subset=['lat', 'lon'])
+        
+        if not df_map.empty:
+            st.map(df_map)
+            st.success(f"{len(df_map)} chantiers affichés sur la carte.")
+        else:
+            st.warning("Impossible de localiser les adresses sur la carte. Vérifiez le format (ex: '4 la villette, 49540 La Fosse-de-Tigné').")
+    else:
+        st.info("Aucun matériel en chantier actuellement.")
 with tab5:
     st.header("⚙️ Administration du Matériel")
     

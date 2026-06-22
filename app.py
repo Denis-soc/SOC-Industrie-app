@@ -489,82 +489,55 @@ with tab4:
     st.header("📍 Carte interactive de localisation")
     
     # 1. Récupération des données
-    try:
-        res_actifs = supabase.table("reservations").select("*").eq("statut", "Active").execute()
-        df_res = pd.DataFrame(res_actifs.data)
-        
-        data_mat = supabase.table("materiel").select("*").execute()
-        df_mat = pd.DataFrame(data_mat.data)
-    except Exception as e:
-        st.error(f"Erreur de connexion à la base : {e}")
-        st.stop()
+    res_actifs = supabase.table("reservations").select("*").eq("statut", "Active").execute()
+    df_res = pd.DataFrame(res_actifs.data)
+    data_mat = supabase.table("materiel").select("*").execute()
+    df_mat = pd.DataFrame(data_mat.data)
     
-    # 2. Préparation des données pour la carte
     points_data = []
-    geolocator = Nominatim(user_agent="soc_industrie_app")
+    geolocator = Nominatim(user_agent="soc_industrie_app_debug")
     
-    # --- A. Ajout du Dépôt ---
-    # On normalise la colonne pour qu'elle soit toujours considérée comme une chaîne de caractères
-    df_mat['est_a_l_agence_norm'] = df_mat['est_a_l_agence'].astype(str).str.lower()
+    # 2. DEBUG : Affichage de ce que le code "voit" au dépôt
+    # Cela va nous montrer pourquoi les articles manquent
+    st.write("📋 **Debug : État actuel du stock (Agence = True)**")
+    df_debug = df_mat[df_mat['est_a_l_agence'].astype(str).str.lower().isin(['true', '1'])]
+    st.write(df_debug[['num_interne', 'Nom du Matériel', 'est_a_l_agence']])
     
-    # Filtrage large : on prend tout ce qui ressemble à 'true' ou '1'
-    df_depot = df_mat[df_mat['est_a_l_agence_norm'].isin(['true', '1', 't'])].copy()
+    # A. Ajout forcé du point Agence avec les bonnes coordonnées
+    # Coordonnées précises de l'agence SOC Industrie (70 route de Brissac)
+    liste_mat_depot = [f"{row['num_interne']} ({row['Nom du Matériel']})" for _, row in df_debug.iterrows()]
     
-    if not df_depot.empty:
-        # Création de la liste détaillée
-        liste_mat_depot = [f"{row['num_interne']} ({row['Nom du Matériel']})" for _, row in df_depot.iterrows()]
-        
-        points_data.append({
-            'lat': 47.279, 'lon': -0.402, 
-            'label': '📍 Dépôt (Terranjou)',
-            'matériel': " | ".join(liste_mat_depot)
-        })
-        
-    # --- B. Ajout des Chantiers ---
+    points_data.append({
+        'lat': 47.3486, 'lon': -0.4651,  # Coordonnées précises de 49380 Terranjou
+        'label': '📍 Agence SOC Industrie',
+        'matériel': " | ".join(liste_mat_depot) if liste_mat_depot else "Aucun matériel"
+    })
+    
+    # B. Ajout des Chantiers
     if not df_res.empty:
-        # Groupe par adresse pour optimiser les appels API
-        chantiers = df_res.groupby('adresse_chantier')
-        
-        for adresse, group in chantiers:
+        for _, row in df_res.iterrows():
             try:
-                location = geolocator.geocode(adresse)
+                location = geolocator.geocode(row['adresse_chantier'])
                 if location:
-                    # Liste du matériel sur ce chantier
-                    mat_chantier = group['num_interne'].astype(str).tolist()
                     points_data.append({
                         'lat': location.latitude, 
                         'lon': location.longitude, 
-                        'label': f"🏗️ {group['num_affaire'].iloc[0]}",
-                        'matériel': ", ".join(mat_chantier)
+                        'label': f"🏗️ {row['num_affaire']}",
+                        'matériel': f"Matériel : {row['num_interne']}"
                     })
-            except:
-                continue
+            except: continue
 
     # 3. Affichage Pydeck
     if points_data:
         df_points = pd.DataFrame(points_data)
+        view_state = pdk.ViewState(latitude=47.3486, longitude=-0.4651, zoom=10)
         
-        # Couche de points
-        layer = pdk.Layer(
-            "ScatterplotLayer",
-            df_points,
-            get_position=["lon", "lat"],
-            get_color=[200, 30, 0, 160],
-            get_radius=300,
-            pickable=True,
-        )
-        
-        # Vue centrée
-        view_state = pdk.ViewState(latitude=47.279, longitude=-0.402, zoom=10)
-        
-        # Rendu final
         st.pydeck_chart(pdk.Deck(
             initial_view_state=view_state,
-            layers=[layer],
-            tooltip={"text": "{label}\nMatériel : {matériel}"}
-        ))
-    else:
-        st.info("Aucune donnée à afficher sur la carte.")
+            layers=[pdk.Layer("ScatterplotLayer", df_points, get_position=["lon", "lat"], 
+                    get_color=[200, 30, 0, 160], get_radius=300, pickable=True)],
+            tooltip={"text": "{label}\n{matériel}"}
+        )))
 with tab5:
     st.header("⚙️ Administration du Matériel")
     

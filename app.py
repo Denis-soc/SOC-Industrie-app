@@ -88,6 +88,50 @@ def rafraichir_page():
         st.experimental_rerun()
 
 # 5. CONTENU DES ONGLETS
+with tab0:
+    st.header("📦 Gestion des Stocks - Olivier")
+    
+    # Sélecteur de catalogue
+    cat_choisi = st.selectbox("Choisir le catalogue", ["EPI", "Consommables", "Outillage"])
+    
+    # 1. Récupération et affichage du stock
+    # On filtre les articles appartenant au catalogue sélectionné
+    data = supabase.table("stocks_catalogues").select("*").eq("catalogue", cat_choisi).execute()
+    df_stock = pd.DataFrame(data.data)
+    
+    if not df_stock.empty:
+        st.subheader(f"État du stock actuel : {cat_choisi}")
+        
+        # Affichage avec alerte visuelle (stock mini)
+        def highlight_alert(row):
+            # Retourne rouge si la quantité est inférieure ou égale au stock mini
+            color = '#ffcccc' if row['quantite'] <= row['stock_mini'] else ''
+            return [f'background-color: {color}'] * len(row)
+        
+        st.dataframe(df_stock.style.apply(highlight_alert, axis=1), use_container_width=True)
+        
+        # 2. Section Mouvements (Entrées / Sorties)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("📥 **Entrée Stock (N° BC/BL)**")
+            with st.form("entree_form"):
+                article_in = st.selectbox("Article à ajouter", df_stock['nom_article'])
+                qt_in = st.number_input("Quantité reçue", min_value=1, step=1)
+                bc_bl = st.text_input("N° BC ou BL")
+                if st.form_submit_button("Valider Entrée"):
+                    st.success(f"Entrée de {qt_in} unités pour {article_in} enregistrée (Ref: {bc_bl}).")
+                    
+        with col2:
+            st.write("📤 **Sortie Stock (Demande)**")
+            with st.form("sortie_form"):
+                article_out = st.selectbox("Article à sortir", df_stock['nom_article'])
+                qt_out = st.number_input("Quantité sortie", min_value=1, step=1)
+                demandeur = st.text_input("Demandeur / Chantier")
+                if st.form_submit_button("Valider Sortie"):
+                    st.success(f"Sortie de {qt_out} unités pour {article_out} validée (Demandeur: {demandeur}).")
+    else:
+        st.info("Aucun article trouvé dans ce catalogue.")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

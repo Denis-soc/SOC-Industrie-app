@@ -482,176 +482,70 @@ with tab3:
         st.info("Aucun matériel disponible.")      
 with tab5:
     st.header("⚙️ Administration du Matériel")
+    action = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
     
-    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
-
-    # Liste unique et harmonisée de vos 4 catégories
-    categories_officielles = ["EPI", "Outillage", "Consommables", "Matériel Commun"]
+    # Récupération de la liste à jour
     data = supabase.table("materiel").select("*").execute()
     df_admin = pd.DataFrame(data.data)
     
+    # --- LOGIQUE SUPPRIMER ---
     if action == "Supprimer":
         st.subheader("🗑️ Supprimer un article")
-        # Sélection du matériel à supprimer
-        mat_a_supprimer = st.selectbox("Choisir le matériel à supprimer :", df_admin['num_interne'].tolist())
-        
-        if st.button("Confirmer la suppression définitive"):
-            try:
-                # Suppression dans Supabase
-                supabase.table("materiel").delete().eq("num_interne", mat_a_supprimer).execute()
-                st.success(f"L'article {mat_a_supprimer} a été supprimé avec succès.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erreur lors de la suppression : {e}")
-    if mode == "Ajouter":
-        with st.form("form_ajouter"):
-            col1, col2 = st.columns(2)
-            with col1:
-                num = st.text_input("N° Interne")
-                nom = st.text_input("Nom du matériel")
-                cat = st.selectbox("Catégorie", categories_officielles, key="add_cat")
-                
-                # Condition : Si EPI, on demande la taille
-                if cat == "EPI":
-                    taille = st.text_input("Taille")
-                else:
-                    taille = ""
-                    
-                # Condition : Si Outillage ou Matériel Commun, on demande les dates et l'intervalle
-                if cat in ["Outillage", "Matériel Commun"]:
-                    date_achat = st.date_input("Date d'achat", value=None, key="add_achat")
-                    perio = st.number_input("Intervalle / Périodicité contrôle (mois)", min_value=0, value=0, key="add_perio")
-                    date_prochain = st.date_input("Date du prochain contrôle", value=None, key="add_prochain")
-                else:
-                    date_achat = None
-                    perio = 0
-                    date_prochain = None
-
-            with col2:
-                ref = st.text_input("Référence")
-                ns = st.text_input("N° de série")
-                fourn = st.text_input("Fournisseur")
-                url_photo = st.text_input("URL de la photo (lien http)")
-                
-                # Si ce n'est pas un outillage/matériel commun, on cache la périodicité ici
-                if cat not in ["Outillage", "Matériel Commun"]:
-                    perio = st.number_input("Périodicité contrôle (mois)", min_value=0, value=0, key="add_perio_autre")
+        if not df_admin.empty:
+            mat_a_supprimer = st.selectbox("Choisir le matériel à supprimer :", df_admin['num_interne'].tolist())
             
-            submit = st.form_submit_button("Valider l'ajout")
-            
-            # À remplacer dans le bloc "Ajouter" de votre Tab 5 :
-
-            # À remplacer sous le bouton "Valider l'ajout" (dans la condition if submit:)
-
-        if submit:
-            if not num.strip():
-                st.warning("Le N° Interne est obligatoire.")
-            else:
-                # Fonction pour transformer les textes vides en None (NULL)
-                def sans_vide(val):
-                    if val is None:
-                        return None
-                    return val.strip() if str(val).strip() != "" else None
-        
-                # DÉFINITION EXPLICITE DE LA VARIABLE 'data'
-                data = {
-                    "num_interne": num.strip(), 
-                    "Nom du Matériel": sans_vide(nom), 
-                    "categorie": cat, 
-                    "taille": sans_vide(taille), 
-                    "reference": sans_vide(ref), 
-                    "num_serie": sans_vide(ns), 
-                    "fournisseur": sans_vide(fourn), 
-                    "periodicite_controle": int(perio), 
-                    "photo_url": sans_vide(url_photo),
-                    "date_achat": str(date_achat) if date_achat else None,
-                    "date_prochain_controle": str(date_prochain) if date_prochain else None,
-                    "est_a_l_agence": True,
-                    "affectation_actuelle": None
-                }
-                
+            if st.button("Confirmer la suppression définitive"):
                 try:
-                    # Envoi de la variable 'data' bien définie à Supabase
-                    supabase.table("materiel").insert(data).execute()
-                    st.success("🎉 Matériel ajouté avec succès !")
+                    supabase.table("materiel").delete().eq("num_interne", mat_a_supprimer).execute()
+                    st.success(f"L'article {mat_a_supprimer} a été supprimé avec succès.")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Erreur Supabase : {e}")
+                    st.error(f"Erreur lors de la suppression : {e}")
+        else:
+            st.info("Aucun matériel à supprimer.")
 
-    elif mode == "Modifier" and not df_materiel_reel.empty:
-        if "num_interne" in df_materiel_reel.columns:
-            liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if str(n).strip() != ""]
-            sel = st.selectbox("Choisir le matériel à modifier (par son N° Interne actuel)", liste_numeros)
+    # --- LOGIQUE AJOUTER ---
+    elif action == "Ajouter":
+        st.subheader("➕ Ajouter un nouvel article")
+        with st.form("form_ajouter"):
+            n_interne = st.text_input("N° Interne")
+            nom_mat = st.text_input("Nom du Matériel")
+            categorie = st.selectbox("Catégorie", ["Matériel Commun", "EPI", "Outillage"])
+            submit_ajout = st.form_submit_button("Ajouter à la base")
             
-            if sel:
-                item = df_materiel_reel[df_materiel_reel["num_interne"] == sel].iloc[0]
-                
-                with st.form("form_modifier"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.info(f"Ancien N° Interne : {sel}")
-                        nouveau_num = st.text_input("Nouveau N° Interne", value=str(item.get("num_interne", "")))
-                        nom = st.text_input("Nom du matériel", value=str(item.get("Nom du Matériel", "")))
-                        
-                        cat_index = 0
-                        item_cat = item.get("categorie")
-                        if item_cat in categories_officielles:
-                            cat_index = categories_officielles.index(item_cat)
-                        
-                        cat = st.selectbox("Catégorie", categories_officielles, index=cat_index, key="mod_cat")
-                        
-                        if cat == "EPI":
-                            taille = st.text_input("Taille", value=str(item.get("taille", "")))
-                        else:
-                            taille = ""
-                            
-                        try:
-                            val_perio = int(item.get("periodicite_controle", 0))
-                        except:
-                            val_perio = 0
-                            
-                        if cat in ["Outillage", "Matériel Commun"]:
-                            val_achat = pd.to_datetime(item.get("date_achat")).date() if item.get("date_achat") else None
-                            val_prochain = pd.to_datetime(item.get("date_prochain_controle")).date() if item.get("date_prochain_controle") else None
-                            
-                            date_achat = st.date_input("Date d'achat", value=val_achat, key="mod_achat")
-                            perio = st.number_input("Intervalle / Périodicité contrôle (mois)", min_value=0, value=val_perio, key="mod_perio")
-                            date_prochain = st.date_input("Date du prochain contrôle", value=val_prochain, key="mod_prochain")
-                        else:
-                            date_achat = None
-                            date_prochain = None
+            if submit_ajout:
+                try:
+                    supabase.table("materiel").insert({
+                        "num_interne": n_interne,
+                        "Nom du Matériel": nom_mat,
+                        "categorie": categorie,
+                        "est_a_l_agence": True
+                    }).execute()
+                    st.success("Article ajouté !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur : {e}")
 
-                    with col2:
-                        ref = st.text_input("Référence", value=str(item.get("reference", "")))
-                        ns = st.text_input("N° de série", value=str(item.get("num_serie", "")))
-                        fourn = st.text_input("Fournisseur", value=str(item.get("fournisseur", "")))
-                        url_photo = st.text_input("URL de la photo (lien http)", value=str(item.get("photo_url", "")))
-                        
-                        if cat not in ["Outillage", "Matériel Commun"]:
-                            perio = st.number_input("Périodicité contrôle (mois)", min_value=0, value=val_perio, key="mod_perio_autre")
-                    
-                    submit = st.form_submit_button("Enregistrer les modifications")
-                    
-                    if submit:
-                        if not nouveau_num.strip():
-                            st.error("Le N° Interne ne peut pas être vide.")
-                        else:
-                            upd = {
-                                "num_interne": nouveau_num,
-                                "Nom du Matériel": nom, 
-                                "categorie": cat, 
-                                "taille": taille, 
-                                "reference": ref, 
-                                "num_serie": ns, 
-                                "fournisseur": fourn, 
-                                "periodicite_controle": int(perio), 
-                                "photo_url": url_photo,
-                                "date_achat": str(date_achat) if date_achat else None,
-                                "date_prochain_controle": str(date_prochain) if date_prochain else None
-                            }
-                            try:
-                                supabase.table("materiel").update(upd).eq("num_interne", sel).execute()
-                                st.success("Modifié avec succès !")
-                                rafraichir_page()
-                            except Exception as e:
-                                st.error(f"Erreur lors de la modification : {e}")
+    # --- LOGIQUE MODIFIER ---
+    elif action == "Modifier":
+        st.subheader("✏️ Modifier un article")
+        if not df_admin.empty:
+            mat_a_modifier = st.selectbox("Choisir le matériel à modifier :", df_admin['num_interne'].tolist())
+            item_data = df_admin[df_admin['num_interne'] == mat_a_modifier].iloc[0]
+            
+            with st.form("form_modifier"):
+                new_nom = st.text_input("Nouveau nom", value=item_data['Nom du Matériel'])
+                new_cat = st.selectbox("Nouvelle catégorie", ["Matériel Commun", "EPI", "Outillage"], 
+                                      index=["Matériel Commun", "EPI", "Outillage"].index(item_data['categorie']))
+                submit_modif = st.form_submit_button("Enregistrer les modifications")
+                
+                if submit_modif:
+                    try:
+                        supabase.table("materiel").update({
+                            "Nom du Matériel": new_nom,
+                            "categorie": new_cat
+                        }).eq("num_interne", mat_a_modifier).execute()
+                        st.success("Article mis à jour !")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erreur : {e}")

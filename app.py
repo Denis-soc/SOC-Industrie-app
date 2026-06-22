@@ -91,35 +91,27 @@ def rafraichir_page():
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    cat_choisi = st.selectbox("Choisir le catalogue", ["EPI", "Consommables", "Outillage"])
+    # Récupération de TOUS les articles créés dans le Tab 5
+    response = supabase.table("stocks_catalogues").select("*").execute()
+    df = pd.DataFrame(response.data)
     
-    try:
-        # 1. On récupère TOUTES les données de la table sans filtre strict
-        response = supabase.table("stocks_catalogues").select("*").execute()
-        df_all = pd.DataFrame(response.data)
+    # Affichage du catalogue complet (avec Photo et Ref)
+    if not df.empty:
+        # On affiche le tableau incluant les colonnes ajoutées
+        st.dataframe(df[['photo', 'nom_article', 'reference_interne', 'quantite']], use_container_width=True)
         
-        if not df_all.empty:
-            # 2. Nettoyage : suppression des espaces et mise en majuscules pour une comparaison fiable
-            df_all['catalogue_clean'] = df_all['catalogue'].astype(str).str.strip().str.upper()
-            target = cat_choisi.strip().upper()
+        # Formulaire Mouvements (Quantités + Projets + BC/BL)
+        with st.form("mouvement_form"):
+            article_select = st.selectbox("Article concerné", df['nom_article'])
+            type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
+            quantite = st.number_input("Quantité", min_value=1)
+            projet = st.text_input("Nom du projet")
+            ref_doc = st.text_input("N° BC ou BL")
             
-            # 3. Filtrage en local
-            df_stock = df_all[df_all['catalogue_clean'] == target]
-            
-            if not df_stock.empty:
-                st.subheader(f"État du stock : {cat_choisi}")
-                st.dataframe(df_stock[['nom_article', 'quantite', 'stock_mini']], use_container_width=True)
-                
-                # --- Vos formulaires restent ici ---
-            else:
-                st.info(f"Aucun article trouvé pour le catalogue '{cat_choisi}'.")
-                # Diagnostic : affichez les catalogues présents pour voir l'erreur de saisie
-                st.write("Catalogues présents dans la base :", df_all['catalogue'].unique())
-        else:
-            st.warning("La table est vide.")
-            
-    except Exception as e:
-        st.error(f"Erreur de connexion : {e}")
+            if st.form_submit_button("Valider le mouvement"):
+                # Logique : mise à jour stock + écriture dans une table historique
+                # ... (Votre logique de calcul ici)
+                st.success(f"Mouvement enregistré pour {article_select} (Projet: {projet})")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

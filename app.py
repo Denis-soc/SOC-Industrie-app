@@ -489,46 +489,48 @@ with tab4:
     st.header("📍 Carte interactive de localisation")
     
     # 1. Récupération des données
-    res_actifs = supabase.table("reservations").select("*").eq("statut", "Active").execute()
-    df_res = pd.DataFrame(res_actifs.data)
-    
-    # Récupération de tout le matériel pour identifier ce qui est au dépôt
-    data_mat = supabase.table("materiel").select("*").execute()
-    df_mat = pd.DataFrame(data_mat.data)
+    try:
+        res_actifs = supabase.table("reservations").select("*").eq("statut", "Active").execute()
+        df_res = pd.DataFrame(res_actifs.data)
+        
+        data_mat = supabase.table("materiel").select("*").execute()
+        df_mat = pd.DataFrame(data_mat.data)
+    except Exception as e:
+        st.error(f"Erreur de connexion à la base : {e}")
+        st.stop()
     
     # 2. Préparation des données pour la carte
     points_data = []
     geolocator = Nominatim(user_agent="soc_industrie_app")
     
-    # A. Ajout du Dépôt (Point fixe)
-    # On filtre en tenant compte que la valeur peut être booléenne (True) ou texte ('True')
-    df_depot = df_mat[df_mat['est_a_l_agence'].astype(str).str.lower() == 'true'].copy()
+    # --- A. Ajout du Dépôt ---
+    # On normalise la colonne pour qu'elle soit toujours considérée comme une chaîne de caractères
+    df_mat['est_a_l_agence_norm'] = df_mat['est_a_l_agence'].astype(str).str.lower()
+    
+    # Filtrage large : on prend tout ce qui ressemble à 'true' ou '1'
+    df_depot = df_mat[df_mat['est_a_l_agence_norm'].isin(['true', '1', 't'])].copy()
     
     if not df_depot.empty:
-        # On crée une liste des noms de matériel au dépôt
-        noms_materiels = df_depot['Nom du Matériel'].tolist()
-        # On crée une liste des numéros internes
-        nums_internes = df_depot['num_interne'].astype(str).tolist()
-        
-        # On combine pour être certain d'avoir tout le contenu
-        liste_totale = [f"{n} ({i})" for n, i in zip(noms_materiels, nums_internes)]
+        # Création de la liste détaillée
+        liste_mat_depot = [f"{row['num_interne']} ({row['Nom du Matériel']})" for _, row in df_depot.iterrows()]
         
         points_data.append({
             'lat': 47.279, 'lon': -0.402, 
             'label': '📍 Dépôt (Terranjou)',
-            'matériel': " | ".join(liste_totale) # Utilisation d'un séparateur clair
+            'matériel': " | ".join(liste_mat_depot)
         })
         
-    # B. Ajout des Chantiers
+    # --- B. Ajout des Chantiers ---
     if not df_res.empty:
+        # Groupe par adresse pour optimiser les appels API
         chantiers = df_res.groupby('adresse_chantier')
         
         for adresse, group in chantiers:
             try:
                 location = geolocator.geocode(adresse)
                 if location:
-                    # Liste du matériel sur ce chantier (N° Interne seulement pour rester concis)
-                    mat_chantier = group['num_interne'].tolist()
+                    # Liste du matériel sur ce chantier
+                    mat_chantier = group['num_interne'].astype(str).tolist()
                     points_data.append({
                         'lat': location.latitude, 
                         'lon': location.longitude, 
@@ -542,24 +544,27 @@ with tab4:
     if points_data:
         df_points = pd.DataFrame(points_data)
         
+        # Couche de points
         layer = pdk.Layer(
             "ScatterplotLayer",
             df_points,
             get_position=["lon", "lat"],
-            get_color=[200, 30, 0, 160], # Rouge
+            get_color=[200, 30, 0, 160],
             get_radius=300,
             pickable=True,
         )
         
-        view_state = pdk.ViewState(latitude=47.279, longitude=-0.402, zoom=9)
+        # Vue centrée
+        view_state = pdk.ViewState(latitude=47.279, longitude=-0.402, zoom=10)
         
+        # Rendu final
         st.pydeck_chart(pdk.Deck(
             initial_view_state=view_state,
             layers=[layer],
             tooltip={"text": "{label}\nMatériel : {matériel}"}
         ))
     else:
-        st.info("Aucune donnée de localisation disponible.")
+        st.info("Aucune donnée à afficher sur la carte.")
 with tab5:
     st.header("⚙️ Administration du Matériel")
     

@@ -96,9 +96,13 @@ with tab0:
     
     # 1. Récupération et affichage du stock
     # On filtre les articles appartenant au catalogue sélectionné
-    data = supabase.table("stocks_catalogues").select("*").eq("catalogue", cat_choisi).execute()
-    df_stock = pd.DataFrame(data.data)
-    
+    response = supabase.table("stocks_catalogues").select("*").execute()
+    df_all = pd.DataFrame(response.data)
+    if not df_all.empty:
+        df_all['catalogue'] = df_all['catalogue'].str.strip()
+        df_stock = df_all[df_all['catalogue'] == cat_choisi.strip()]
+    else:
+        df_stock = pd.DataFrame()
     if not df_stock.empty:
         st.subheader(f"État du stock actuel : {cat_choisi}")
         

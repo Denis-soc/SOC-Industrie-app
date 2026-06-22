@@ -359,7 +359,6 @@ with tab3:
         if df_commun.empty:
             st.info("Aucun matériel commun enregistré pour le moment.")
         else:
-            # Sécurisation locale des colonnes d'état
             if 'est_a_l_agence' not in df_commun.columns:
                 df_commun['est_a_l_agence'] = True
 
@@ -369,7 +368,6 @@ with tab3:
             visual_status = []
             localisation_label = []
             
-            # Récupération des réservations actives pour l'affichage en direct
             try:
                 res_planning = supabase.table("reservations").select("*").eq("statut", "Active").execute()
                 dict_res = {r['num_interne']: r for r in res_planning.data} if res_planning.data else {}
@@ -380,7 +378,6 @@ with tab3:
                 num_int = row['num_interne']
                 au_depot = row['est_a_l_agence']
                 
-                # Si marqué au dépôt ou s'il n'y a pas de réservation active trouvée
                 if au_depot is True or au_depot == "True" or num_int not in dict_res:
                     visual_status.append("🟢 Disponible")
                     localisation_label.append("📍 Dépôt (Terranjou)")
@@ -399,7 +396,7 @@ with tab3:
             
             st.divider()
             
-            # --- PARTIE 2 : FORMULAIRE DE MOUVEMENT ---
+            # --- PARTIE 2 : FORMULAIRE ---
             st.subheader("🔄 Enregistrer un mouvement (Retour ou Nouvelle Réservation)")
             
             df_commun['choix_label'] = df_commun['num_interne'].astype(str) + " - " + df_commun['Nom du Matériel'].astype(str)
@@ -408,7 +405,7 @@ with tab3:
             if mat_cible:
                 num_int_isole = mat_cible.split(" - ")[0]
                 
-                with st.form("form_mixte_reservation_v2"):
+                with st.form("form_mixte_reservation_v3"):
                     st.markdown("##### 📥 Option A : Retour au dépôt")
                     case_retour = st.checkbox("Le matériel est revenu et est de nouveau disponible à l'agence (Terranjou)")
                     
@@ -417,9 +414,9 @@ with tab3:
                     
                     col_form1, col_form2 = st.columns(2)
                     with col_form1:
-                        nom_demandeur = st.text_input("Nom du demandeur :", placeholder="Ex: Kévin")
-                        nom_chantier = st.text_input("Nom du chantier :", placeholder="Ex: Chantier Thomas / ALH")
-                        adresse_chantier = st.text_input("📍 Adresse complète du chantier (pour la carte) :", placeholder="Ex: 12 rue des Angles, 49000 Angers")
+                        nom_demandeur = st.text_input("Nom du demandeur :", placeholder="Ex: Denis")
+                        nom_chantier = st.text_input("Nom du chantier :", placeholder="Ex: ALH")
+                        adresse_chantier = st.text_input("📍 Adresse complète du chantier (pour la carte) :", placeholder="Ex: 4 la villette, 49540 La Fosse-de-Tigné")
                     with col_form2:
                         date_debut = st.date_input("Date de début :", value=datetime.now().date())
                         date_fin = st.date_input("Date de fin :", value=datetime.now().date())
@@ -428,30 +425,37 @@ with tab3:
                     
                     if btn_valider:
                         try:
-                            # CAS 1 : C'est un retour au dépôt
                             if case_retour:
-                                # 1. On repasse le matériel à True (disponible)
-                                supabase.table("materiel").update({"est_a_l_agence": True}).eq("num_interne", num_int_isole).execute()
-                                # 2. On clôture l'ancienne réservation dans la table réservations
+                                # Retour au dépôt : on remet l'affectation à None
+                                supabase.table("materiel").update({
+                                    "est_a_l_agence": True,
+                                    "affectation_actuelle": None
+                                }).eq("num_interne", num_int_isole).execute()
+                                
                                 supabase.table("reservations").update({"statut": "Terminée"}).eq("num_interne", num_int_isole).eq("statut", "Active").execute()
                                 
-                                st.success(f"📥 Le matériel {num_int_isole} est archivé comme disponible à l'agence.")
+                                st.success(f"📥 Le matériel {num_int_isole} est de retour au dépôt.")
                                 st.rerun()
                             
-                            # CAS 2 : C'est une affectation chantier
                             else:
                                 if not nom_demandeur.strip() or not nom_chantier.strip() or not adresse_chantier.strip():
-                                    st.error("❌ Pour valider une affectation, merci de renseigner le Demandeur, le Nom du chantier ET l'Adresse complète.")
+                                    st.error("❌ Merci de renseigner le Demandeur, le Nom du chantier ET l'Adresse complète.")
                                 elif date_fin < date_debut:
                                     st.error("❌ La date de fin ne peut pas être antérieure à la date de début.")
                                 else:
-                                    # 1. On marque le matériel hors de l'agence
-                                    supabase.table("materiel").update({"est_a_l_agence": False}).eq("num_interne", num_int_isole).execute()
+                                    # Formatage pour l'affichage rapide (emballé dans une liste [] pour le type text[])
+                                    libelle_affichage = f"{nom_demandeur.strip()} ({nom_chantier.strip()})"
                                     
-                                    # 2. On ferme l'éventuelle réservation active précédente pour éviter les doublons
+                                    # 1. Mise à jour table matériel (avec la sécurité des crochets pour le type de colonne text[])
+                                    supabase.table("materiel").update({
+                                        "est_a_l_agence": False,
+                                        "affectation_actuelle": [libelle_affichage]
+                                    }).eq("num_interne", num_int_isole).execute()
+                                    
+                                    # 2. Clôture des anciennes réservations actives pour ce matériel
                                     supabase.table("reservations").update({"statut": "Terminée"}).eq("num_interne", num_int_isole).eq("statut", "Active").execute()
                                     
-                                    # 3. On insère la nouvelle ligne claire (sans tableaux compliqués)
+                                    # 3. Insertion propre dans l'historique pour la carte du Tab 4
                                     supabase.table("reservations").insert({
                                         "num_interne": num_int_isole,
                                         "technicien": nom_demandeur.strip(),
@@ -462,13 +466,13 @@ with tab3:
                                         "statut": "Active"
                                     }).execute()
                                     
-                                    st.success(f"🎉 Matériel {num_int_isole} affecté avec succès au chantier '{nom_chantier.strip()}' !")
+                                    st.success(f"🎉 Affectation validée avec succès pour le chantier {nom_chantier.strip()} !")
                                     st.rerun()
                                     
                         except Exception as e:
                             st.error(f"Erreur lors de l'enregistrement : {e}")
     else:
-        st.info("Aucun matériel disponible.")       
+        st.info("Aucun matériel disponible.")      
 with tab5:
     st.header("⚙️ Administration du Matériel")
     

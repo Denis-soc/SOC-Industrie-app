@@ -628,3 +628,19 @@ with tab5:
                                 rafraichir_page()
                             except Exception as e:
                                 st.error(f"Erreur lors de la modification : {e}")
+                                elif mode == "Supprimer" and not df_materiel_reel.empty:
+        if "num_interne" in df_materiel_reel.columns:
+            liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if str(n).strip() != ""]
+            choix = st.selectbox("Sélectionner le N° Interne à supprimer", liste_numeros)
+            
+            if choix:
+                item_suppr = df_materiel_reel[df_materiel_reel["num_interne"] == choix].iloc[0]
+                st.warning(f"Attention, vous allez supprimer définitivement : {item_suppr.get('Nom du Matériel', 'Matériel inconnu')}")
+                
+                if st.button("Confirmer la suppression définitive"):
+                    try:
+                        supabase.table("materiel").delete().eq("num_interne", choix).execute()
+                        st.success(f"N° {choix} supprimé.")
+                        rafraichir_page()
+                    except Exception as e:
+                        st.error(f"Erreur lors de la suppression : {e}")

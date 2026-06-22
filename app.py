@@ -240,13 +240,16 @@ with tab5:
     
     mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
 
+    # Liste unique et harmonisée de vos 4 catégories
+    categories_officielles = ["EPI", "Outillage", "Consommables", "Matériel Commun"]
+
     if mode == "Ajouter":
         with st.form("form_ajouter"):
             col1, col2 = st.columns(2)
             with col1:
                 num = st.text_input("N° Interne")
                 nom = st.text_input("Nom du matériel")
-                cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Matériel Commun"])
+                cat = st.selectbox("Catégorie", categories_officielles)
                 taille = st.text_input("Taille (si EPI)")
             with col2:
                 ref = st.text_input("Référence")
@@ -258,10 +261,20 @@ with tab5:
             submit = st.form_submit_button("Valider l'ajout")
             
             if submit:
-                if not num:
+                if not num.strip():
                     st.warning("Le N° Interne est obligatoire.")
                 else:
-                    data = {"num_interne": num, "Nom du Matériel": nom, "categorie": cat, "taille": taille, "reference": ref, "num_serie": ns, "fournisseur": fourn, "periodicite_controle": int(perio), "photo_url": url_photo}
+                    data = {
+                        "num_interne": num, 
+                        "Nom du Matériel": nom, 
+                        "categorie": cat, 
+                        "taille": taille, 
+                        "reference": ref, 
+                        "num_serie": ns, 
+                        "fournisseur": fourn, 
+                        "periodicite_controle": int(perio), 
+                        "photo_url": url_photo
+                    }
                     try:
                         supabase.table("materiel").insert(data).execute()
                         st.success("Matériel ajouté !")
@@ -271,7 +284,7 @@ with tab5:
 
     elif mode == "Modifier" and not df_materiel_reel.empty:
         if "num_interne" in df_materiel_reel.columns:
-            liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if n != ""]
+            liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if str(n).strip() != ""]
             sel = st.selectbox("Choisir le matériel à modifier (par son N° Interne actuel)", liste_numeros)
             
             if sel:
@@ -280,20 +293,17 @@ with tab5:
                 with st.form("form_modifier"):
                     col1, col2 = st.columns(2)
                     with col1:
-                        # On stocke l'ancien numéro dans une variable cachée ou sous forme de texte informatif
                         st.info(f"Ancien N° Interne : {sel}")
-                        
-                        # Le champ est maintenant modifiable !
                         nouveau_num = st.text_input("Nouveau N° Interne", value=str(item.get("num_interne", "")))
-                        
                         nom = st.text_input("Nom du matériel", value=str(item.get("Nom du Matériel", "")))
                         
+                        # Calcul de l'index par défaut pour la catégorie
                         cat_index = 0
-                        categories_liste = ["EPI", "Outillage", "Consommables", "Matériel Commun"]
-                        if item.get("categorie") in categories_liste:
-                        cat_index = categories_liste.index(item.get("categorie"))
-                        cat = st.selectbox("Catégorie", categories_liste, index=cat_index)
+                        item_cat = item.get("categorie")
+                        if item_cat in categories_officielles:
+                            cat_index = categories_officielles.index(item_cat)
                         
+                        cat = st.selectbox("Catégorie", categories_officielles, index=cat_index)
                         taille = st.text_input("Taille (si EPI)", value=str(item.get("taille", "")))
                     with col2:
                         ref = st.text_input("Référence", value=str(item.get("reference", "")))
@@ -313,7 +323,6 @@ with tab5:
                         if not nouveau_num.strip():
                             st.error("Le N° Interne ne peut pas être vide.")
                         else:
-                            # On prépare les données incluant le potentiel NOUVEAU numéro interne
                             upd = {
                                 "num_interne": nouveau_num,
                                 "Nom du Matériel": nom, 
@@ -326,8 +335,6 @@ with tab5:
                                 "photo_url": url_photo
                             }
                             try:
-                                # CRUCIAL : On cherche l'ancienne ligne grâce à 'sel' (l'ancien numéro)
-                                # et on lui applique le dictionnaire 'upd' (qui contient le nouveau numéro)
                                 supabase.table("materiel").update(upd).eq("num_interne", sel).execute()
                                 st.success("Modifié avec succès !")
                                 rafraichir_page()
@@ -336,7 +343,7 @@ with tab5:
 
     elif mode == "Supprimer" and not df_materiel_reel.empty:
         if "num_interne" in df_materiel_reel.columns:
-            liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if n != ""]
+            liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if str(n).strip() != ""]
             choix = st.selectbox("Sélectionner le N° Interne à supprimer", liste_numeros)
             
             if choix:

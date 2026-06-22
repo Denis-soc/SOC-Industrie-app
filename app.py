@@ -246,7 +246,7 @@ with tab5:
             with col1:
                 num = st.text_input("N° Interne")
                 nom = st.text_input("Nom du matériel")
-                cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"])
+                cat = st.selectbox("Catégorie", ["EPI", "Outillage", "Consommables", "Matériel Commun"])
                 taille = st.text_input("Taille (si EPI)")
             with col2:
                 ref = st.text_input("Référence")
@@ -289,9 +289,9 @@ with tab5:
                         nom = st.text_input("Nom du matériel", value=str(item.get("Nom du Matériel", "")))
                         
                         cat_index = 0
-                        categories_liste = ["EPI", "Outillage", "Consommables", "Soudage", "Mesure"]
+                        categories_liste = ["EPI", "Outillage", "Consommables", "Matériel Commun"]
                         if item.get("categorie") in categories_liste:
-                            cat_index = categories_liste.index(item.get("categorie"))
+                        cat_index = categories_liste.index(item.get("categorie"))
                         cat = st.selectbox("Catégorie", categories_liste, index=cat_index)
                         
                         taille = st.text_input("Taille (si EPI)", value=str(item.get("taille", "")))

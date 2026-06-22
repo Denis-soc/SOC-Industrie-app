@@ -279,45 +279,6 @@ with tab1:
             
     else:
         st.info("Le panier est vide.")
-with tab1:
-    st.header("📦 Gestion des Stocks - Olivier")
-    
-    # Sélecteur de catalogue
-    cat_choisi = st.selectbox("Choisir le catalogue", ["EPI", "Consommables", "Outillage"])
-    
-    # 1. Vue d'ensemble du stock avec alertes
-    st.subheader(f"État du stock : {cat_choisi}")
-    data = supabase.table("stocks_catalogues").select("*").eq("catalogue", cat_choisi).execute()
-    df_stock = pd.DataFrame(data.data)
-    
-    # Couleur d'alerte si stock < stock_mini
-    def highlight_alert(row):
-        return ['background-color: #ffcccc' if row['quantite'] <= row['stock_mini'] else '' for _ in row]
-    
-    st.dataframe(df_stock.style.apply(highlight_alert, axis=1))
-    
-    # 2. Section Mouvements (Entrées / Sorties)
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.write("📥 **Entrée Stock (N° BC/BL)**")
-        with st.form("entree_form"):
-            article = st.selectbox("Article", df_stock['nom_article'])
-            qt = st.number_input("Quantité reçue", min_value=1)
-            bc_bl = st.text_input("N° BC / BL")
-            if st.form_submit_button("Valider Entrée"):
-                # Logique d'update Supabase ici
-                st.success("Entrée enregistrée")
-                
-    with col2:
-        st.write("📤 **Sortie Stock (Demande)**")
-        with st.form("sortie_form"):
-            article_out = st.selectbox("Article", df_stock['nom_article'])
-            qt_out = st.number_input("Quantité sortie", min_value=1)
-            nom_demandeur = st.text_input("Demandeur / Chantier")
-            if st.form_submit_button("Valider Sortie"):
-                # Logique d'update Supabase ici
-                st.success("Sortie enregistrée")
 with tab2:
     st.header("📋 Suivi des Contrôles & Étalonnages")
     

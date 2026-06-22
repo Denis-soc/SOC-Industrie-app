@@ -108,7 +108,7 @@ with tab1:
         else:
             st.info("Aucun matériel dans cette catégorie.")
 
-   # --- PARTIE PANIER ---
+  # --- PARTIE PANIER ---
     st.divider()
     st.subheader("📦 Votre Panier")
     
@@ -116,11 +116,18 @@ with tab1:
         df_panier = pd.DataFrame.from_dict(st.session_state.panier, orient='index')
         st.table(df_panier)
         
-        num_affaire = st.text_input("Entrez votre numéro d'affaire :", key="num_affaire_panier")
+        # On crée deux colonnes pour saisir proprement le Nom et le N° d'affaire
+        col_demandeur, col_affaire = st.columns(2)
+        with col_demandeur:
+            nom_demandeur = st.text_input("Nom du demandeur :", key="nom_demandeur_panier")
+        with col_affaire:
+            num_affaire = st.text_input("Entrez votre numéro d'affaire :", key="num_affaire_panier")
         
-        if num_affaire:
-            # Fonction interne pour générer le PDF en mémoire
-            def generer_pdf(df, affaire):
+        # Le bouton de téléchargement ne s'active que si les deux champs sont remplis
+        if nom_demandeur and num_affaire:
+            
+            # Fonction interne pour générer le PDF en mémoire avec le nom du demandeur
+            def generer_pdf(df, affaire, demandeur):
                 import io
                 from reportlab.lib.pagesizes import letter
                 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -133,25 +140,27 @@ with tab1:
                 
                 styles = getSampleStyleSheet()
                 
-                # Styles personnalisés aux couleurs de l'entreprise
+                # Styles personnalisés
                 style_titre = ParagraphStyle(
                     'TitreEntreprise',
                     parent=styles['Heading1'],
                     fontSize=20,
                     leading=24,
-                    textColor=colors.HexColor("#1A365D"), # Bleu pro
+                    textColor=colors.HexColor("#1A365D"),
                     spaceAfter=10
                 )
                 
-                # En-tête du document
+                # En-tête du document PDF
                 story.append(Paragraph("<b>SOC Industrie – Gestion Interne</b>", style_titre))
                 story.append(Paragraph(f"<b>Bon de Commande Matériel / EPI</b>", styles['Heading2']))
                 story.append(Spacer(1, 15))
+                
+                # Ajout des informations du demandeur et de l'affaire
+                story.append(Paragraph(f"<b>Demandeur :</b> {demandeur}", styles['Normal']))
                 story.append(Paragraph(f"<b>N° d'Affaire :</b> {affaire}", styles['Normal']))
                 story.append(Spacer(1, 20))
                 
                 # Préparation du tableau des données du panier
-                # Colonnes : [N° Interne, Nom, Quantité, Taille]
                 donnees_table = [["N° Interne", "Désignation", "Quantité", "Taille"]]
                 for num_int, row in df.iterrows():
                     donnees_table.append([
@@ -161,13 +170,13 @@ with tab1:
                         str(row.get('taille', '-'))
                     ])
                 
-                # Création et style du tableau HTML/PDF
+                # Style du tableau
                 t = Table(donnees_table, colWidths=[100, 250, 70, 70])
                 t.setStyle(TableStyle([
                     ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1A365D")),
                     ('TEXTCOLOR', (0,0), (-1,0), colors.white),
                     ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-                    ('ALIGN', (2,0), (-1,-1), 'CENTER'), # Centrer Qté et Taille
+                    ('ALIGN', (2,0), (-1,-1), 'CENTER'),
                     ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0,0), (-1,0), 11),
                     ('BOTTOMPADDING', (0,0), (-1,0), 8),
@@ -183,19 +192,19 @@ with tab1:
                 buffer.seek(0)
                 return buffer.getvalue()
 
-            # Génération du fichier binaire
-            pdf_data = generer_pdf(df_panier, num_affaire)
+            # Génération du PDF avec les deux paramètres requis
+            pdf_data = generer_pdf(df_panier, num_affaire, nom_demandeur)
             
-            # Bouton Streamlit natif pour télécharger le fichier créé
+            # Bouton de téléchargement
             st.download_button(
                 label="📥 Télécharger le Bon de Commande (PDF)",
                 data=pdf_data,
-                file_name=f"Commande_Affaire_{num_affaire}.pdf",
+                file_name=f"Commande_{nom_demandeur.replace(' ', '_')}_Affaire_{num_affaire}.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
         else:
-            st.info("💡 Veuillez saisir un numéro d'affaire pour pouvoir générer le PDF.")
+            st.info("💡 Veuillez renseigner le nom du demandeur ET le numéro d'affaire pour pouvoir générer le PDF.")
             
     else:
         st.info("Le panier est vide.")

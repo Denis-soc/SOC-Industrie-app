@@ -24,10 +24,10 @@ def charger_materiel():
     try:
         response = supabase.table("materiel").select("*").execute()
         if not df_materiel_reel.empty:
-    if 'date_achat' not in df_materiel_reel.columns:
-        df_materiel_reel['date_achat'] = None
-    if 'date_prochain_controle' not in df_materiel_reel.columns:
-        df_materiel_reel['date_prochain_controle'] = None
+            if 'date_achat' not in df_materiel_reel.columns:
+                df_materiel_reel['date_achat'] = None
+            if 'date_prochain_controle' not in df_materiel_reel.columns:
+                df_materiel_reel['date_prochain_controle'] = None
         if response.data:
             # On remplace immédiatement les valeurs nulles/NaN par du texte vide ou 0
             df = pd.DataFrame(response.data)

@@ -501,24 +501,26 @@ with tab4:
     geolocator = Nominatim(user_agent="soc_industrie_app")
     
     # A. Ajout du Dépôt (Point fixe)
-    mat_depot = df_mat[df_mat['est_a_l_agence'] == True]['Nom du Matériel'].tolist()
-    if mat_depot:
+    # On filtre en tenant compte que la valeur peut être booléenne (True) ou texte ('True')
+    df_depot = df_mat[df_mat['est_a_l_agence'].astype(str).str.lower() == 'true'].copy()
+    
+    if not df_depot.empty:
+        liste_mat_depot = (df_depot['num_interne'].astype(str) + " (" + df_depot['Nom du Matériel'] + ")").tolist()
         points_data.append({
             'lat': 47.279, 'lon': -0.402, 
             'label': '📍 Dépôt (Terranjou)',
-            'matériel': ", ".join(mat_depot)
+            'matériel': ", ".join(liste_mat_depot)
         })
         
     # B. Ajout des Chantiers
     if not df_res.empty:
-        # On groupe par adresse pour éviter de geocoder 10 fois la même adresse
         chantiers = df_res.groupby('adresse_chantier')
         
         for adresse, group in chantiers:
             try:
                 location = geolocator.geocode(adresse)
                 if location:
-                    # Liste du matériel sur ce chantier précis
+                    # Liste du matériel sur ce chantier (N° Interne seulement pour rester concis)
                     mat_chantier = group['num_interne'].tolist()
                     points_data.append({
                         'lat': location.latitude, 
@@ -537,7 +539,7 @@ with tab4:
             "ScatterplotLayer",
             df_points,
             get_position=["lon", "lat"],
-            get_color=[200, 30, 0, 160],
+            get_color=[200, 30, 0, 160], # Rouge
             get_radius=300,
             pickable=True,
         )
@@ -547,7 +549,7 @@ with tab4:
         st.pydeck_chart(pdk.Deck(
             initial_view_state=view_state,
             layers=[layer],
-            tooltip={"text": "{label}\nMatériel présent : {matériel}"}
+            tooltip={"text": "{label}\nMatériel : {matériel}"}
         ))
     else:
         st.info("Aucune donnée de localisation disponible.")

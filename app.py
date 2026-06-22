@@ -342,7 +342,7 @@ with tab2:
                     # Sélection et ordre des colonnes pour Olivier
                     colonnes_finales = [
                         'Statut', 'num_interne', 'Nom du Matériel', 'categorie', 
-                        'Dernier Contrôle', 'periodicite_controle', 'Prochain Contrôle'
+                        'date achat', 'periodicite_controle', 'date Prochain Contrôle'
                     ]
                     
                     # On renomme proprement les colonnes

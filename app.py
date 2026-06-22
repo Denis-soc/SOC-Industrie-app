@@ -383,8 +383,20 @@ with tab3:
                     localisation_label.append("📍 Dépôt (Terranjou)")
                 else:
                     info_res = dict_res[num_int]
+                    # Récupération et formatage rapide des dates (AAAA-MM-JJ)
+                    d_debut = info_res.get('date_debut', '')
+                    d_fin = info_res.get('date_fin', '')
+                    
+                    # Formatage optionnel en JJ/MM si les dates existent
+                    try:
+                        date_deb_fr = datetime.strptime(d_debut, "%Y-%m-%d").strftime("%d/%m")
+                        date_fin_fr = datetime.strptime(d_fin, "%Y-%m-%d").strftime("%d/%m")
+                        dates_str = f"({date_deb_fr} au {date_fin_fr})"
+                    except:
+                        dates_str = f"({d_debut} au {d_fin})" if d_debut else ""
+
                     visual_status.append("🔴 En chantier")
-                    localisation_label.append(f"👷 {info_res.get('technicien', '')} — 🏗️ {info_res.get('num_affaire', '')}")
+                    localisation_label.append(f"👷 {info_res.get('technicien', '')} — 🏗️ {info_res.get('num_affaire', '')} {dates_str}")
             
             df_commun['Statut'] = visual_status
             df_commun['Localisation / Affectation'] = localisation_label
@@ -426,7 +438,6 @@ with tab3:
                     if btn_valider:
                         try:
                             if case_retour:
-                                # Retour au dépôt : on remet l'affectation à None
                                 supabase.table("materiel").update({
                                     "est_a_l_agence": True,
                                     "affectation_actuelle": None
@@ -443,19 +454,15 @@ with tab3:
                                 elif date_fin < date_debut:
                                     st.error("❌ La date de fin ne peut pas être antérieure à la date de début.")
                                 else:
-                                    # Formatage pour l'affichage rapide (emballé dans une liste [] pour le type text[])
                                     libelle_affichage = f"{nom_demandeur.strip()} ({nom_chantier.strip()})"
                                     
-                                    # 1. Mise à jour table matériel (avec la sécurité des crochets pour le type de colonne text[])
                                     supabase.table("materiel").update({
                                         "est_a_l_agence": False,
                                         "affectation_actuelle": [libelle_affichage]
                                     }).eq("num_interne", num_int_isole).execute()
                                     
-                                    # 2. Clôture des anciennes réservations actives pour ce matériel
                                     supabase.table("reservations").update({"statut": "Terminée"}).eq("num_interne", num_int_isole).eq("statut", "Active").execute()
                                     
-                                    # 3. Insertion propre dans l'historique pour la carte du Tab 4
                                     supabase.table("reservations").insert({
                                         "num_interne": num_int_isole,
                                         "technicien": nom_demandeur.strip(),

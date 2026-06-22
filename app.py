@@ -35,11 +35,14 @@ def charger_materiel():
                 
             # On remplace immédiatement les valeurs nulles/NaN par du texte vide
             df = df.astype(object).fillna("")
+            
+            # --- TRI PAR N° INTERNE CROISSANT ---
+            if 'num_interne' in df.columns:
+                # natsort permet de trier intelligemment (ex: OUT 2 passera avant OUT 10)
+                df = df.sort_values(by='num_interne', key=lambda x: x.str.alphanumeric if hasattr(x, 'str') else x)
+            
             return df
             
-        return pd.DataFrame()
-    except Exception as e:
-        st.error(f"Erreur lors du chargement de la table 'materiel' : {e}")
         return pd.DataFrame()
     except Exception as e:
         st.error(f"Erreur lors du chargement de la table 'materiel' : {e}")

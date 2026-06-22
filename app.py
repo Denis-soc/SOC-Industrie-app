@@ -94,48 +94,32 @@ with tab0:
     # Sélecteur de catalogue
     cat_choisi = st.selectbox("Choisir le catalogue", ["EPI", "Consommables", "Outillage"])
     
-    # 1. Récupération et affichage du stock
-    # On filtre les articles appartenant au catalogue sélectionné
-    response = supabase.table("stocks_catalogues").select("*").execute()
-    df_all = pd.DataFrame(response.data)
-    if not df_all.empty:
-        df_all['catalogue'] = df_all['catalogue'].str.strip()
-        df_stock = df_all[df_all['catalogue'] == cat_choisi.strip()]
-    else:
-        df_stock = pd.DataFrame()
-    if not df_stock.empty:
-        st.subheader(f"État du stock actuel : {cat_choisi}")
+    # 1. Récupération globale pour déboguer
+    try:
+        response = supabase.table("stocks_catalogues").select("*").execute()
+        df_all = pd.DataFrame(response.data)
         
-        # Affichage avec alerte visuelle (stock mini)
-        def highlight_alert(row):
-            # Retourne rouge si la quantité est inférieure ou égale au stock mini
-            color = '#ffcccc' if row['quantite'] <= row['stock_mini'] else ''
-            return [f'background-color: {color}'] * len(row)
-        
-        st.dataframe(df_stock.style.apply(highlight_alert, axis=1), use_container_width=True)
-        
-        # 2. Section Mouvements (Entrées / Sorties)
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.write("📥 **Entrée Stock (N° BC/BL)**")
-            with st.form("entree_form"):
-                article_in = st.selectbox("Article à ajouter", df_stock['nom_article'])
-                qt_in = st.number_input("Quantité reçue", min_value=1, step=1)
-                bc_bl = st.text_input("N° BC ou BL")
-                if st.form_submit_button("Valider Entrée"):
-                    st.success(f"Entrée de {qt_in} unités pour {article_in} enregistrée (Ref: {bc_bl}).")
-                    
-        with col2:
-            st.write("📤 **Sortie Stock (Demande)**")
-            with st.form("sortie_form"):
-                article_out = st.selectbox("Article à sortir", df_stock['nom_article'])
-                qt_out = st.number_input("Quantité sortie", min_value=1, step=1)
-                demandeur = st.text_input("Demandeur / Chantier")
-                if st.form_submit_button("Valider Sortie"):
-                    st.success(f"Sortie de {qt_out} unités pour {article_out} validée (Demandeur: {demandeur}).")
-    else:
-        st.info("Aucun article trouvé dans ce catalogue.")
+        if not df_all.empty:
+            # Nettoyage : suppression des espaces inutiles et mise en minuscules pour comparaison
+            df_all['catalogue_clean'] = df_all['catalogue'].astype(str).str.strip().str.lower()
+            cat_choisi_clean = cat_choisi.strip().lower()
+            
+            # Filtrage
+            df_stock = df_all[df_all['catalogue_clean'] == cat_choisi_clean]
+            
+            if not df_stock.empty:
+                st.subheader(f"État du stock actuel : {cat_choisi}")
+                # Affichage du DataFrame
+                st.dataframe(df_stock, use_container_width=True)
+                
+                # ... (Votre section formulaires reste ici) ...
+            else:
+                st.info(f"Aucun article trouvé dans le catalogue '{cat_choisi}'. Vérifiez l'orthographe dans Supabase.")
+        else:
+            st.warning("La table 'stocks_catalogues' est vide.")
+            
+    except Exception as e:
+        st.error(f"Erreur de connexion : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

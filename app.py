@@ -424,13 +424,11 @@ with tab3:
                     btn_maj = st.form_submit_button("💾 Enregistrer le statut")
                     
                     if btn_maj:
-                        # Logique de nettoyage des données avant envoi
+                        # Logique de nettoyage : si le matériel est à l'agence, on passe l'affectation à None (NULL)
                         if a_l_agence:
-                            nouvelle_affectation = "" # Retour au dépôt
+                            nouvelle_affectation = None
                         else:
-                            nouvelle_affectation = qui_a_le_materiel.strip()
-                            if not nouvelle_affectation:
-                                nouvelle_affectation = "Non spécifié"
+                            nouvelle_affectation = qui_a_le_materiel.strip() if qui_a_le_materiel.strip() != "" else None
                         
                         # Mise à jour dans Supabase
                         upd_data = {

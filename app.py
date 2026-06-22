@@ -91,36 +91,41 @@ def rafraichir_page():
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # 1. On récupère directement depuis la table 'materiel'
+    # 1. Récupération des données depuis la table 'materiel'
     try:
-        # On sélectionne les colonnes nécessaires (adaptables selon votre table materiel)
-        response = supabase.table("materiel").select("id, nom, reference_interne, photo, quantite").execute()
+        # On récupère les colonnes nécessaires (assurez-vous qu'elles existent bien dans votre table 'materiel')
+        response = supabase.table("materiel").select("nom, reference_interne, photo, quantite").execute()
         df = pd.DataFrame(response.data)
         
         if not df.empty:
             st.subheader("État du stock")
             
-            # Affichage dynamique
+            # Affichage du tableau
             st.dataframe(df, use_container_width=True)
             
-            # 2. Formulaire de mouvement lié à la table 'materiel'
+            # 2. Formulaire de mouvement
             with st.form("mouvement_form"):
                 article_select = st.selectbox("Article concerné", df['nom'])
                 type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
-                quantite = st.number_input("Quantité", min_value=1)
+                quantite = st.number_input("Quantité", min_value=1, step=1)
                 projet = st.text_input("Projet")
                 ref_doc = st.text_input("N° BC ou BL")
                 
                 if st.form_submit_button("Valider"):
-                    # Calcul du nouveau stock
+                    # Calcul de la nouvelle quantité
                     article_data = df[df['nom'] == article_select].iloc[0]
                     stock_actuel = int(article_data['quantite'])
-                    nouveau_stock = stock_actuel + quantite if type_mvt == "Entrée" else stock_actuel - quantite
+                    
+                    if type_mvt == "Entrée":
+                        nouveau_stock = stock_actuel + int(quantite)
+                    else:
+                        nouveau_stock = stock_actuel - int(quantite)
                     
                     # Mise à jour directe dans la table 'materiel'
-                    supabase.table("materiel").update({"quantite": nouveau_stock}).eq("id", article_data['id']).execute()
+                    # On utilise 'nom' au lieu de 'id' pour éviter l'erreur de colonne
+                    supabase.table("materiel").update({"quantite": nouveau_stock}).eq("nom", article_select).execute()
                     
-                    st.success("Stock mis à jour !")
+                    st.success(f"Stock mis à jour pour {article_select} !")
                     st.rerun()
         else:
             st.info("Aucun matériel trouvé dans la base.")

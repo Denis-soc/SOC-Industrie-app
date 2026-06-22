@@ -378,6 +378,13 @@ with tab3:
                 else:
                     visual_status.append("🔴 En chantier")
                     qui = row['affectation_actuelle']
+                    
+                    # SÉCURITÉ : Si Supabase renvoie un tableau/liste, on extrait le premier élément texte
+                    if isinstance(qui, list) and len(qui) > 0:
+                        qui = qui[0]
+                    elif isinstance(qui, str) and qui.startswith('{') and qui.endswith('}'):
+                        qui = qui.strip('{}').replace('"', '')
+                        
                     visual_status_str = f"👷 Sorti chez : {qui}" if qui else "🔴 Hors Agence"
                     localisation_label.append(visual_status_str)
             
@@ -423,7 +430,6 @@ with tab3:
                     
                     if btn_valider:
                         try:
-                            # Si des champs chantiers sont saisis, cela devient prioritaire sur le retour dépôt
                             est_un_chantier = bool(nom_demandeur.strip() or nom_chantier.strip())
                             
                             if est_un_chantier:
@@ -434,10 +440,10 @@ with tab3:
                                 else:
                                     libelle_affectation = f"{nom_demandeur.strip()} ({nom_chantier.strip()})"
                                     
-                                    # Mise à jour Table Matériel (Type TEXT)
+                                    # MISE À JOUR : On envoie une liste [libelle...] pour satisfaire le type text[] de Supabase
                                     supabase.table("materiel").update({
                                         "est_a_l_agence": False,
-                                        "affectation_actuelle": libelle_affectation
+                                        "affectation_actuelle": [libelle_affectation]
                                     }).eq("num_interne", num_int_isole).execute()
                                     
                                     # Enregistrement dans l'historique
@@ -453,7 +459,7 @@ with tab3:
                                     st.success(f"🎉 Réservation validée pour {libelle_affectation} !")
                                     st.rerun()
                             else:
-                                # Retour classique à l'agence
+                                # Retour classique à l'agence (on passe le tableau à None/NULL)
                                 supabase.table("materiel").update({
                                     "est_a_l_agence": True,
                                     "affectation_actuelle": None

@@ -21,6 +21,7 @@ except Exception as e:
 
 # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
 # # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
+# # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
 def charger_materiel():
     try:
         response = supabase.table("materiel").select("*").execute()
@@ -34,12 +35,17 @@ def charger_materiel():
             if 'date_prochain_controle' not in df.columns:
                 df['date_prochain_controle'] = None
                 
+            # --- SÉCURISATION DES COLONNES DE RÉSERVATION ---
+            if 'est_a_l_agence' not in df.columns:
+                df['est_a_l_agence'] = True
+            if 'affectation_actuelle' not in df.columns:
+                df['affectation_actuelle'] = ""
+                
             # On remplace immédiatement les valeurs nulles/NaN par du texte vide
             df = df.astype(object).fillna("")
             
             # --- TRI PAR N° INTERNE CROISSANT ---
             if 'num_interne' in df.columns:
-                # Tri alphabétique classique et efficace
                 df['num_interne_str'] = df['num_interne'].astype(str)
                 df = df.sort_values(by='num_interne_str', ascending=True).drop(columns=['num_interne_str'])
             

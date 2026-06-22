@@ -481,50 +481,48 @@ with tab3:
     else:
         st.info("Aucun matériel disponible.") 
 with tab4:
-    st.header("📍 Carte de localisation du matériel en chantier")
+    st.header("📍 Carte de localisation du matériel")
     
     from geopy.geocoders import Nominatim
     import pandas as pd
     
-    # 1. Récupération des chantiers actifs
+    # 1. On définit l'emplacement fixe de l'agence (coordonnées de Terranjou)
+    agence_lat, agence_lon = 47.279, -0.402  # Coordonnées approximatives
+    
+    # 2. Récupération des chantiers actifs
     res_actifs = supabase.table("reservations").select("*").eq("statut", "Active").execute()
     df_map = pd.DataFrame(res_actifs.data)
     
+    # Création d'une liste pour stocker les points de la carte
+    points = []
+    
+    # Ajout du point "Agence"
+    points.append({'lat': agence_lat, 'lon': agence_lon, 'label': '📍 Agence SOC Industrie'})
+    
+    # 3. Traitement des chantiers
     if not df_map.empty:
-        # Fonction de géocodage simple
-        geolocator = Nominatim(user_agent="soc_industrie_app")
+        geolocator = Nominatim(user_agent="soc_industrie_app_v2")
         
-        lats = []
-        lons = []
-        
-        st.write("Chargement des coordonnées des chantiers...")
-        
-        for adresse in df_map['adresse_chantier']:
+        for _, row in df_map.iterrows():
+            adresse = row['adresse_chantier']
             try:
                 location = geolocator.geocode(adresse)
                 if location:
-                    lats.append(location.latitude)
-                    lons.append(location.longitude)
-                else:
-                    lats.append(None)
-                    lons.append(None)
+                    points.append({
+                        'lat': location.latitude, 
+                        'lon': location.longitude, 
+                        'label': f"🏗️ {row['num_affaire']}"
+                    })
             except:
-                lats.append(None)
-                lons.append(None)
-        
-        df_map['lat'] = lats
-        df_map['lon'] = lons
-        
-        # Filtrer les adresses non trouvées
-        df_map = df_map.dropna(subset=['lat', 'lon'])
-        
-        if not df_map.empty:
-            st.map(df_map)
-            st.success(f"{len(df_map)} chantiers affichés sur la carte.")
-        else:
-            st.warning("Impossible de localiser les adresses sur la carte. Vérifiez le format (ex: '4 la villette, 49540 La Fosse-de-Tigné').")
-    else:
-        st.info("Aucun matériel en chantier actuellement.")
+                continue
+    
+    # 4. Conversion en DataFrame pour l'affichage
+    df_points = pd.DataFrame(points)
+    
+    # Affichage de la carte
+    st.map(df_points)
+    
+    st.info("La carte affiche l'Agence (point de base) et tous les chantiers en cours.")
 with tab5:
     st.header("⚙️ Administration du Matériel")
     

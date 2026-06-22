@@ -480,49 +480,77 @@ with tab3:
                             st.error(f"Erreur lors de l'enregistrement : {e}")
     else:
         st.info("Aucun matériel disponible.") 
+import streamlit as st
+import pandas as pd
+import pydeck as pdk
+from geopy.geocoders import Nominatim
+
 with tab4:
-    st.header("📍 Carte de localisation du matériel")
+    st.header("📍 Carte interactive de localisation")
     
-    from geopy.geocoders import Nominatim
-    import pandas as pd
-    
-    # 1. On définit l'emplacement fixe de l'agence (coordonnées de Terranjou)
-    agence_lat, agence_lon = 47.279, -0.402  # Coordonnées approximatives
-    
-    # 2. Récupération des chantiers actifs
+    # 1. Récupération des données
     res_actifs = supabase.table("reservations").select("*").eq("statut", "Active").execute()
-    df_map = pd.DataFrame(res_actifs.data)
+    df_res = pd.DataFrame(res_actifs.data)
     
-    # Création d'une liste pour stocker les points de la carte
-    points = []
+    # Récupération de tout le matériel pour identifier ce qui est au dépôt
+    data_mat = supabase.table("materiel").select("*").execute()
+    df_mat = pd.DataFrame(data_mat.data)
     
-    # Ajout du point "Agence"
-    points.append({'lat': agence_lat, 'lon': agence_lon, 'label': '📍 Agence SOC Industrie'})
+    # 2. Préparation des données pour la carte
+    points_data = []
+    geolocator = Nominatim(user_agent="soc_industrie_app")
     
-    # 3. Traitement des chantiers
-    if not df_map.empty:
-        geolocator = Nominatim(user_agent="soc_industrie_app_v2")
+    # A. Ajout du Dépôt (Point fixe)
+    mat_depot = df_mat[df_mat['est_a_l_agence'] == True]['Nom du Matériel'].tolist()
+    if mat_depot:
+        points_data.append({
+            'lat': 47.279, 'lon': -0.402, 
+            'label': '📍 Dépôt (Terranjou)',
+            'matériel': ", ".join(mat_depot)
+        })
         
-        for _, row in df_map.iterrows():
-            adresse = row['adresse_chantier']
+    # B. Ajout des Chantiers
+    if not df_res.empty:
+        # On groupe par adresse pour éviter de geocoder 10 fois la même adresse
+        chantiers = df_res.groupby('adresse_chantier')
+        
+        for adresse, group in chantiers:
             try:
                 location = geolocator.geocode(adresse)
                 if location:
-                    points.append({
+                    # Liste du matériel sur ce chantier précis
+                    mat_chantier = group['num_interne'].tolist()
+                    points_data.append({
                         'lat': location.latitude, 
                         'lon': location.longitude, 
-                        'label': f"🏗️ {row['num_affaire']}"
+                        'label': f"🏗️ {group['num_affaire'].iloc[0]}",
+                        'matériel': ", ".join(mat_chantier)
                     })
             except:
                 continue
-    
-    # 4. Conversion en DataFrame pour l'affichage
-    df_points = pd.DataFrame(points)
-    
-    # Affichage de la carte
-    st.map(df_points)
-    
-    st.info("La carte affiche l'Agence (point de base) et tous les chantiers en cours.")
+
+    # 3. Affichage Pydeck
+    if points_data:
+        df_points = pd.DataFrame(points_data)
+        
+        layer = pdk.Layer(
+            "ScatterplotLayer",
+            df_points,
+            get_position=["lon", "lat"],
+            get_color=[200, 30, 0, 160],
+            get_radius=300,
+            pickable=True,
+        )
+        
+        view_state = pdk.ViewState(latitude=47.279, longitude=-0.402, zoom=9)
+        
+        st.pydeck_chart(pdk.Deck(
+            initial_view_state=view_state,
+            layers=[layer],
+            tooltip={"text": "{label}\nMatériel présent : {matériel}"}
+        ))
+    else:
+        st.info("Aucune donnée de localisation disponible.")
 with tab5:
     st.header("⚙️ Administration du Matériel")
     

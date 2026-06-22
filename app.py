@@ -91,27 +91,42 @@ def rafraichir_page():
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # Récupération de TOUS les articles créés dans le Tab 5
-    response = supabase.table("stocks_catalogues").select("*").execute()
-    df = pd.DataFrame(response.data)
-    
-    # Affichage du catalogue complet (avec Photo et Ref)
-    if not df.empty:
-        # On affiche le tableau incluant les colonnes ajoutées
-        st.dataframe(df[['photo', 'nom_article', 'reference_interne', 'quantite']], use_container_width=True)
+    # 1. On récupère directement depuis la table 'materiel'
+    try:
+        # On sélectionne les colonnes nécessaires (adaptables selon votre table materiel)
+        response = supabase.table("materiel").select("id, nom, reference_interne, photo, quantite").execute()
+        df = pd.DataFrame(response.data)
         
-        # Formulaire Mouvements (Quantités + Projets + BC/BL)
-        with st.form("mouvement_form"):
-            article_select = st.selectbox("Article concerné", df['nom_article'])
-            type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
-            quantite = st.number_input("Quantité", min_value=1)
-            projet = st.text_input("Nom du projet")
-            ref_doc = st.text_input("N° BC ou BL")
+        if not df.empty:
+            st.subheader("État du stock")
             
-            if st.form_submit_button("Valider le mouvement"):
-                # Logique : mise à jour stock + écriture dans une table historique
-                # ... (Votre logique de calcul ici)
-                st.success(f"Mouvement enregistré pour {article_select} (Projet: {projet})")
+            # Affichage dynamique
+            st.dataframe(df, use_container_width=True)
+            
+            # 2. Formulaire de mouvement lié à la table 'materiel'
+            with st.form("mouvement_form"):
+                article_select = st.selectbox("Article concerné", df['nom'])
+                type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
+                quantite = st.number_input("Quantité", min_value=1)
+                projet = st.text_input("Projet")
+                ref_doc = st.text_input("N° BC ou BL")
+                
+                if st.form_submit_button("Valider"):
+                    # Calcul du nouveau stock
+                    article_data = df[df['nom'] == article_select].iloc[0]
+                    stock_actuel = int(article_data['quantite'])
+                    nouveau_stock = stock_actuel + quantite if type_mvt == "Entrée" else stock_actuel - quantite
+                    
+                    # Mise à jour directe dans la table 'materiel'
+                    supabase.table("materiel").update({"quantite": nouveau_stock}).eq("id", article_data['id']).execute()
+                    
+                    st.success("Stock mis à jour !")
+                    st.rerun()
+        else:
+            st.info("Aucun matériel trouvé dans la base.")
+            
+    except Exception as e:
+        st.error(f"Erreur : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

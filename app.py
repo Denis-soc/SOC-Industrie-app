@@ -113,9 +113,54 @@ with tab1:
     st.subheader("📦 Votre Panier")
     
     if st.session_state.panier:
+        # 1. Transformation du panier en DataFrame pour l'affichage
         df_panier = pd.DataFrame.from_dict(st.session_state.panier, orient='index')
-        st.table(df_panier)
         
+        # On renomme proprement les colonnes pour l'affichage
+        df_affichage = df_panier.rename(columns={
+            "nom": "Désignation",
+            "qte": "Quantité",
+            "taille": "Taille"
+        })
+        st.table(df_affichage)
+        
+        # 2. ZONE DE MODIFICATION / SUPPRESSION D'UN ARTICLE
+        with st.expander("✏️ Modifier ou retirer un article du panier"):
+            liste_articles_panier = list(st.session_state.panier.keys())
+            article_a_modifier = st.selectbox("Sélectionner un N° Interne :", liste_articles_panier)
+            
+            if article_a_modifier:
+                col_mod_qte, col_mod_btn = st.columns([2, 1])
+                with col_mod_qte:
+                    nouvelle_qte = st.number_input(
+                        f"Nouvelle quantité pour {article_a_modifier}", 
+                        min_value=1, 
+                        max_value=20, 
+                        value=int(st.session_state.panier[article_a_modifier]["qte"])
+                    )
+                with col_mod_btn:
+                    st.write("") # Juste pour aligner le bouton verticalement
+                    st.write("")
+                    if st.button("🔄 Mettre à jour la quantité", use_container_width=True):
+                        st.session_state.panier[article_a_modifier]["qte"] = nouvelle_qte
+                        st.success("Quantité mise à jour !")
+                        st.rerun()
+                
+                # Bouton pour supprimer l'article sélectionné
+                if st.button(f"❌ Retirer l'article {article_a_modifier} du panier", use_container_width=True):
+                    del st.session_state.panier[article_a_modifier]
+                    st.success("Article retiré !")
+                    st.rerun()
+
+        # 3. BOUTON POUR VIDER TOUT LE PANIER
+        if st.button("🗑️ Vider entièrement le panier", type="secondary"):
+            st.session_state.panier = {}
+            st.success("Le panier a été vidé.")
+            st.rerun()
+            
+        st.divider()
+        
+        # 4. FORMULAIRE ET GÉNÉRATION DU PDF
         # On crée deux colonnes pour saisir proprement le Nom et le N° d'affaire
         col_demandeur, col_affaire = st.columns(2)
         with col_demandeur:
@@ -126,7 +171,6 @@ with tab1:
         # Le bouton de téléchargement ne s'active que si les deux champs sont remplis
         if nom_demandeur and num_affaire:
             
-            # Fonction interne pour générer le PDF avec Nom, Affaire et DATE automatique
             def generer_pdf(df, affaire, demandeur):
                 import io
                 from datetime import datetime
@@ -135,7 +179,6 @@ with tab1:
                 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
                 from reportlab.lib import colors
                 
-                # Récupération et formatage de la date du jour (ex: 22/06/2026)
                 date_aujourdhui = datetime.now().strftime("%d/%m/%Y")
                 
                 buffer = io.BytesIO()
@@ -144,7 +187,6 @@ with tab1:
                 
                 styles = getSampleStyleSheet()
                 
-                # Styles personnalisés
                 style_titre = ParagraphStyle(
                     'TitreEntreprise',
                     parent=styles['Heading1'],
@@ -154,18 +196,15 @@ with tab1:
                     spaceAfter=10
                 )
                 
-                # En-tête du document PDF
                 story.append(Paragraph("<b>SOC Industrie – Gestion Interne</b>", style_titre))
                 story.append(Paragraph(f"<b>Bon de Commande Matériel / EPI</b>", styles['Heading2']))
                 story.append(Spacer(1, 15))
                 
-                # Ajout des informations : Date, Demandeur, Affaire
                 story.append(Paragraph(f"<b>Date de la demande :</b> {date_aujourdhui}", styles['Normal']))
                 story.append(Paragraph(f"<b>Demandeur :</b> {demandeur}", styles['Normal']))
                 story.append(Paragraph(f"<b>N° d'Affaire :</b> {affaire}", styles['Normal']))
                 story.append(Spacer(1, 20))
                 
-                # Préparation du tableau des données du panier
                 donnees_table = [["N° Interne", "Désignation", "Quantité", "Taille"]]
                 for num_int, row in df.iterrows():
                     donnees_table.append([
@@ -175,7 +214,6 @@ with tab1:
                         str(row.get('taille', '-'))
                     ])
                 
-                # Style du tableau
                 t = Table(donnees_table, colWidths=[100, 250, 70, 70])
                 t.setStyle(TableStyle([
                     ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1A365D")),
@@ -197,10 +235,8 @@ with tab1:
                 buffer.seek(0)
                 return buffer.getvalue()
 
-            # Génération du PDF
             pdf_data = generer_pdf(df_panier, num_affaire, nom_demandeur)
             
-            # Bouton de téléchargement
             st.download_button(
                 label="📥 Télécharger le Bon de Commande (PDF)",
                 data=pdf_data,

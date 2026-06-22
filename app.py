@@ -497,23 +497,17 @@ with tab4:
     points_data = []
     geolocator = Nominatim(user_agent="soc_industrie_app_debug")
     
-    # 2. DEBUG : Affichage de ce que le code "voit" au dépôt
-    # Cela va nous montrer pourquoi les articles manquent
-    st.write("📋 **Debug : État actuel du stock (Agence = True)**")
+    # 2. Préparation des données Dépôt
     df_debug = df_mat[df_mat['est_a_l_agence'].astype(str).str.lower().isin(['true', '1'])]
-    st.write(df_debug[['num_interne', 'Nom du Matériel', 'est_a_l_agence']])
-    
-    # A. Ajout forcé du point Agence avec les bonnes coordonnées
-    # Coordonnées précises de l'agence SOC Industrie (70 route de Brissac)
     liste_mat_depot = [f"{row['num_interne']} ({row['Nom du Matériel']})" for _, row in df_debug.iterrows()]
     
     points_data.append({
-        'lat': 47.3486, 'lon': -0.4651,  # Coordonnées précises de 49380 Terranjou
+        'lat': 47.3486, 'lon': -0.4651,
         'label': '📍 Agence SOC Industrie',
         'matériel': " | ".join(liste_mat_depot) if liste_mat_depot else "Aucun matériel"
     })
     
-    # B. Ajout des Chantiers
+    # 3. Préparation des données Chantiers
     if not df_res.empty:
         for _, row in df_res.iterrows():
             try:
@@ -525,19 +519,29 @@ with tab4:
                         'label': f"🏗️ {row['num_affaire']}",
                         'matériel': f"Matériel : {row['num_interne']}"
                     })
-            except: continue
+            except:
+                continue
 
-    # 3. Affichage Pydeck
+    # 4. Affichage Pydeck
     if points_data:
         df_points = pd.DataFrame(points_data)
         view_state = pdk.ViewState(latitude=47.3486, longitude=-0.4651, zoom=10)
         
+        # Le rendu final avec le bon nombre de parenthèses
         st.pydeck_chart(pdk.Deck(
             initial_view_state=view_state,
-            layers=[pdk.Layer("ScatterplotLayer", df_points, get_position=["lon", "lat"], 
-                    get_color=[200, 30, 0, 160], get_radius=300, pickable=True)],
+            layers=[pdk.Layer(
+                "ScatterplotLayer",
+                df_points,
+                get_position=["lon", "lat"],
+                get_color=[200, 30, 0, 160],
+                get_radius=300,
+                pickable=True
+            )],
             tooltip={"text": "{label}\n{matériel}"}
-        )))
+        ))
+    else:
+        st.info("Aucune donnée de localisation disponible.")
 with tab5:
     st.header("⚙️ Administration du Matériel")
     

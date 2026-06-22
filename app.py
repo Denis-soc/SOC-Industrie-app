@@ -91,34 +91,35 @@ def rafraichir_page():
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    cat_choisi = st.selectbox("Choisir le catalogue", ["EPI", "Consommables", "Outillage"], key="cat_tab0")
+    cat_choisi = st.selectbox("Choisir le catalogue", ["EPI", "Consommables", "Outillage"])
     
     try:
-        # 1. On récupère TOUT le contenu de la table sans filtrer à la source
+        # 1. On récupère TOUTES les données de la table sans filtre strict
         response = supabase.table("stocks_catalogues").select("*").execute()
         df_all = pd.DataFrame(response.data)
         
         if not df_all.empty:
-            # 2. On nettoie les noms des catalogues pour comparer sans erreur
-            # (supprime les espaces et met en majuscules)
+            # 2. Nettoyage : suppression des espaces et mise en majuscules pour une comparaison fiable
             df_all['catalogue_clean'] = df_all['catalogue'].astype(str).str.strip().str.upper()
             target = cat_choisi.strip().upper()
             
-            # 3. On filtre en mémoire
+            # 3. Filtrage en local
             df_stock = df_all[df_all['catalogue_clean'] == target]
             
             if not df_stock.empty:
                 st.subheader(f"État du stock : {cat_choisi}")
                 st.dataframe(df_stock[['nom_article', 'quantite', 'stock_mini']], use_container_width=True)
                 
-                # ... (vos formulaires restent identiques)
+                # --- Vos formulaires restent ici ---
             else:
-                st.info(f"Aucun article trouvé pour '{cat_choisi}'.")
-                st.write("Articles actuellement dans la base :", df_all['catalogue'].unique())
+                st.info(f"Aucun article trouvé pour le catalogue '{cat_choisi}'.")
+                # Diagnostic : affichez les catalogues présents pour voir l'erreur de saisie
+                st.write("Catalogues présents dans la base :", df_all['catalogue'].unique())
         else:
             st.warning("La table est vide.")
+            
     except Exception as e:
-        st.error(f"Erreur : {e}")
+        st.error(f"Erreur de connexion : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

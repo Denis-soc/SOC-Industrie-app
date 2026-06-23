@@ -152,6 +152,16 @@ with tab0:
                     st.rerun()
 
                 if st.button("✅ Valider tout le panier"):
+                    # --- NOUVEAU : Nettoyage des données ---
+                    # On remplace les NaN/None par des chaînes vides
+                    for item in st.session_state.panier_stock:
+                        if isinstance(item.get('nom'), float): item['nom'] = ""
+                        if isinstance(item.get('chantier'), float): item['chantier'] = ""
+                        # Assurer que la quantité est un entier
+                        item['qte'] = int(item['qte']) if item['qte'] is not None else 0
+                    
+                    # --- Maintenant, on traite le panier ---
+                    for item in st.session_state.panier_stock:
                     for item in st.session_state.panier_stock:
                         # 1. Calcul et mise à jour Supabase
                         mask = (df_stock['num_interne'] == item['ref']) & (df_stock['taille'] == item['taille'])

@@ -707,7 +707,7 @@ with tab4:
     else:
         st.info("Aucune donnée de localisation disponible.")
 with tab5:
-    st.header("⚙️ Administration du Matériel")
+    st.header("⚙️ Administration & Gestion des Stocks")
     
     mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
 

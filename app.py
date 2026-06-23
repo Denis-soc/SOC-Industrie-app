@@ -180,40 +180,45 @@ with tab0:
             st.subheader("⚙️ Actions Historique")
             col_pdf, col_del = st.columns(2)
             
-            if col_pdf.button("📄 Exporter Historique en PDF"):
+           if col_pdf.button("📄 Exporter Historique en PDF"):
                 from fpdf import FPDF
-                pdf = FPDF()
+                pdf = FPDF(orientation='L') # L pour Paysage, plus d'espace pour le tableau
                 pdf.add_page()
                 pdf.set_font("Arial", 'B', 16)
-                pdf.cell(200, 10, txt="Historique des mouvements", ln=True, align='C')
-                pdf.ln(10) # Petit saut de ligne
+                pdf.cell(0, 10, txt="Historique des mouvements", ln=True, align='C')
+                pdf.ln(5)
                 
-                pdf.set_font("Arial", size=10)
+                # En-têtes du tableau (largeurs définies)
+                pdf.set_font("Arial", 'B', 9)
+                col_widths = [25, 20, 20, 15, 20, 40, 40]
+                headers = ["Date", "Réf", "Mvt", "Qté", "Taille", "Collaborateur", "Chantier"]
                 
-                # En-tête du tableau dans le PDF
-                pdf.cell(200, 10, txt="Date | Réf | Mvt | Qté | Taille | Collaborateur | Chantier", ln=True)
-                pdf.line(10, 30, 200, 30) # Ligne de séparation
-                
-                # Parcours de l'historique
+                for i, h in enumerate(headers):
+                    pdf.cell(col_widths[i], 10, h, border=1, align='C')
+                pdf.ln()
+
+                # Contenu du tableau
+                pdf.set_font("Arial", size=9)
                 for _, row in df_hist.sort_values(by="date", ascending=False).iterrows():
-                    # Conversion sécurisée en string pour éviter les erreurs avec les valeurs vides (None/NaN)
-                    date_val = str(row.get('date', ''))
-                    ref = str(row.get('num_interne', ''))
-                    mvt = str(row.get('type_mvt', ''))
-                    qte = str(row.get('quantite', ''))
-                    taille = str(row.get('taille', ''))
-                    nom = str(row.get('collaborateur', ''))
-                    chantier = str(row.get('code_chantier', ''))
-                    
-                    ligne_texte = f"{date_val} | {ref} | {mvt} | {qte} | {taille} | {nom} | {chantier}"
-                    pdf.cell(200, 7, txt=ligne_texte, ln=True)
+                    data = [
+                        str(row.get('date', '')),
+                        str(row.get('num_interne', '')),
+                        str(row.get('type_mvt', '')),
+                        str(row.get('quantite', '')),
+                        str(row.get('taille', '')),
+                        str(row.get('collaborateur', '')),
+                        str(row.get('code_chantier', ''))
+                    ]
+                    for i, d in enumerate(data):
+                        # On utilise multi_cell pour gérer le retour à la ligne si le texte est long
+                        pdf.cell(col_widths[i], 8, d, border=1, align='C')
+                    pdf.ln()
                 
-                # Sauvegarde en mémoire
                 pdf_output = pdf.output(dest='S').encode('latin-1')
                 st.download_button(
-                    label="📥 Télécharger le PDF complet", 
+                    label="📥 Télécharger le PDF (Tableau)", 
                     data=pdf_output, 
-                    file_name="historique_complet.pdf", 
+                    file_name="historique_tableau.pdf", 
                     mime="application/pdf"
                 )
             if col_del.button("🗑️ Vider l'historique complet"):

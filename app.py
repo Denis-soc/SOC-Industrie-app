@@ -20,8 +20,6 @@ except Exception as e:
     st.stop()
 
 # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
-# # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
-# # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
 def charger_materiel():
     try:
         response = supabase.table("materiel").select("*").execute()
@@ -183,30 +181,7 @@ with tab0:
                     st.session_state.panier_stock = []
                     import time; time.sleep(1)
                     st.rerun()
-                        
-                        if not ligne.empty:
-                            stock_act = int(ligne.iloc[0]['quantité'])
-                            new_stock = stock_act + qte_a_ajuster if item['type'] == "Entrée" else max(0, stock_act - qte_a_ajuster)
-                            
-                            # Mise à jour avec conversion explicite
-                            supabase.table("materiel").update({"quantité": int(new_stock)}).eq("num_interne", ref_cible).eq("taille", taille_cible).execute()
-                        
-                        # Insertion historique
-                        supabase.table("historique_mouvements").insert({
-                            "date": str(date.today()), 
-                            "num_interne": ref_cible, 
-                            "type_mvt": item['type'], 
-                            "quantite": qte_a_ajuster, 
-                            "code_chantier": str(item['chantier']), 
-                            "collaborateur": str(item['nom']), 
-                            "taille": taille_cible
-                        }).execute()
-                    
-                    st.session_state.panier_stock = []
-                    st.cache_data.clear() # On vide le cache pour recharger les données fraîches
-                    st.success("Mise à jour réussie !")
-                    st.rerun()
-
+                     
             # --- D. HISTORIQUE & ACTIONS ---
             st.subheader("📜 Historique des mouvements")
             if not df_hist.empty:

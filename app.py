@@ -105,110 +105,51 @@ def get_data():
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # 1. Initialisation
-    if 'panier_stock' not in st.session_state or not isinstance(st.session_state.panier_stock, list):
-        st.session_state.panier_stock = []
+    # --- CONFIGURATION ---
+    # MODIFIEZ 'nom_article' ICI SI VOTRE COLONNE DANS SUPABASE A UN AUTRE NOM
+    COLONNE_NOM = "nom_article" 
     
     try:
-        # Récupération données Supabase
-        df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
-        df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
+        # 1. Récupération des données depuis la table 'materiel'
+        # Assurez-vous que les colonnes 'reference_interne', 'photo', 'quantite' existent
+        response = supabase.table("materiel").select(f"{COLONNE_NOM}, reference_interne, photo, quantite").execute()
+        df = pd.DataFrame(response.data)
         
-        # --- A. TABLEAU ÉTAT DU STOCK ---
-        if not df_stock.empty:
-            st.subheader("État du stock détaillé")
-            df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'taille', 'quantité']].copy()
-            df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0)
-            st.data_editor(df_display, column_config={"photo_url": st.column_config.ImageColumn("Photo")}, use_container_width=True, disabled=True)
-
-            # --- B. FORMULAIRE D'AJOUT ---
-            with st.expander("➕ Ajouter un mouvement au stock", expanded=True):
-                with st.form("panier_form", clear_on_submit=True):
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        ref = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
-                        type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
-                        qte = st.number_input("quantité", min_value=1, step=1)
-                    with col_b:
-                        taille = st.selectbox("Taille", options=st.session_state.liste_tailles)
-                        collab = st.text_input("Collaborateur")
-                        chantier = st.text_input("Code Chantier")
+        if not df.empty:
+            st.subheader("État du stock")
+            
+            # Affichage du tableau
+            st.dataframe(df, use_container_width=True)
+            
+            # 2. Formulaire de mouvement
+            with st.form("mouvement_form"):
+                article_select = st.selectbox("Article concerné", df[COLONNE_NOM])
+                type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
+                quantite = st.number_input("Quantité", min_value=1, step=1)
+                projet = st.text_input("Projet associé")
+                ref_doc = st.text_input("N° BC ou BL")
+                
+                if st.form_submit_button("Valider le mouvement"):
+                    # Calcul de la nouvelle quantité
+                    article_data = df[df[COLONNE_NOM] == article_select].iloc[0]
+                    stock_actuel = int(article_data['quantite'])
                     
-                    if st.form_submit_button("Ajouter à la liste"):
-                        st.session_state.panier_stock.append({
-                            "ref": ref, "type": type_mvt, "qte": int(qte), 
-                            "taille": taille, "nom": collab, "chantier": chantier
-                        })
-                        st.rerun()
-
-            # --- C. PANIER ---
-            if st.session_state.panier_stock:
-                st.subheader("🛒 Panier en attente")
-                df_panier = pd.DataFrame(st.session_state.panier_stock)
-                st.dataframe(df_panier, use_container_width=True)
-                
-                cols = st.columns([1, 1, 4])
-                if cols[0].button("🗑️ Vider le panier"):
-                    st.session_state.panier_stock = []
+                    if type_mvt == "Entrée":
+                        nouveau_stock = stock_actuel + int(quantite)
+                    else:
+                        nouveau_stock = stock_actuel - int(quantite)
+                    
+                    # Mise à jour dans la table 'materiel'
+                    supabase.table("materiel").update({"quantite": nouveau_stock}).eq(COLONNE_NOM, article_select).execute()
+                    
+                    st.success(f"Stock mis à jour pour {article_select} !")
                     st.rerun()
-                
-                index_a_supprimer = cols[1].selectbox("Supprimer ligne n°", range(len(st.session_state.panier_stock)))
-                if cols[1].button("Retirer cette ligne"):
-                    st.session_state.panier_stock.pop(index_a_supprimer)
-                    st.rerun()
-
-                if st.button("✅ Valider tout le panier"):
-                    for item in st.session_state.panier_stock:
-                        # On pointe maintenant vers la bonne table
-                        table_ref = supabase.table("stock_catalogue")
-                        
-                        # Récupération de la ligne
-                        verif = table_ref.select("*").eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
-                        
-                        if not verif.data:
-                            st.error(f"❌ Ligne introuvable dans stock_catalogue : Réf {item['ref']}, Taille {item['taille']}")
-                        else:
-                            stock_act = int(verif.data[0]['quantité'])
-                            new_qte = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
-                            
-                            # Mise à jour
-                            table_ref.update({"quantité": new_qte}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
-                            st.success(f"✅ Stock mis à jour dans stock_catalogue pour {item['ref']}")
-            # --- D. HISTORIQUE & ACTIONS ---
-            st.subheader("📜 Historique des mouvements")
-            if not df_hist.empty:
-                st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
+        else:
+            st.info("Aucun matériel trouvé dans la table 'materiel'.")
             
-            st.subheader("⚙️ Actions Historique")
-            col_pdf, col_del = st.columns(2)
-            
-            if col_pdf.button("📄 Exporter Historique en PDF"):
-                from fpdf import FPDF
-                pdf = FPDF(orientation='L')
-                pdf.add_page()
-                pdf.set_font("Arial", 'B', 16)
-                pdf.cell(0, 10, txt="Historique des mouvements", ln=True, align='C')
-                pdf.ln(5)
-                pdf.set_font("Arial", 'B', 9)
-                col_widths = [25, 20, 20, 15, 20, 40, 40]
-                headers = ["Date", "Réf", "Mvt", "Qté", "Taille", "Collaborateur", "Chantier"]
-                for i, h in enumerate(headers): pdf.cell(col_widths[i], 10, h, border=1, align='C')
-                pdf.ln()
-                pdf.set_font("Arial", size=9)
-                for _, row in df_hist.sort_values(by="date", ascending=False).iterrows():
-                    data = [str(row.get('date', '')), str(row.get('num_interne', '')), str(row.get('type_mvt', '')), 
-                            str(row.get('quantite', '')), str(row.get('taille', '')), str(row.get('collaborateur', '')), str(row.get('code_chantier', ''))]
-                    for i, d in enumerate(data): pdf.cell(col_widths[i], 8, d, border=1, align='C')
-                    pdf.ln()
-                pdf_output = pdf.output(dest='S').encode('latin-1')
-                st.download_button("📥 Télécharger le PDF", pdf_output, "historique.pdf", "application/pdf")
-
-            if col_del.button("🗑️ Vider l'historique complet"):
-                supabase.table("historique_mouvements").delete().neq("id", -1).execute()
-                st.rerun()
-                
     except Exception as e:
-        st.error(f"Erreur technique : {e}")
+        st.error(f"Erreur de connexion : {e}")
+        st.write("Vérifiez que les colonnes demandées existent bien dans votre table 'materiel' sur Supabase.")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

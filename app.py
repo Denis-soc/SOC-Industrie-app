@@ -88,11 +88,14 @@ def rafraichir_page():
         st.experimental_rerun()
 
 # 5. CONTENU DES ONGLETS
+import streamlit as st
+import pandas as pd
+
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
     try:
-        # 1. Récupération des données
+        # 1. Récupération de toute la table
         response = supabase.table("materiel").select("*").execute()
         df = pd.DataFrame(response.data)
         
@@ -124,9 +127,8 @@ with tab0:
                     # Récupération de l'article sélectionné
                     article_data = df[df['Nom du Matériel'] == article_select].iloc[0]
                     
-                    # Sécurité : On force la valeur à 0 si elle est vide (None)
-                    stock_actuel_brut = article_data['quantité']
-                    stock_actuel = int(stock_actuel_brut) if pd.notnull(stock_actuel_brut) else 0
+                    # Sécurité : On force la valeur à 0 si elle est vide
+                    stock_actuel = int(article_data['quantité']) if pd.notnull(article_data['quantité']) else 0
                     
                     # Calcul du nouveau stock
                     if type_mvt == "Entrée":
@@ -134,8 +136,9 @@ with tab0:
                     else:
                         nouveau_stock = max(0, stock_actuel - int(quantite_mvt))
                     
-                    # Mise à jour dans Supabase
-                    supabase.table("materiel").update({"quantité": nouveau_stock}).eq("Nom du Matériel", article_select).execute()
+                    # MISE À JOUR : On utilise 'num_interne' qui est unique
+                    # Cela garantit que la bonne ligne est modifiée dans Supabase
+                    supabase.table("materiel").update({"quantité": nouveau_stock}).eq("num_interne", article_data['num_interne']).execute()
                     
                     st.success(f"Stock mis à jour pour {article_select} : {stock_actuel} ➡️ {nouveau_stock}")
                     st.rerun()

@@ -871,33 +871,27 @@ with tab5:
                     except Exception as e:
                         st.error(f"Erreur lors de la suppression : {e}")
 with tab6:
-    st.header("📦 État Global des Stocks")
+    st.header("📦 État des Stocks (Calculé en temps réel)")
     
-    if not df_materiel_reel.empty:
-        # On définit les colonnes à afficher
-        # Assurez-vous que 'photo_url' est bien le nom de la colonne dans votre base
-        colonnes_a_afficher = ['photo_url', 'num_interne', 'Nom du Matériel', 'categorie', 'taille', 'quantité']
-        cols_dispo = [c for c in colonnes_a_afficher if c in df_materiel_reel.columns]
+    # 1. On récupère l'historique
+    df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
+    
+    # 2. Calcul des totaux par matériel
+    if not df_hist.empty:
+        # On calcule les entrées et sorties
+        entrees = df_hist[df_hist['type_mvt'] == 'Entrée'].groupby('num_interne')['quantite'].sum()
+        sorties = df_hist[df_hist['type_mvt'] == 'Sortie'].groupby('num_interne')['quantite'].sum()
         
-        df_affichage_stock = df_materiel_reel[cols_dispo].copy()
+        # On fusionne ces calculs avec votre liste de matériel
+        df_affichage = df_materiel_reel.copy()
+        df_affichage['total_entrees'] = df_affichage['num_interne'].map(entrees).fillna(0)
+        df_affichage['total_sorties'] = df_affichage['num_interne'].map(sorties).fillna(0)
         
-        # Affichage avec configuration de la colonne image
-        st.dataframe(
-            df_affichage_stock, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config={
-                "photo_url": st.column_config.ImageColumn(
-                    "Photo",
-                    help="Aperçu du matériel",
-                    width="small"
-                ),
-                "quantité": st.column_config.NumberColumn(
-                    "Quantité en Stock", 
-                    format="%d"
-                ),
-                "num_interne": "N° Interne"
-            }
-        )
+        # 3. Calcul du stock final
+        # (On suppose que la colonne 'quantité' dans materiel est le stock de départ)
+        df_affichage['Stock Final'] = df_affichage['quantité'].astype(int) + df_affichage['total_entrees'] - df_affichage['total_sorties']
+        
+        # 4. Affichage
+        st.dataframe(df_affichage[['num_interne', 'Nom du Matériel', 'Stock Final']], use_container_width=True)
     else:
-        st.warning("Aucune donnée de stock disponible.")
+        st.info("Aucun mouvement enregistré dans l'historique.")

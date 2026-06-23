@@ -99,28 +99,28 @@ if 'panier' not in st.session_state or not isinstance(st.session_state.panier, l
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
+    # --- 1. INITIALISATION SÉCURISÉE ---
+    if 'panier' not in st.session_state or not isinstance(st.session_state.panier, list):
+        st.session_state.panier = []
+    
     try:
         # Récupération des données
-        df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
+        response = supabase.table("materiel").select("*").execute()
+        df_stock = pd.DataFrame(response.data)
         
         if not df_stock.empty:
-            # Nettoyage pour affichage : conversion des None en 0
+            # Affichage tableau (avec nettoyage des None)
             df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']].copy()
             df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0)
             
             st.subheader("État du stock")
             st.data_editor(
                 df_display,
-                column_config={
-                    "photo_url": st.column_config.ImageColumn("Photo"),
-                    "num_interne": "Réf. Interne",
-                    "Nom du Matériel": "Désignation",
-                    "quantité": "Stock"
-                },
+                column_config={"photo_url": st.column_config.ImageColumn("Photo")},
                 use_container_width=True, disabled=True
             )
 
-            # Formulaire d'ajout au panier
+            # --- 2. FORMULAIRE PANIER ---
             with st.expander("➕ Ajouter un mouvement au panier", expanded=True):
                 with st.form("panier_form", clear_on_submit=True):
                     col_a, col_b = st.columns(2)
@@ -134,20 +134,22 @@ with tab0:
                         chantier = st.text_input("Code Chantier")
                     
                     if st.form_submit_button("Ajouter à la liste"):
-                        st.session_state.panier.append({
+                        # On force l'ajout dans une liste
+                        nouveau_mouvement = {
                             "ref": ref_select, 
                             "type": type_mvt, 
                             "qte": int(qte_input),
                             "taille": taille, 
                             "nom": collaborateur, 
                             "chantier": chantier
-                        })
+                        }
+                        st.session_state.panier.append(nouveau_mouvement)
                         st.rerun()
 
-            # Gestion du panier
+            # --- 3. GESTION DU PANIER ---
             if st.session_state.panier:
                 st.subheader("🛒 Panier en attente")
-                # Création sécurisée du dataframe panier
+                # On crée le DataFrame directement depuis la liste
                 df_panier = pd.DataFrame(st.session_state.panier)
                 st.dataframe(df_panier)
                 
@@ -158,16 +160,14 @@ with tab0:
                 
                 if col_d.button("✅ Valider tout"):
                     for item in st.session_state.panier:
-                        # 1. Calcul du nouveau stock
+                        # Logique de mise à jour (Supposant que colonnes correspondent à Supabase)
                         art = df_stock[df_stock['num_interne'] == item['ref']].iloc[0]
                         stock_act = int(art['quantité']) if pd.notnull(art['quantité']) else 0
                         new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
                         
-                        # 2. Mise à jour de la table 'materiel'
                         supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).execute()
                         
-                        # 3. Insertion historique
-                        # IMPORTANT: Ces noms de colonnes doivent correspondre exactement à votre base Supabase
+                        # Historisation
                         supabase.table("historique_mouvements").insert({
                             "date": str(date.today()),
                             "num_interne": item['ref'],
@@ -179,12 +179,10 @@ with tab0:
                         }).execute()
                     
                     st.session_state.panier = []
-                    st.success("Mouvements validés !")
+                    st.success("Opérations validées !")
                     st.rerun()
-        else:
-            st.info("Aucune donnée disponible.")
     except Exception as e:
-        st.error(f"Erreur technique : {e}")
+        st.error(f"Erreur : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

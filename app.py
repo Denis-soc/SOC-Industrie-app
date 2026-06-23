@@ -153,19 +153,30 @@ with tab0:
 
                 if st.button("✅ Valider tout le panier"):
                     for item in st.session_state.panier_stock:
+                        # 1. Calcul et mise à jour Supabase
                         mask = (df_stock['num_interne'] == item['ref']) & (df_stock['taille'] == item['taille'])
                         ligne = df_stock[mask]
                         if not ligne.empty:
                             stock_act = int(ligne.iloc[0]['quantité'])
                             new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
+                            
                             supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
                         
+                        # 2. Insertion dans l'historique
                         supabase.table("historique_mouvements").insert({
                             "date": str(date.today()), "num_interne": item['ref'], "type_mvt": item['type'], 
                             "quantite": int(item['qte']), "code_chantier": str(item['chantier']), 
                             "collaborateur": str(item['nom']), "taille": str(item['taille'])
                         }).execute()
+                    
+                    # 3. VIDER LE PANIER ET FORCER LE REFRESH
                     st.session_state.panier_stock = []
+                    
+                    # --- NOUVEAUTÉ : Petit délai pour laisser Supabase finir l'écriture ---
+                    import time
+                    time.sleep(0.5) 
+                    
+                    st.success("Mise à jour réussie !")
                     st.rerun()
 
             # --- D. HISTORIQUE & ACTIONS ---

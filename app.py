@@ -94,7 +94,7 @@ with tab0:
     try:
         # Remplacez 'nom' par le nom exact de votre colonne trouvée dans Supabase
         # Si c'est 'nom_article', écrivez : select("nom_article, reference_interne, photo, quantite")
-        response = supabase.table("materiel").select("nom_article, reference_interne, photo, quantite").execute()
+        response = supabase.table("materiel").select("num_interne, Nom_du_materiel, photo, quantite").execute()
         df = pd.DataFrame(response.data)
         
         if not df.empty:
@@ -102,19 +102,19 @@ with tab0:
             st.dataframe(df, use_container_width=True)
             
             with st.form("mouvement_form"):
-                # Utilisez ici aussi le nom de la colonne correct (ex: 'nom_article')
-                num_interne = st.selectbox("Article concerné", df['nom_article'])
+                # Utilisez ici aussi le nom de la colonne correct (ex: 'num_interne')
+                num_interne = st.selectbox("Article concerné", df['num_interne'])
                 type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
                 quantite = st.number_input("Quantité", min_value=1, step=1)
                 
                 if st.form_submit_button("Valider"):
                     # Calcul...
-                    article_data = df[df['nom_article'] == article_select].iloc[0]
+                    article_data = df[df['num_interne'] == article_select].iloc[0]
                     stock_actuel = int(article_data['quantite'])
                     nouveau_stock = stock_actuel + int(quantite) if type_mvt == "Entrée" else stock_actuel - int(quantite)
                     
                     # Mise à jour en utilisant le nom de la colonne correct
-                    supabase.table("materiel").update({"quantite": nouveau_stock}).eq("nom_article", article_select).execute()
+                    supabase.table("materiel").update({"quantite": nouveau_stock}).eq("num_interne", article_select).execute()
                     
                     st.success("Stock mis à jour !")
                     st.rerun()

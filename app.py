@@ -71,13 +71,14 @@ df_demandes_reel = charger_demandes()
 st.title("🏗️ SOC Industrie – Gestion Interne")
 
 # Définition des onglets
-tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📦 Tableau de Bord Olivier",
     "🛒 Catalogues EPI/Consommables/Outillage",
-    "📋 Suivi Contrôles & Étalonnages", # Correspond au Tab2 mentionné
+    "📋 Suivi Contrôles & Étalonnages",
     "📅 Réservation matériel",
     "📍 Carte de localisation du matériel",
-    "⚙️ Administration Matériel"
+    "⚙️ Administration Matériel",
+    "📦 État des Stocks" # <--- Nouvel onglet
 ])
 if 'liste_tailles' not in st.session_state:
     st.session_state.liste_tailles = [

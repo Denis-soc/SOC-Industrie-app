@@ -121,7 +121,7 @@ with tab0:
                     # Calcul stock
                     article_data = df[df['num_interne'] == ref_select].iloc[0]
                     stock_actuel = int(article_data['quantité']) if pd.notnull(article_data['quantité']) else 0
-                    nouveau_stock = stock_actuel + int(quantite_mvt) if type_mvt == "Entrée" else max(0, stock_actuel - int(quantite_mvt))
+                    nouveau_stock = stock_actuel + int(quantité_mvt) if type_mvt == "Entrée" else max(0, stock_actuel - int(quantite_mvt))
                     
                     # 1. Mise à jour du stock
                     supabase.table("materiel").update({"quantité": nouveau_stock}).eq("num_interne", ref_select).execute()
@@ -131,7 +131,7 @@ with tab0:
                         "date": str(date_op),
                         "num_interne": ref_select,
                         "type_mvt": type_mvt,
-                        "quantite": int(quantite_mvt),
+                        "quantite": int(quantité_mvt),
                         "code_chantier": code_chantier
                     }).execute()
                     

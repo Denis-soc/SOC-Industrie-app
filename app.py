@@ -122,7 +122,7 @@ with tab0:
         st.subheader("État du stock détaillé")
         df_stock['quantité'] = pd.to_numeric(df_stock['quantité'], errors='coerce').fillna(0)
         
-        # On affiche sans la colonne 'taille'
+        # Affichage simplifié sans la colonne taille
         df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']].copy()
         st.data_editor(
             df_display, 
@@ -131,7 +131,7 @@ with tab0:
             disabled=True
         )
 
-        # --- B. FORMULAIRE D'AJOUT (Sans la taille) ---
+        # --- B. FORMULAIRE D'AJOUT (Avec taille pour l'historique) ---
         with st.expander("➕ Ajouter un mouvement au stock", expanded=True):
             with st.form("panier_form", clear_on_submit=True):
                 col_a, col_b = st.columns(2)
@@ -140,23 +140,38 @@ with tab0:
                     type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
                     qte = st.number_input("Quantité", min_value=1, step=1)
                 with col_b:
+                    taille = st.selectbox("Taille", options=st.session_state.liste_tailles)
                     collab = st.text_input("Collaborateur")
                     chantier = st.text_input("Code Chantier")
                 
                 if st.form_submit_button("Ajouter à la liste"):
                     st.session_state.panier_stock.append({
                         "ref": ref, "type": type_mvt, "qte": int(qte), 
-                        "nom": collab, "chantier": chantier
+                        "taille": taille, "nom": collab, "chantier": chantier
                     })
                     st.rerun()
 
-        # --- C. PANIER ---
+        # --- C. PANIER (Avec taille et suppression) ---
         if st.session_state.panier_stock:
             st.subheader("🛒 Panier en attente")
-            st.dataframe(pd.DataFrame(st.session_state.panier_stock), use_container_width=True)
+            df_panier = pd.DataFrame(st.session_state.panier_stock)
+            st.dataframe(df_panier, use_container_width=True)
             
+            col1, col2 = st.columns([1, 4])
+            if col1.button("🗑️ Vider le panier"):
+                st.session_state.panier_stock = []
+                st.rerun()
+            
+            with col2:
+                idx_a_supprimer = st.selectbox("Ligne à retirer", range(len(st.session_state.panier_stock)), format_func=lambda x: f"Ligne {x+1}")
+                if st.button("Retirer cette ligne"):
+                    st.session_state.panier_stock.pop(idx_a_supprimer)
+                    st.rerun()
+
+            # --- Validation ---
             if st.button("✅ Valider tout le panier"):
                 for item in st.session_state.panier_stock:
+                    # Calcul du stock sur N° Interne uniquement
                     mask = (df_stock['num_interne'] == item['ref'])
                     ligne = df_stock[mask]
                     
@@ -164,10 +179,10 @@ with tab0:
                         stock_act = int(ligne.iloc[0]['quantité'])
                         new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
                         
-                        # Mise à jour Supabase
+                        # Mise à jour Stock (Sans taille)
                         supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).execute()
                         
-                        # Insertion historique
+                        # Insertion Historique (Avec taille)
                         supabase.table("historique_mouvements").insert({
                             "date": str(date.today()), 
                             "num_interne": item['ref'], 
@@ -175,12 +190,18 @@ with tab0:
                             "quantite": int(item['qte']), 
                             "code_chantier": str(item['chantier'] or ""), 
                             "collaborateur": str(item['nom'] or ""),
-                            "taille": "N/A" # Optionnel : on peut mettre N/A ou ne pas le mettre
+                            "taille": str(item['taille'])
                         }).execute()
                 
                 st.session_state.panier_stock = []
                 st.success("Mise à jour réussie !")
                 st.rerun()
+
+    # --- D. HISTORIQUE ---
+    st.subheader("📜 Historique des mouvements")
+    if not df_hist.empty:
+        # Affichage complet avec taille
+        st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

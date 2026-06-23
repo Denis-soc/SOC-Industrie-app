@@ -92,9 +92,10 @@ with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
     try:
-        # Remplacez 'nom' par le nom exact de votre colonne trouvée dans Supabase
-        # Si c'est 'nom_article', écrivez : select("nom_article, reference_interne, photo, quantite")
-        response = supabase.table("materiel").select("num_interne, Nom_du_materiel, photo, quantite").execute()
+        # On récupère les colonnes avec vos noms spécifiques
+        # Note : Si Supabase vous donne une erreur, vérifiez si 'Nom du Matériel' 
+        # ne devrait pas s'écrire 'Nom_du_Materiel' (sans espaces ni accents)
+        response = supabase.table("materiel").select("photo_url, num_interne, 'Nom du Matériel', quantité").execute()
         df = pd.DataFrame(response.data)
         
         if not df.empty:
@@ -102,27 +103,27 @@ with tab0:
             st.dataframe(df, use_container_width=True)
             
             with st.form("mouvement_form"):
-                # Utilisez ici aussi le nom de la colonne correct (ex: 'num_interne')
-                num_interne = st.selectbox("Article concerné", df['num_interne'])
+                # On utilise la colonne 'Nom du Matériel' pour la sélection
+                article_select = st.selectbox("Article concerné", df['Nom du Matériel'])
                 type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
-                quantite = st.number_input("Quantité", min_value=1, step=1)
+                quantite_mvt = st.number_input("Quantité", min_value=1, step=1)
                 
                 if st.form_submit_button("Valider"):
-                    # Calcul...
-                    article_data = df[df['num_interne'] == article_select].iloc[0]
-                    stock_actuel = int(article_data['quantite'])
-                    nouveau_stock = stock_actuel + int(quantite) if type_mvt == "Entrée" else stock_actuel - int(quantite)
+                    # Calcul
+                    article_data = df[df['Nom du Matériel'] == article_select].iloc[0]
+                    stock_actuel = int(article_data['quantité'])
+                    nouveau_stock = stock_actuel + int(quantite_mvt) if type_mvt == "Entrée" else stock_actuel - int(quantite_mvt)
                     
-                    # Mise à jour en utilisant le nom de la colonne correct
-                    supabase.table("materiel").update({"quantite": nouveau_stock}).eq("num_interne", article_select).execute()
+                    # Mise à jour dans Supabase
+                    supabase.table("materiel").update({"quantité": nouveau_stock}).eq("Nom du Matériel", article_select).execute()
                     
-                    st.success("Stock mis à jour !")
+                    st.success(f"Stock mis à jour pour {article_select} !")
                     st.rerun()
         else:
-            st.info("Aucun matériel trouvé.")
+            st.info("Aucun matériel trouvé dans la table.")
             
     except Exception as e:
-        st.error(f"Erreur : {e}")
+        st.error(f"Erreur de communication avec Supabase : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

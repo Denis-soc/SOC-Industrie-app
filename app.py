@@ -96,7 +96,7 @@ with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
     # 1. INITIALISATION SÉCURISÉE (On force une liste vide si rien n'existe)
-    if 'panier_stock' not in st.session_state or not isinstance(st.session_state.panier, list):
+    if 'panier_stock' not in st.session_state or not isinstance(st.session_state.panier_stock, list):
         st.session_state.panier_stock = []
     
     try:

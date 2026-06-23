@@ -122,6 +122,7 @@ with tab0:
         st.subheader("État du stock détaillé")
         df_stock['quantité'] = pd.to_numeric(df_stock['quantité'], errors='coerce').fillna(0)
         
+        # On affiche sans la colonne 'taille'
         df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']].copy()
         st.data_editor(
             df_display, 
@@ -139,7 +140,7 @@ with tab0:
                     type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
                     qte = st.number_input("Quantité", min_value=1, step=1)
                 with col_b:
-                    taille = st.selectbox("Taille", options=st.session_state.liste_tailles)
+                    taille = st.selectbox("Taille", options=st.session_state.get('liste_tailles', ['N/A']))
                     collab = st.text_input("Collaborateur")
                     chantier = st.text_input("Code Chantier")
                 
@@ -173,13 +174,19 @@ with tab0:
                     if not ligne.empty:
                         stock_act = int(ligne.iloc[0]['quantité'])
                         new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
+                        
                         supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).execute()
                         
                         supabase.table("historique_mouvements").insert({
-                            "date": str(date.today()), "num_interne": item['ref'], "type_mvt": item['type'], 
-                            "quantite": int(item['qte']), "code_chantier": str(item['chantier'] or ""), 
-                            "collaborateur": str(item['nom'] or ""), "taille": str(item['taille'])
+                            "date": str(date.today()), 
+                            "num_interne": item['ref'], 
+                            "type_mvt": item['type'], 
+                            "quantite": int(item['qte']), 
+                            "code_chantier": str(item.get('chantier', '')), 
+                            "collaborateur": str(item.get('nom', '')), 
+                            "taille": str(item.get('taille', 'N/A'))
                         }).execute()
+                
                 st.session_state.panier_stock = []
                 st.success("Mise à jour réussie !")
                 st.rerun()
@@ -203,14 +210,16 @@ with tab0:
         for h in headers: pdf.cell(35, 10, h, border=1)
         pdf.ln()
         for _, row in df_hist.sort_values(by="date", ascending=False).iterrows():
-            for d in [str(row.get('date', '')), str(row.get('num_interne', '')), str(row.get('type_mvt', '')), 
-                      str(row.get('quantite', '')), str(row.get('taille', '')), str(row.get('collaborateur', '')), str(row.get('code_chantier', ''))]:
+            # Conversion sécurisée en string pour le PDF
+            vals = [str(row.get(k, '')) for k in ['date', 'num_interne', 'type_mvt', 'quantite', 'taille', 'collaborateur', 'code_chantier']]
+            for d in vals:
                 pdf.cell(35, 8, d, border=1)
             pdf.ln()
         st.download_button("📥 Télécharger le PDF", pdf.output(dest='S').encode('latin-1'), "historique.pdf", "application/pdf")
 
     # Suppression Historique
     if col_del.button("🗑️ Vider l'historique complet"):
+        # On utilise une condition qui cible toute la table
         supabase.table("historique_mouvements").delete().neq("id", -1).execute()
         st.rerun()
 with tab1:

@@ -161,15 +161,28 @@ with tab0:
 
                 if st.button("✅ Valider tout le panier"):
                     for item in st.session_state.panier_stock:
-                        # Nettoyage pour garantir le typage
-                        ref_cible = str(item['ref']) # Force en string
-                        taille_cible = str(item['taille'])
-                        qte_a_ajuster = int(item['qte'])
+                        # DÉBOGAGE : On vérifie ce qu'on cherche
+                        st.write(f"Cherche: Réf {item['ref']} | Taille {item['taille']}")
                         
-                        # Récupération de la ligne actuelle
-                        # On filtre d'abord en mémoire pour vérifier
-                        ligne = df_stock[(df_stock['num_interne'].astype(str) == ref_cible) & 
-                                         (df_stock['taille'].astype(str) == taille_cible)]
+                        # Récupération de la ligne réelle depuis Supabase pour vérification
+                        verif = supabase.table("materiel").select("*").eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
+                        
+                        if not verif.data:
+                            st.error(f"❌ Impossible de trouver la ligne pour Réf {item['ref']} et Taille {item['taille']} dans Supabase.")
+                        else:
+                            st.success(f"✅ Ligne trouvée ! Stock actuel : {verif.data[0]['quantité']}")
+                            
+                            # Calcul de la nouvelle quantité
+                            stock_act = int(verif.data[0]['quantité'])
+                            new_qte = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
+                            
+                            # MISE À JOUR
+                            res = supabase.table("materiel").update({"quantité": new_qte}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
+                            st.write("Résultat mise à jour:", res.data)
+
+                    st.session_state.panier_stock = []
+                    import time; time.sleep(1)
+                    st.rerun()
                         
                         if not ligne.empty:
                             stock_act = int(ligne.iloc[0]['quantité'])

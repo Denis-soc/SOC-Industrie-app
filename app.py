@@ -180,6 +180,33 @@ with tab0:
         
     except Exception as e:
         st.error(f"Erreur technique : {e}")
+        # --- ACTIONS HISTORIQUE (PDF & SUPPRESSION) ---
+            st.subheader("⚙️ Actions Historique")
+            col_pdf, col_del = st.columns(2)
+            
+            # Bouton PDF
+            if col_pdf.button("📄 Exporter Historique en PDF"):
+                from fpdf import FPDF
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", 'B', 16)
+                pdf.cell(200, 10, txt="Historique des mouvements", ln=True, align='C')
+                pdf.set_font("Arial", size=10)
+                
+                # Ajout des données
+                for _, row in df_hist.sort_values(by="date", ascending=False).iterrows():
+                    pdf.cell(200, 10, txt=f"{row['date']} - {row['num_interne']} ({row['taille']}) : {row['type_mvt']} de {row['quantite']}", ln=True)
+                
+                # Sauvegarde en mémoire
+                pdf_output = pdf.output(dest='S').encode('latin-1')
+                st.download_button(label="📥 Télécharger le PDF", data=pdf_output, file_name="historique_stock.pdf", mime="application/pdf")
+
+            # Bouton Suppression Historique
+            if col_del.button("🗑️ Vider l'historique complet"):
+                # Supabase : suppression de toutes les lignes
+                supabase.table("historique_mouvements").delete().neq("id", -1).execute()
+                st.success("Historique supprimé !")
+                st.rerun()
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

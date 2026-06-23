@@ -95,23 +95,29 @@ from datetime import date
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # 1. Initialisation sécurisée
+    # Initialisation
     if 'panier_stock' not in st.session_state or not isinstance(st.session_state.panier_stock, list):
         st.session_state.panier_stock = []
     
     try:
-        # Récupération des données
-        response = supabase.table("materiel").select("*").execute()
-        df_stock = pd.DataFrame(response.data)
+        # Récupération
+        df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
+        df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
         
         if not df_stock.empty:
-            # Affichage stock
-            df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']].copy()
-            st.subheader("État du stock")
-            st.data_editor(df_display, use_container_width=True, disabled=True)
+            st.subheader("État du stock par taille")
+            # Affichage avec taille
+            df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'taille', 'quantité']].copy()
+            df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0)
+            
+            st.data_editor(
+                df_display,
+                column_config={"photo_url": st.column_config.ImageColumn("Photo")},
+                use_container_width=True, disabled=True
+            )
 
-            # 2. Formulaire d'ajout
-            with st.expander("➕ Ajouter un mouvement au panier_stock", expanded=True):
+            # --- FORMULAIRE ---
+            with st.expander("➕ Ajouter mouvement", expanded=True):
                 with st.form("panier_form", clear_on_submit=True):
                     col_a, col_b = st.columns(2)
                     with col_a:
@@ -130,30 +136,29 @@ with tab0:
                         })
                         st.rerun()
 
-            # 3. Gestion du panier
+            # --- HISTORIQUE ---
+            st.subheader("📜 Historique")
+            if not df_hist.empty:
+                st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
+            
+            # --- VALIDATION ---
             if st.session_state.panier_stock:
                 st.subheader("🛒 panier_stock en attente")
-                
-                # CRÉATION DU DATAFRAME (L'erreur venait d'ici)
-                df_panier_stock = pd.DataFrame(st.session_state.panier_stock)
-                st.dataframe(df_panier_stock, use_container_width=True)
-                
+                df_panier = pd.DataFrame(st.session_state.panier_stock)
+                st.dataframe(df_panier)
                 if st.button("✅ Valider tout"):
                     for item in st.session_state.panier_stock:
-                        # Logique Supabase
+                        # Mise à jour (Note : on cible par ref ET taille)
+                        supabase.table("materiel").update({"quantité": 100}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
                         supabase.table("historique_mouvements").insert({
-                            "date": str(date.today()),
-                            "num_interne": item['ref'],
-                            "type_mvt": item['type'],
-                            "quantite": int(item['qte']),
-                            "code_chantier": item['chantier'],
-                            "collaborateur": item['nom'],
-                            "taille": item['taille']
+                            "date": str(date.today()), "num_interne": item['ref'], 
+                            "type_mvt": item['type'], "quantite": int(item['qte']),
+                            "code_chantier": item['chantier'], "collaborateur": item['nom'], "taille": item['taille']
                         }).execute()
                     st.session_state.panier_stock = []
                     st.rerun()
         else:
-            st.write("Chargement des données...")
+            st.write("Données en cours de chargement...")
     except Exception as e:
         st.error(f"Erreur : {e}")
 with tab1:

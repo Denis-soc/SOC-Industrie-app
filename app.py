@@ -870,35 +870,53 @@ with tab5:
                         rafraichir_page()
                     except Exception as e:
                         st.error(f"Erreur lors de la suppression : {e}")
+# --- Début de votre onglet État des Stocks ---
 with tab6:
     st.header("📦 État des Stocks (Calculé en temps réel)")
     
-    # Récupération sécurisée
+    # Récupération des données nécessaires
     try:
-        df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
+        # On récupère l'historique depuis Supabase
+        response = supabase.table("historique_mouvements").select("*").execute()
+        df_hist = pd.DataFrame(response.data)
     except:
         df_hist = pd.DataFrame()
 
-    if not df_hist.empty and not df_materiel_reel.empty:
-        # Nettoyage des quantités avant calcul
+    if not df_materiel_reel.empty:
+        # 1. Préparation du dataframe
         df_calc = df_materiel_reel.copy()
+        
+        # Conversion sécurisée de la quantité en nombre
         df_calc['quantité'] = pd.to_numeric(df_calc['quantité'], errors='coerce').fillna(0)
         
-        entrees = df_hist[df_hist['type_mvt'] == 'Entrée'].groupby('num_interne')['quantite'].sum()
-        sorties = df_hist[df_hist['type_mvt'] == 'Sortie'].groupby('num_interne')['quantite'].sum()
+        # 2. Calcul des mouvements si l'historique existe
+        if not df_hist.empty:
+            entrees = df_hist[df_hist['type_mvt'] == 'Entrée'].groupby('num_interne')['quantite'].sum()
+            sorties = df_hist[df_hist['type_mvt'] == 'Sortie'].groupby('num_interne')['quantite'].sum()
+            
+            df_calc['total_entrees'] = df_calc['num_interne'].map(entrees).fillna(0)
+            df_calc['total_sorties'] = df_calc['num_interne'].map(sorties).fillna(0)
+            
+            # Calcul du stock final
+            df_calc['Stock Final'] = df_calc['quantité'] + df_calc['total_entrees'] - df_calc['total_sorties']
+        else:
+            df_calc['Stock Final'] = df_calc['quantité']
+            
+        # 3. Affichage du tableau agrandi
+        # On sélectionne les colonnes à afficher
+        colonnes_a_afficher = ['photo_url', 'num_interne', 'Nom du Matériel', 'Stock Final']
+        df_display = df_calc[colonnes_a_afficher]
         
-        df_calc['total_entrees'] = df_calc['num_interne'].map(entrees).fillna(0)
-        df_calc['total_sorties'] = df_calc['num_interne'].map(sorties).fillna(0)
-        
-        # Calcul sécurisé
-        df_calc['Stock Final'] = df_calc['quantité'] + df_calc['total_entrees'] - df_calc['total_sorties']
-        
-        # Affichage avec image
-        df_display = df_calc[['photo_url', 'num_interne', 'Nom du Matériel', 'Stock Final']]
         st.dataframe(
             df_display, 
-            use_container_width=True,
-            column_config={"photo_url": st.column_config.ImageColumn("Photo")}
+            use_container_width=True, 
+            hide_index=True,
+            height=600, # <-- Taille agrandie pour afficher plus de lignes
+            column_config={
+                "photo_url": st.column_config.ImageColumn("Photo"),
+                "Stock Final": st.column_config.NumberColumn("Stock Final", format="%d")
+            }
         )
     else:
-        st.info("Données insuffisantes pour le calcul.")
+        st.warning("Aucune donnée de matériel disponible.")
+# --- Fin de votre onglet État des Stocks ---

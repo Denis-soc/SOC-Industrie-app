@@ -777,65 +777,12 @@ with tab5:
                     except Exception as e:
                         st.error(f"Erreur Supabase : {e}")
 
-    elif mode == "Modifier" and not df_materiel_reel.empty:
-        if "num_interne" in df_materiel_reel.columns:
-            liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if str(n).strip() != ""]
-            sel = st.selectbox("Choisir le matériel à modifier (par son N° Interne actuel)", liste_numeros)
-            
-            if sel:
-                item = df_materiel_reel[df_materiel_reel["num_interne"] == sel].iloc[0]
-                
-                with st.form("form_modifier"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.info(f"Ancien N° Interne : {sel}")
-                        nouveau_num = st.text_input("Nouveau N° Interne", value=str(item.get("num_interne", "")))
-                        nom = st.text_input("Nom du matériel", value=str(item.get("Nom du Matériel", "")))
-                        
-                        cat_index = 0
-                        item_cat = item.get("categorie")
-                        if item_cat in categories_officielles:
-                            cat_index = categories_officielles.index(item_cat)
-                        
-                        cat = st.selectbox("Catégorie", categories_officielles, index=cat_index, key="mod_cat")
-                        
-                        if cat == "EPI":
-                            taille = st.text_input("Taille", value=str(item.get("taille", "")))
-                        else:
-                            taille = ""
-                            
-                        try:
-                            val_perio = int(item.get("periodicite_controle", 0))
-                        except:
-                            val_perio = 0
-                            
-                        if cat in ["Outillage", "Matériel Commun"]:
-                            val_achat = pd.to_datetime(item.get("date_achat")).date() if item.get("date_achat") else None
-                            val_prochain = pd.to_datetime(item.get("date_prochain_controle")).date() if item.get("date_prochain_controle") else None
-                            
-                            date_achat = st.date_input("Date d'achat", value=val_achat, key="mod_achat")
-                            perio = st.number_input("Intervalle / Périodicité contrôle (mois)", min_value=0, value=val_perio, key="mod_perio")
-                            date_prochain = st.date_input("Date du prochain contrôle", value=val_prochain, key="mod_prochain")
-                        else:
-                            date_achat = None
-                            date_prochain = None
-
-                    with col2:
-                        ref = st.text_input("Référence", value=str(item.get("reference", "")))
-                        ns = st.text_input("N° de série", value=str(item.get("num_serie", "")))
-                        fourn = st.text_input("Fournisseur", value=str(item.get("fournisseur", "")))
-                        url_photo = st.text_input("URL de la photo (lien http)", value=str(item.get("photo_url", "")))
-                        
-                        if cat not in ["Outillage", "Matériel Commun"]:
-                            perio = st.number_input("Périodicité contrôle (mois)", min_value=0, value=val_perio, key="mod_perio_autre")
-                    
-                    submit = st.form_submit_button("Enregistrer les modifications")
-                    
-                    if submit:
+    if submit:
                         if not nouveau_num.strip():
                             st.error("Le N° Interne ne peut pas être vide.")
                         else:
-                            upd = {
+                            # Création du dictionnaire de mise à jour
+                            upd_brut = {
                                 "num_interne": nouveau_num,
                                 "Nom du Matériel": nom, 
                                 "categorie": cat, 
@@ -848,6 +795,14 @@ with tab5:
                                 "date_achat": str(date_achat) if date_achat else None,
                                 "date_prochain_controle": str(date_prochain) if date_prochain else None
                             }
+                            
+                            # NETTOYAGE : On supprime les champs vides pour ne pas écraser les données 
+                            # et éviter les erreurs de formatage Supabase
+                            upd = {k: v for k, v in upd_brut.items() if v != "" and v is not None}
+                            
+                            # On force le maintien du num_interne pour la clause WHERE
+                            upd["num_interne"] = nouveau_num 
+
                             try:
                                 supabase.table("materiel").update(upd).eq("num_interne", sel).execute()
                                 st.success("Modifié avec succès !")

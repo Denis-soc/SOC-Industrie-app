@@ -707,9 +707,8 @@ with tab4:
     else:
         st.info("Aucune donnée de localisation disponible.")
 with tab5:
-    st.header("⚙️ Administration & Gestion des Stocks")
-    
-    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True) # Ligne 712 (même décalage)
+    st.header("⚙️ Administration & Gestion des Stocks")  # <--- Ajoutez 4 espaces ici
+    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
         
     categories_officielles = ["EPI", "Outillage", "Consommables", "Matériel Commun"] # Ligne 715 (même décalage)
         

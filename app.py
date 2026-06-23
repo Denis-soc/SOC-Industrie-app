@@ -159,29 +159,21 @@ with tab0:
 
                 if st.button("✅ Valider tout le panier"):
                     for item in st.session_state.panier_stock:
-                        # DÉBOGAGE : On vérifie ce qu'on cherche
-                        st.write(f"Cherche: Réf {item['ref']} | Taille {item['taille']}")
+                        # On pointe maintenant vers la bonne table
+                        table_ref = supabase.table("stock_catalogue")
                         
-                        # Récupération de la ligne réelle depuis Supabase pour vérification
-                        verif = supabase.table("materiel").select("*").eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
+                        # Récupération de la ligne
+                        verif = table_ref.select("*").eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
                         
                         if not verif.data:
-                            st.error(f"❌ Impossible de trouver la ligne pour Réf {item['ref']} et Taille {item['taille']} dans Supabase.")
+                            st.error(f"❌ Ligne introuvable dans stock_catalogue : Réf {item['ref']}, Taille {item['taille']}")
                         else:
-                            st.success(f"✅ Ligne trouvée ! Stock actuel : {verif.data[0]['quantité']}")
-                            
-                            # Calcul de la nouvelle quantité
                             stock_act = int(verif.data[0]['quantité'])
                             new_qte = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
                             
-                            # MISE À JOUR
-                            res = supabase.table("materiel").update({"quantité": new_qte}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
-                            st.write("Résultat mise à jour:", res.data)
-
-                    st.session_state.panier_stock = []
-                    import time; time.sleep(1)
-                    st.rerun()
-                     
+                            # Mise à jour
+                            table_ref.update({"quantité": new_qte}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
+                            st.success(f"✅ Stock mis à jour dans stock_catalogue pour {item['ref']}")
             # --- D. HISTORIQUE & ACTIONS ---
             st.subheader("📜 Historique des mouvements")
             if not df_hist.empty:

@@ -874,49 +874,66 @@ with tab5:
 with tab6:
     st.header("📦 État des Stocks (Calculé en temps réel)")
     
-    # Récupération des données nécessaires
+    # 1. Récupération des données
     try:
-        # On récupère l'historique depuis Supabase
         response = supabase.table("historique_mouvements").select("*").execute()
         df_hist = pd.DataFrame(response.data)
     except:
         df_hist = pd.DataFrame()
 
     if not df_materiel_reel.empty:
-        # 1. Préparation du dataframe
         df_calc = df_materiel_reel.copy()
-        
-        # Conversion sécurisée de la quantité en nombre
         df_calc['quantité'] = pd.to_numeric(df_calc['quantité'], errors='coerce').fillna(0)
         
-        # 2. Calcul des mouvements si l'historique existe
+        # Calcul du stock
         if not df_hist.empty:
             entrees = df_hist[df_hist['type_mvt'] == 'Entrée'].groupby('num_interne')['quantite'].sum()
             sorties = df_hist[df_hist['type_mvt'] == 'Sortie'].groupby('num_interne')['quantite'].sum()
-            
             df_calc['total_entrees'] = df_calc['num_interne'].map(entrees).fillna(0)
             df_calc['total_sorties'] = df_calc['num_interne'].map(sorties).fillna(0)
-            
-            # Calcul du stock final
             df_calc['Stock Final'] = df_calc['quantité'] + df_calc['total_entrees'] - df_calc['total_sorties']
         else:
             df_calc['Stock Final'] = df_calc['quantité']
-            
-        # 3. Affichage du tableau agrandi
-        # On sélectionne les colonnes à afficher
-        colonnes_a_afficher = ['photo_url', 'num_interne', 'Nom du Matériel', 'Stock Final']
-        df_display = df_calc[colonnes_a_afficher]
+
+        # 2. Sélecteur de catégorie
+        categories = ["Tous"] + sorted([c for c in df_calc['categorie'].unique() if c])
+        cat_choisie = st.selectbox("Filtrer par catégorie :", categories)
         
+        df_display = df_calc.copy()
+        if cat_choisie != "Tous":
+            df_display = df_display[df_display['categorie'] == cat_choisie]
+            
+        # 3. Affichage du tableau
         st.dataframe(
-            df_display, 
-            use_container_width=True, 
-            hide_index=True,
-            height=600, # <-- Taille agrandie pour afficher plus de lignes
-            column_config={
-                "photo_url": st.column_config.ImageColumn("Photo"),
-                "Stock Final": st.column_config.NumberColumn("Stock Final", format="%d")
-            }
+            df_display[['photo_url', 'num_interne', 'Nom du Matériel', 'Stock Final']], 
+            use_container_width=True, hide_index=True, height=600,
+            column_config={"photo_url": st.column_config.ImageColumn("Photo")}
         )
+        
+        # 4. Bouton PDF
+        if st.button("📥 Générer le PDF de ce catalogue"):
+            from fpdf import FPDF
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", 'B', 16)
+            pdf.cell(0, 10, f"Stock : {cat_choisie}", ln=True, align='C')
+            pdf.ln(10)
+            
+            pdf.set_font("Arial", 'B', 10)
+            pdf.cell(30, 10, "N. Int", border=1)
+            pdf.cell(100, 10, "Designation", border=1)
+            pdf.cell(30, 10, "Stock", border=1)
+            pdf.ln()
+            
+            pdf.set_font("Arial", size=10)
+            for _, row in df_display.iterrows():
+                pdf.cell(30, 10, str(row['num_interne']), border=1)
+                pdf.cell(100, 10, str(row['Nom du Matériel']), border=1)
+                pdf.cell(30, 10, str(int(row['Stock Final'])), border=1)
+                pdf.ln()
+            
+            pdf_output = pdf.output(dest='S').encode('latin-1')
+            st.download_button("📥 Télécharger le fichier PDF", pdf_output, f"stock_{cat_choisie}.pdf", "application/pdf")
+            
     else:
-        st.warning("Aucune donnée de matériel disponible.")
-# --- Fin de votre onglet État des Stocks ---
+        st.warning("Aucune donnée.")

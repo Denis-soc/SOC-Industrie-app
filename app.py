@@ -711,7 +711,7 @@ with tab5:
     
     mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True) # Ligne 712 (même décalage)
         
-        categories_officielles = ["EPI", "Outillage", "Consommables", "Matériel Commun"] # Ligne 715 (même décalage)
+    categories_officielles = ["EPI", "Outillage", "Consommables", "Matériel Commun"] # Ligne 715 (même décalage)
         
         
     if mode == "Ajouter":

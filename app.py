@@ -92,15 +92,15 @@ with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
     try:
-        # Récupération de toute la table
+        # 1. Récupération des données
         response = supabase.table("materiel").select("*").execute()
         df = pd.DataFrame(response.data)
         
         if not df.empty:
-            # Liste des colonnes à afficher dans l'ordre souhaité
+            # 2. Liste des colonnes à afficher
             colonnes_a_afficher = ['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']
             
-            # Affichage du tableau avec images
+            # 3. Affichage du tableau avec images
             st.subheader("État du stock")
             st.data_editor(
                 df[colonnes_a_afficher],
@@ -111,10 +111,10 @@ with tab0:
                     "quantité": "Stock"
                 },
                 use_container_width=True,
-                disabled=True # Le tableau est en lecture seule ici
+                disabled=True
             )
             
-            # Formulaire de mouvement
+            # 4. Formulaire de mouvement
             with st.form("mouvement_form"):
                 article_select = st.selectbox("Article concerné", df['Nom du Matériel'])
                 type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
@@ -123,15 +123,21 @@ with tab0:
                 if st.form_submit_button("Valider le mouvement"):
                     # Récupération de l'article sélectionné
                     article_data = df[df['Nom du Matériel'] == article_select].iloc[0]
-                    stock_actuel = int(article_data['quantité'])
+                    
+                    # Sécurité : On force la valeur à 0 si elle est vide (None)
+                    stock_actuel_brut = article_data['quantité']
+                    stock_actuel = int(stock_actuel_brut) if pd.notnull(stock_actuel_brut) else 0
                     
                     # Calcul du nouveau stock
-                    nouveau_stock = stock_actuel + int(quantite_mvt) if type_mvt == "Entrée" else stock_actuel - int(quantite_mvt)
+                    if type_mvt == "Entrée":
+                        nouveau_stock = stock_actuel + int(quantite_mvt)
+                    else:
+                        nouveau_stock = max(0, stock_actuel - int(quantite_mvt))
                     
                     # Mise à jour dans Supabase
                     supabase.table("materiel").update({"quantité": nouveau_stock}).eq("Nom du Matériel", article_select).execute()
                     
-                    st.success(f"Stock mis à jour pour {article_select} !")
+                    st.success(f"Stock mis à jour pour {article_select} : {stock_actuel} ➡️ {nouveau_stock}")
                     st.rerun()
         else:
             st.info("Aucun matériel trouvé dans la table.")

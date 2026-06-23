@@ -72,7 +72,7 @@ st.title("🏗️ SOC Industrie – Gestion Interne")
 
 # Définition des onglets
 tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "📦 Tableau de Bord Olivier",
+    "📦 Mouvements stock",
     "🛒 Catalogues EPI/Consommables/Outillage",
     "📋 Suivi Contrôles & Étalonnages",
     "📅 Réservation matériel",

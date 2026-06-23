@@ -870,3 +870,33 @@ with tab5:
                         rafraichir_page()
                     except Exception as e:
                         st.error(f"Erreur lors de la suppression : {e}")
+with tab6:
+    st.header("📦 État Global des Stocks")
+    st.info("Visualisation complète du stock actuel. Aucune modification possible ici.")
+    
+    if not df_materiel_reel.empty:
+        # On sélectionne les colonnes pertinentes pour l'affichage
+        # Ajustez la liste des colonnes selon votre base de données réelle
+        colonnes_a_afficher = ['num_interne', 'Nom du Matériel', 'categorie', 'taille', 'quantité', 'est_a_l_agence']
+        
+        # On vérifie quelles colonnes existent réellement pour éviter les erreurs
+        cols_dispo = [c for c in colonnes_a_afficher if c in df_materiel_reel.columns]
+        
+        df_affichage_stock = df_materiel_reel[cols_dispo].copy()
+        
+        # Optionnel : améliorer le rendu des colonnes booléennes ou numériques
+        if 'est_a_l_agence' in df_affichage_stock.columns:
+            df_affichage_stock['est_a_l_agence'] = df_affichage_stock['est_a_l_agence'].replace({True: "✅ Oui", False: "❌ Non"})
+        
+        # Affichage du tableau statique
+        st.dataframe(
+            df_affichage_stock, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "quantité": st.column_config.NumberColumn("Quantité en Stock", format="%d"),
+                "est_a_l_agence": "Au dépôt ?"
+            }
+        )
+    else:
+        st.warning("Aucune donnée de stock disponible.")

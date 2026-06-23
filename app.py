@@ -90,63 +90,55 @@ def rafraichir_page():
 # 5. CONTENU DES ONGLETS
 import streamlit as st
 import pandas as pd
+from datetime import date
 
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
     try:
-        # 1. Récupération de toute la table
+        # Récupération données
         response = supabase.table("materiel").select("*").execute()
         df = pd.DataFrame(response.data)
         
         if not df.empty:
-            # 2. Liste des colonnes à afficher
-            colonnes_a_afficher = ['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']
+            # Affichage tableau (épuré)
+            st.dataframe(df[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']], use_container_width=True)
             
-            # 3. Affichage du tableau avec images
-            st.subheader("État du stock")
-            st.data_editor(
-                df[colonnes_a_afficher],
-                column_config={
-                    "photo_url": st.column_config.ImageColumn("Photo", help="Aperçu du matériel"),
-                    "num_interne": "Réf. Interne",
-                    "Nom du Matériel": "Désignation",
-                    "quantité": "Stock"
-                },
-                use_container_width=True,
-                disabled=True
-            )
-            
-            # 4. Formulaire de mouvement
             with st.form("mouvement_form"):
-                article_select = st.selectbox("Article concerné", df['Nom du Matériel'])
-                type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
-                quantite_mvt = st.number_input("Quantité", min_value=1, step=1)
+                # Choix par référence interne
+                ref_select = st.selectbox("Choisir la Réf. Interne", df['num_interne'].unique())
                 
-                if st.form_submit_button("Valider le mouvement"):
-                    # Récupération de l'article sélectionné
-                    article_data = df[df['Nom du Matériel'] == article_select].iloc[0]
-                    
-                    # Sécurité : On force la valeur à 0 si elle est vide
+                # Saisie des informations
+                col1, col2 = st.columns(2)
+                with col1:
+                    date_op = st.date_input("Date de l'opération", date.today())
+                    type_mvt = st.radio("Type", ["Entrée", "Sortie"])
+                with col2:
+                    code_chantier = st.text_input("Code Chantier")
+                    quantite_mvt = st.number_input("Quantité", min_value=1, step=1)
+                
+                if st.form_submit_button("Valider et Historiser"):
+                    # Calcul stock
+                    article_data = df[df['num_interne'] == ref_select].iloc[0]
                     stock_actuel = int(article_data['quantité']) if pd.notnull(article_data['quantité']) else 0
+                    nouveau_stock = stock_actuel + int(quantite_mvt) if type_mvt == "Entrée" else max(0, stock_actuel - int(quantite_mvt))
                     
-                    # Calcul du nouveau stock
-                    if type_mvt == "Entrée":
-                        nouveau_stock = stock_actuel + int(quantite_mvt)
-                    else:
-                        nouveau_stock = max(0, stock_actuel - int(quantite_mvt))
+                    # 1. Mise à jour du stock
+                    supabase.table("materiel").update({"quantité": nouveau_stock}).eq("num_interne", ref_select).execute()
                     
-                    # MISE À JOUR : On utilise 'num_interne' qui est unique
-                    # Cela garantit que la bonne ligne est modifiée dans Supabase
-                    supabase.table("materiel").update({"quantité": nouveau_stock}).eq("num_interne", article_data['num_interne']).execute()
+                    # 2. Enregistrement dans l'historique
+                    supabase.table("historique_mouvements").insert({
+                        "date": str(date_op),
+                        "num_interne": ref_select,
+                        "type_mvt": type_mvt,
+                        "quantite": int(quantite_mvt),
+                        "code_chantier": code_chantier
+                    }).execute()
                     
-                    st.success(f"Stock mis à jour pour {article_select} : {stock_actuel} ➡️ {nouveau_stock}")
+                    st.success(f"Mouvement enregistré pour {ref_select} !")
                     st.rerun()
-        else:
-            st.info("Aucun matériel trouvé dans la table.")
-            
     except Exception as e:
-        st.error(f"Erreur de communication avec Supabase : {e}")
+        st.error(f"Erreur : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

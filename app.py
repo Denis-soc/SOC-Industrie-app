@@ -92,33 +92,43 @@ with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
     try:
-        # On sélectionne TOUT avec '*' pour éviter les erreurs de noms de colonnes complexes
+        # Récupération de toute la table
         response = supabase.table("materiel").select("*").execute()
         df = pd.DataFrame(response.data)
         
         if not df.empty:
-            # On renomme les colonnes pour l'affichage (optionnel, pour faire joli)
-            # Assurez-vous que les noms ici correspondent exactement à votre base
-            # Si le nom est "Nom du Matériel", Python le lira dans 'df' avec les espaces.
+            # Liste des colonnes à afficher dans l'ordre souhaité
+            colonnes_a_afficher = ['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']
             
+            # Affichage du tableau avec images
             st.subheader("État du stock")
-            st.dataframe(df, use_container_width=True)
+            st.data_editor(
+                df[colonnes_a_afficher],
+                column_config={
+                    "photo_url": st.column_config.ImageColumn("Photo", help="Aperçu du matériel"),
+                    "num_interne": "Réf. Interne",
+                    "Nom du Matériel": "Désignation",
+                    "quantité": "Stock"
+                },
+                use_container_width=True,
+                disabled=True # Le tableau est en lecture seule ici
+            )
             
+            # Formulaire de mouvement
             with st.form("mouvement_form"):
-                # On utilise la colonne avec espaces telle qu'elle est dans la base
-                # Si cela plante, c'est que le nom dans la base est légèrement différent
                 article_select = st.selectbox("Article concerné", df['Nom du Matériel'])
                 type_mvt = st.radio("Type de mouvement", ["Entrée", "Sortie"])
                 quantite_mvt = st.number_input("Quantité", min_value=1, step=1)
                 
-                if st.form_submit_button("Valider"):
-                    # Récupération de l'article via son nom
+                if st.form_submit_button("Valider le mouvement"):
+                    # Récupération de l'article sélectionné
                     article_data = df[df['Nom du Matériel'] == article_select].iloc[0]
                     stock_actuel = int(article_data['quantité'])
                     
+                    # Calcul du nouveau stock
                     nouveau_stock = stock_actuel + int(quantite_mvt) if type_mvt == "Entrée" else stock_actuel - int(quantite_mvt)
                     
-                    # Mise à jour
+                    # Mise à jour dans Supabase
                     supabase.table("materiel").update({"quantité": nouveau_stock}).eq("Nom du Matériel", article_select).execute()
                     
                     st.success(f"Stock mis à jour pour {article_select} !")
@@ -127,7 +137,7 @@ with tab0:
             st.info("Aucun matériel trouvé dans la table.")
             
     except Exception as e:
-        st.error(f"Erreur technique : {e}")
+        st.error(f"Erreur de communication avec Supabase : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

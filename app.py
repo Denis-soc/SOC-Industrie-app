@@ -709,11 +709,11 @@ with tab4:
 with tab5:
     st.header("⚙️ Administration & Gestion des Stocks")
     
-    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True)
-
-    # Liste unique et harmonisée de vos 4 catégories
-    categories_officielles = ["EPI", "Outillage", "Consommables", "Matériel Commun"]
-
+    mode = st.radio("Action", ["Ajouter", "Modifier", "Supprimer"], horizontal=True) # Ligne 712 (même décalage)
+        
+        categories_officielles = ["EPI", "Outillage", "Consommables", "Matériel Commun"] # Ligne 715 (même décalage)
+        
+        
     if mode == "Ajouter":
         with st.form("form_ajouter"):
             col1, col2 = st.columns(2)

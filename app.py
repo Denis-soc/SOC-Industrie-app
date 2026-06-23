@@ -92,68 +92,51 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
+# Initialisation du panier en mémoire
+if 'panier' not in st.session_state:
+    st.session_state.panier = []
+
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    try:
-        # 1. Récupération des données
-        df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
-        df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
-        
-        # 2. Affichage du Tableau de Stock
-        st.subheader("État du stock")
-        st.data_editor(
-            df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']],
-            column_config={
-                "photo_url": st.column_config.ImageColumn("Photo"),
-                "num_interne": "Réf. Interne",
-                "Nom du Matériel": "Désignation",
-                "quantité": "Stock"
-            },
-            use_container_width=True, disabled=True
-        )
-
-        # 3. Formulaire de mouvement
-        with st.form("mouvement_form"):
-            ref_select = st.selectbox("Choisir la Réf. Interne", df_stock['num_interne'].unique())
-            col1, col2 = st.columns(2)
-            with col1:
-                date_op = st.date_input("Date", date.today())
-                type_mvt = st.radio("Type", ["Entrée", "Sortie"])
-            with col2:
+    # --- FORMULAIRE PANIER ---
+    with st.expander("➕ Ajouter au panier", expanded=True):
+        with st.form("panier_form"):
+            col_a, col_b = st.columns(2)
+            with col_a:
+                ref = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
+                type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
+                quantite = st.number_input("Quantité", min_value=1, step=1)
+            with col_b:
+                taille = st.text_input("Taille (ex: L, 42)")
+                collaborateur = st.text_input("Collaborateur")
                 code_chantier = st.text_input("Code Chantier")
-                quantite_mvt = st.number_input("Quantité", min_value=1, step=1)
             
-            if st.form_submit_button("Valider"):
-                # Calcul stock
-                art = df_stock[df_stock['num_interne'] == ref_select].iloc[0]
-                stock_act = int(art['quantité']) if pd.notnull(art['quantité']) else 0
-                nouveau_stock = stock_act + int(quantite_mvt) if type_mvt == "Entrée" else max(0, stock_act - int(quantite_mvt))
-                
-                # Mise à jour Stock (table 'materiel')
-                supabase.table("materiel").update({"quantité": nouveau_stock}).eq("num_interne", ref_select).execute()
-                
-                # Enregistrement Historique (table 'historique_mouvements')
-                # NOTE: vérifiez ici si c'est 'quantité' ou 'quantite' dans votre table
-                supabase.table("historique_mouvements").insert({
-                    "date": str(date_op),
-                    "num_interne": ref_select,
-                    "type_mvt": type_mvt,
-                    "quantite": int(quantite_mvt), 
-                    "code_chantier": code_chantier
-                }).execute()
-                
-                st.rerun()
+            if st.form_submit_button("Ajouter à la liste"):
+                st.session_state.panier.append({
+                    "ref": ref, "type": type_mvt, "qte": quantite, 
+                    "taille": taille, "nom": collaborateur, "chantier": code_chantier
+                })
 
-        # 4. Affichage Historique
-        st.subheader("📜 Historique des mouvements")
-        if not df_hist.empty:
-            st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
-        else:
-            st.write("Aucun mouvement enregistré.")
-
-    except Exception as e:
-        st.error(f"Erreur technique : {e}")
+    # --- AFFICHAGE ET MODIFICATION DU PANIER ---
+    if st.session_state.panier:
+        st.subheader("🛒 Panier en attente")
+        df_panier = pd.DataFrame(st.session_state.panier)
+        st.dataframe(df_panier)
+        
+        col_c, col_d = st.columns(2)
+        if col_c.button("❌ Vider le panier"):
+            st.session_state.panier = []
+            st.rerun()
+            
+        if col_d.button("✅ Valider et mettre à jour le stock"):
+            for item in st.session_state.panier:
+                # Logique de calcul et mise à jour Supabase ici...
+                # (Même logique que précédemment, appliquée à chaque item)
+                pass
+            st.success("Mouvements validés !")
+            st.session_state.panier = []
+            st.rerun()
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

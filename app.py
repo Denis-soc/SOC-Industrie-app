@@ -186,12 +186,36 @@ with tab0:
                 pdf.add_page()
                 pdf.set_font("Arial", 'B', 16)
                 pdf.cell(200, 10, txt="Historique des mouvements", ln=True, align='C')
+                pdf.ln(10) # Petit saut de ligne
+                
                 pdf.set_font("Arial", size=10)
+                
+                # En-tête du tableau dans le PDF
+                pdf.cell(200, 10, txt="Date | Réf | Mvt | Qté | Taille | Collaborateur | Chantier", ln=True)
+                pdf.line(10, 30, 200, 30) # Ligne de séparation
+                
+                # Parcours de l'historique
                 for _, row in df_hist.sort_values(by="date", ascending=False).iterrows():
-                    pdf.cell(200, 10, txt=f"{row['date']} - {row['num_interne']} ({row['taille']}) : {row['type_mvt']} de {row['quantite']}", ln=True)
+                    # Conversion sécurisée en string pour éviter les erreurs avec les valeurs vides (None/NaN)
+                    date_val = str(row.get('date', ''))
+                    ref = str(row.get('num_interne', ''))
+                    mvt = str(row.get('type_mvt', ''))
+                    qte = str(row.get('quantite', ''))
+                    taille = str(row.get('taille', ''))
+                    nom = str(row.get('collaborateur', ''))
+                    chantier = str(row.get('code_chantier', ''))
+                    
+                    ligne_texte = f"{date_val} | {ref} | {mvt} | {qte} | {taille} | {nom} | {chantier}"
+                    pdf.cell(200, 7, txt=ligne_texte, ln=True)
+                
+                # Sauvegarde en mémoire
                 pdf_output = pdf.output(dest='S').encode('latin-1')
-                st.download_button(label="📥 Télécharger le PDF", data=pdf_output, file_name="historique_stock.pdf", mime="application/pdf")
-
+                st.download_button(
+                    label="📥 Télécharger le PDF complet", 
+                    data=pdf_output, 
+                    file_name="historique_complet.pdf", 
+                    mime="application/pdf"
+                )
             if col_del.button("🗑️ Vider l'historique complet"):
                 supabase.table("historique_mouvements").delete().neq("id", -1).execute()
                 st.success("Historique supprimé !")

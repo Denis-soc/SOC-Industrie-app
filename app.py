@@ -152,21 +152,24 @@ with tab0:
                 
                 if st.button("✅ Valider tout le panier"):
                     for item in st.session_state.panier_stock:
-                        # 1. Mise à jour Stock
-                        mask = (df_stock['num_interne'] == item['ref']) & (df_stock['taille'] == item['taille'])
-                        ligne = df_stock[mask]
-                        if not ligne.empty:
-                            actuel = int(ligne.iloc[0][COL_STOCK])
-                            nouveau = actuel + int(item['qte']) if item['type'] == "Entrée" else max(0, actuel - int(item['qte']))
-                            
-                            supabase.table("materiel").update({COL_STOCK: nouveau}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
+                        # 1. On affiche ce qu'on cherche
+                        st.write(f"Recherche de : Réf={item['ref']}, Taille={item['taille']}")
                         
-                        # 2. Insertion Historique
-                        supabase.table("historique_mouvements").insert({
-                            "date": str(date.today()), "num_interne": item['ref'], "type_mvt": item['type'], 
-                            COL_HISTO: int(item['qte']), "code_chantier": item['chantier'], "collaborateur": item['nom'], "taille": item['taille']
-                        }).execute()
-                    
+                        # 2. On exécute la mise à jour avec affichage du résultat
+                        try:
+                            # On tente la mise à jour
+                            resultat = supabase.table("materiel").update(
+                                {COL_STOCK: 999} # Test temporaire : mettre 999 pour voir si ça bouge
+                            ).eq("num_interne", str(item['ref'])).eq("taille", str(item['taille'])).execute()
+                            
+                            st.write("Résultat Supabase :", resultat.data)
+                            
+                            if not resultat.data:
+                                st.error(f"Aucune ligne trouvée pour Réf: {item['ref']} et Taille: {item['taille']}. Vérifiez les espaces ou les majuscules !")
+                        
+                        except Exception as e:
+                            st.error(f"Erreur Supabase : {e}")
+
                     st.session_state.panier_stock = []
                     st.success("Opération réussie !")
                     import time; time.sleep(1)

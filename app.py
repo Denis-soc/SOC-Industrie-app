@@ -96,59 +96,62 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
+import streamlit as st
+import pandas as pd
+from datetime import date
+
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # 1. Initialisation
+    # Initialisation globale du panier
     if 'panier_stock' not in st.session_state or not isinstance(st.session_state.panier_stock, list):
         st.session_state.panier_stock = []
     
+    # Assurez-vous que liste_tailles est définie (à définir en haut du fichier app.py)
+    if 'liste_tailles' not in st.session_state:
+        st.session_state.liste_tailles = ["", "S", "M", "L", "XL", "XXL", "XXXL", "XXXXL", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52"]
+
     try:
+        # Récupération données Supabase
         df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
         df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
         
         if not df_stock.empty:
-            # --- ÉTAT DU STOCK ---
+            # --- STOCK ---
             st.subheader("État du stock")
             df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'taille', 'quantité']].copy()
             df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0)
-            
             st.data_editor(df_display, column_config={"photo_url": st.column_config.ImageColumn("Photo")}, use_container_width=True, disabled=True)
 
-            # --- FORMULAIRE D'AJOUT ---
+            # --- FORMULAIRE ---
             with st.expander("➕ Ajouter un mouvement", expanded=True):
                 with st.form("panier_form", clear_on_submit=True):
-                    col_a, col_b = st.columns(2)
-                    with col_a:
+                    c1, c2 = st.columns(2)
+                    with c1:
                         ref = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
                         type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
                         qte = st.number_input("Quantité", min_value=1, step=1)
-                    with col_b:
+                    with c2:
                         taille = st.selectbox("Taille", options=st.session_state.liste_tailles)
                         collab = st.text_input("Collaborateur")
                         chantier = st.text_input("Code Chantier")
                     
                     if st.form_submit_button("Ajouter à la liste"):
-                        st.session_state.panier_stock.append({
-                            "id_temp": len(st.session_state.panier_stock), # ID unique pour suppression
-                            "ref": ref, "type": type_mvt, "qte": int(qte), 
-                            "taille": taille, "nom": collab, "chantier": chantier
-                        })
+                        st.session_state.panier_stock.append({"ref": ref, "type": type_mvt, "qte": int(qte), "taille": taille, "nom": collab, "chantier": chantier})
                         st.rerun()
 
-            # --- GESTION DU PANIER (AVEC SUPPRESSION) ---
+            # --- PANIER MODIFIABLE ---
             if st.session_state.panier_stock:
                 st.subheader("🛒 Panier en attente")
+                panier_df = pd.DataFrame(st.session_state.panier_stock)
                 
-                # Affichage dynamique avec boutons de suppression
-                for i, item in enumerate(st.session_state.panier_stock):
-                    col1, col2, col3 = st.columns([4, 1, 1])
-                    col1.write(f"{item['ref']} | {item['type']} | {item['qte']} | {item['taille']} | {item['nom']}")
-                    
-                    # Bouton Supprimer
-                    if col3.button("🗑️", key=f"del_{i}"):
-                        st.session_state.panier_stock.pop(i)
-                        st.rerun()
+                # Éditeur pour modifier ou supprimer (en effaçant la ligne)
+                edited_panier = st.data_editor(
+                    panier_df,
+                    column_config={"taille": st.column_config.SelectboxColumn("Taille", options=st.session_state.liste_tailles)},
+                    use_container_width=True
+                )
+                st.session_state.panier_stock = edited_panier.to_dict('records')
 
                 if st.button("✅ Valider tout le panier"):
                     for item in st.session_state.panier_stock:
@@ -160,7 +163,7 @@ with tab0:
                             new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
                             supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
                         
-                        # Insertion Historique
+                        # Historique
                         supabase.table("historique_mouvements").insert({
                             "date": str(date.today()), "num_interne": item['ref'], "type_mvt": item['type'], 
                             "quantite": int(item['qte']), "code_chantier": item['chantier'], 
@@ -168,16 +171,18 @@ with tab0:
                         }).execute()
                     
                     st.session_state.panier_stock = []
+                    st.success("Mise à jour réussie !")
                     st.rerun()
 
-            st.subheader("📜 Historique des mouvements")
+            # --- HISTORIQUE ---
+            st.subheader("📜 Historique")
             if not df_hist.empty:
                 st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
         else:
-            st.info("Chargement en cours...")
+            st.warning("Aucune donnée.")
             
     except Exception as e:
-        st.error(f"Erreur technique : {e}")
+        st.error(f"Erreur : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

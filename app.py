@@ -114,7 +114,7 @@ with tab0:
         df_stock = pd.DataFrame(data_stock.data)
         df_hist = pd.DataFrame(data_hist.data)
     except Exception as e:
-        st.error(f"Erreur : {e}")
+        st.error(f"Erreur de connexion : {e}")
         st.stop()
     
     # --- A. TABLEAU ÉTAT DU STOCK (Sans la taille) ---
@@ -122,7 +122,6 @@ with tab0:
         st.subheader("État du stock détaillé")
         df_stock['quantité'] = pd.to_numeric(df_stock['quantité'], errors='coerce').fillna(0)
         
-        # Affichage simplifié sans la colonne taille
         df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']].copy()
         st.data_editor(
             df_display, 
@@ -131,7 +130,7 @@ with tab0:
             disabled=True
         )
 
-        # --- B. FORMULAIRE D'AJOUT (Avec taille pour l'historique) ---
+        # --- B. FORMULAIRE D'AJOUT ---
         with st.expander("➕ Ajouter un mouvement au stock", expanded=True):
             with st.form("panier_form", clear_on_submit=True):
                 col_a, col_b = st.columns(2)
@@ -151,11 +150,10 @@ with tab0:
                     })
                     st.rerun()
 
-        # --- C. PANIER (Avec taille et suppression) ---
+        # --- C. PANIER ---
         if st.session_state.panier_stock:
             st.subheader("🛒 Panier en attente")
-            df_panier = pd.DataFrame(st.session_state.panier_stock)
-            st.dataframe(df_panier, use_container_width=True)
+            st.dataframe(pd.DataFrame(st.session_state.panier_stock), use_container_width=True)
             
             col1, col2 = st.columns([1, 4])
             if col1.button("🗑️ Vider le panier"):
@@ -163,45 +161,58 @@ with tab0:
                 st.rerun()
             
             with col2:
-                idx_a_supprimer = st.selectbox("Ligne à retirer", range(len(st.session_state.panier_stock)), format_func=lambda x: f"Ligne {x+1}")
+                idx_del = st.selectbox("Ligne à supprimer", range(len(st.session_state.panier_stock)), format_func=lambda x: f"Ligne {x+1}")
                 if st.button("Retirer cette ligne"):
-                    st.session_state.panier_stock.pop(idx_a_supprimer)
+                    st.session_state.panier_stock.pop(idx_del)
                     st.rerun()
 
-            # --- Validation ---
             if st.button("✅ Valider tout le panier"):
                 for item in st.session_state.panier_stock:
-                    # Calcul du stock sur N° Interne uniquement
                     mask = (df_stock['num_interne'] == item['ref'])
                     ligne = df_stock[mask]
-                    
                     if not ligne.empty:
                         stock_act = int(ligne.iloc[0]['quantité'])
                         new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
-                        
-                        # Mise à jour Stock (Sans taille)
                         supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).execute()
                         
-                        # Insertion Historique (Avec taille)
                         supabase.table("historique_mouvements").insert({
-                            "date": str(date.today()), 
-                            "num_interne": item['ref'], 
-                            "type_mvt": item['type'], 
-                            "quantite": int(item['qte']), 
-                            "code_chantier": str(item['chantier'] or ""), 
-                            "collaborateur": str(item['nom'] or ""),
-                            "taille": str(item['taille'])
+                            "date": str(date.today()), "num_interne": item['ref'], "type_mvt": item['type'], 
+                            "quantite": int(item['qte']), "code_chantier": str(item['chantier'] or ""), 
+                            "collaborateur": str(item['nom'] or ""), "taille": str(item['taille'])
                         }).execute()
-                
                 st.session_state.panier_stock = []
                 st.success("Mise à jour réussie !")
                 st.rerun()
 
-    # --- D. HISTORIQUE ---
+    # --- D. HISTORIQUE & ACTIONS ---
     st.subheader("📜 Historique des mouvements")
     if not df_hist.empty:
-        # Affichage complet avec taille
         st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
+    
+    col_pdf, col_del = st.columns(2)
+    
+    # Export PDF
+    if col_pdf.button("📄 Exporter Historique en PDF"):
+        from fpdf import FPDF
+        pdf = FPDF(orientation='L')
+        pdf.add_page()
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 10, "Historique des mouvements", ln=True, align='C')
+        pdf.set_font("Arial", size=9)
+        headers = ["Date", "Réf", "Mvt", "Qté", "Taille", "Collaborateur", "Chantier"]
+        for h in headers: pdf.cell(35, 10, h, border=1)
+        pdf.ln()
+        for _, row in df_hist.sort_values(by="date", ascending=False).iterrows():
+            for d in [str(row.get('date', '')), str(row.get('num_interne', '')), str(row.get('type_mvt', '')), 
+                      str(row.get('quantite', '')), str(row.get('taille', '')), str(row.get('collaborateur', '')), str(row.get('code_chantier', ''))]:
+                pdf.cell(35, 8, d, border=1)
+            pdf.ln()
+        st.download_button("📥 Télécharger le PDF", pdf.output(dest='S').encode('latin-1'), "historique.pdf", "application/pdf")
+
+    # Suppression Historique
+    if col_del.button("🗑️ Vider l'historique complet"):
+        supabase.table("historique_mouvements").delete().neq("id", -1).execute()
+        st.rerun()
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

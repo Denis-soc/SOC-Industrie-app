@@ -95,7 +95,7 @@ from datetime import date
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # 1. INITIALISATION SÉCURISÉE (On force une liste vide si rien n'existe)
+    # 1. Initialisation sécurisée
     if 'panier_stock' not in st.session_state or not isinstance(st.session_state.panier_stock, list):
         st.session_state.panier_stock = []
     
@@ -105,64 +105,42 @@ with tab0:
         df_stock = pd.DataFrame(response.data)
         
         if not df_stock.empty:
-            # Nettoyage affichage
+            # Affichage stock
             df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']].copy()
-            df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0)
-            
             st.subheader("État du stock")
-            st.data_editor(
-                df_display,
-                column_config={"photo_url": st.column_config.ImageColumn("Photo")},
-                use_container_width=True, disabled=True
-            )
+            st.data_editor(df_display, use_container_width=True, disabled=True)
 
-            # 2. FORMULAIRE "Ajouter au Panier"
+            # 2. Formulaire d'ajout
             with st.expander("➕ Ajouter un mouvement au panier_stock", expanded=True):
-                with st.form("panier_stock_form", clear_on_submit=True):
+                with st.form("panier_form", clear_on_submit=True):
                     col_a, col_b = st.columns(2)
                     with col_a:
-                        ref_select = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
+                        ref = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
                         type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
-                        qte_input = st.number_input("Quantité", min_value=1, step=1)
+                        qte = st.number_input("Quantité", min_value=1, step=1)
                     with col_b:
                         taille = st.text_input("Taille")
-                        collaborateur = st.text_input("Collaborateur")
+                        collab = st.text_input("Collaborateur")
                         chantier = st.text_input("Code Chantier")
                     
                     if st.form_submit_button("Ajouter à la liste"):
-                        # Ajout sécurisé dans la liste
                         st.session_state.panier_stock.append({
-                            "ref": ref_select, 
-                            "type": type_mvt, 
-                            "qte": int(qte_input),
-                            "taille": taille, 
-                            "nom": collaborateur, 
-                            "chantier": chantier
+                            "ref": ref, "type": type_mvt, "qte": qte, 
+                            "taille": taille, "nom": collab, "chantier": chantier
                         })
                         st.rerun()
 
-            # 3. GESTION DU PANIER (Affichage et Validation)
+            # 3. Gestion du panier
             if st.session_state.panier_stock:
                 st.subheader("🛒 panier_stock en attente")
-                # Construction sécurisée du DataFrame
-                df_panier = pd.DataFrame(st.session_state.panier_stock)
+                
+                # CRÉATION DU DATAFRAME (L'erreur venait d'ici)
+                df_panier_stock = pd.DataFrame(st.session_state.panier_stock)
                 st.dataframe(df_panier_stock, use_container_width=True)
                 
-                col_c, col_d = st.columns(2)
-                if col_c.button("❌ Vider le panier_stock"):
-                    st.session_state.panier_stock = []
-                    st.rerun()
-                
-                if col_d.button("✅ Valider tout"):
+                if st.button("✅ Valider tout"):
                     for item in st.session_state.panier_stock:
-                        # Mise à jour Stock
-                        art = df_stock[df_stock['num_interne'] == item['ref']].iloc[0]
-                        stock_act = int(art['quantité']) if pd.notnull(art['quantité']) else 0
-                        new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
-                        
-                        supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).execute()
-                        
-                        # Insertion Historique
+                        # Logique Supabase
                         supabase.table("historique_mouvements").insert({
                             "date": str(date.today()),
                             "num_interne": item['ref'],
@@ -172,14 +150,12 @@ with tab0:
                             "collaborateur": item['nom'],
                             "taille": item['taille']
                         }).execute()
-                    
-                    st.session_state.panier = []
-                    st.success("Opérations validées !")
+                    st.session_state.panier_stock = []
                     st.rerun()
         else:
-            st.info("Aucune donnée matérielle trouvée.")
+            st.write("Chargement des données...")
     except Exception as e:
-        st.error(f"Erreur technique : {e}")
+        st.error(f"Erreur : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

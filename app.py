@@ -99,16 +99,17 @@ from datetime import date
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # 1. Initialisation
+    # 1. Initialisation sécurisée
     if 'panier_stock' not in st.session_state or not isinstance(st.session_state.panier_stock, list):
         st.session_state.panier_stock = []
     
     try:
+        # Récupération des données fraîches
         df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
         df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
         
-        # --- A. TABLEAU ÉTAT DU STOCK ---
         if not df_stock.empty:
+            # --- A. TABLEAU ÉTAT DU STOCK ---
             st.subheader("État du stock détaillé")
             df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'taille', 'quantité']].copy()
             df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0)
@@ -134,21 +135,18 @@ with tab0:
                         })
                         st.rerun()
 
-            # --- C. PANIER EN FORMAT TABLEAU (Affichage propre) ---
+            # --- C. PANIER (Format Tableau) ---
             if st.session_state.panier_stock:
                 st.subheader("🛒 Panier en attente")
-                
-                # On affiche le panier sous forme de DataFrame (le look que vous aimez)
                 df_panier = pd.DataFrame(st.session_state.panier_stock)
                 st.dataframe(df_panier, use_container_width=True)
                 
-                # Suppression : Bouton pour vider ou supprimer par ligne
+                # Gestion Suppression
                 cols = st.columns([1, 1, 4])
                 if cols[0].button("🗑️ Vider le panier"):
                     st.session_state.panier_stock = []
                     st.rerun()
                 
-                # Pour supprimer une ligne spécifique, on liste les index
                 index_a_supprimer = cols[1].selectbox("Supprimer ligne n°", range(len(st.session_state.panier_stock)))
                 if cols[1].button("Retirer cette ligne"):
                     st.session_state.panier_stock.pop(index_a_supprimer)
@@ -173,38 +171,34 @@ with tab0:
                     st.success("Mise à jour réussie !")
                     st.rerun()
 
-          # --- D. HISTORIQUE ---
-                st.subheader("📜 Historique des mouvements")
-                if not df_hist.empty:
-                    st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
+            # --- D. HISTORIQUE ---
+            st.subheader("📜 Historique des mouvements")
+            if not df_hist.empty:
+                st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
+
+            # --- E. ACTIONS HISTORIQUE (PDF & SUPPRESSION) ---
+            st.subheader("⚙️ Actions Historique")
+            col_pdf, col_del = st.columns(2)
             
-                # --- ACTIONS HISTORIQUE (PDF & SUPPRESSION) ---
-                st.subheader("⚙️ Actions Historique")
-                col_pdf, col_del = st.columns(2)
-                
-                # Bouton PDF
-                if col_pdf.button("📄 Exporter Historique en PDF"):
-                    from fpdf import FPDF
-                    pdf = FPDF()
-                    pdf.add_page()
-                    pdf.set_font("Arial", 'B', 16)
-                    pdf.cell(200, 10, txt="Historique des mouvements", ln=True, align='C')
-                    pdf.set_font("Arial", size=10)
-                    
-                    # Ajout des données
-                    for _, row in df_hist.sort_values(by="date", ascending=False).iterrows():
-                        pdf.cell(200, 10, txt=f"{row['date']} - {row['num_interne']} ({row['taille']}) : {row['type_mvt']} de {row['quantite']}", ln=True)
-                    
-                    # Sauvegarde en mémoire
-                    pdf_output = pdf.output(dest='S').encode('latin-1')
-                    st.download_button(label="📥 Télécharger le PDF", data=pdf_output, file_name="historique_stock.pdf", mime="application/pdf")
-            
-                # Bouton Suppression Historique
-                if col_del.button("🗑️ Vider l'historique complet"):
-                    # Supabase : suppression de toutes les lignes
-                    supabase.table("historique_mouvements").delete().neq("id", -1).execute()
-                    st.success("Historique supprimé !")
-                    st.rerun()
+            if col_pdf.button("📄 Exporter Historique en PDF"):
+                from fpdf import FPDF
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", 'B', 16)
+                pdf.cell(200, 10, txt="Historique des mouvements", ln=True, align='C')
+                pdf.set_font("Arial", size=10)
+                for _, row in df_hist.sort_values(by="date", ascending=False).iterrows():
+                    pdf.cell(200, 10, txt=f"{row['date']} - {row['num_interne']} ({row['taille']}) : {row['type_mvt']} de {row['quantite']}", ln=True)
+                pdf_output = pdf.output(dest='S').encode('latin-1')
+                st.download_button(label="📥 Télécharger le PDF", data=pdf_output, file_name="historique_stock.pdf", mime="application/pdf")
+
+            if col_del.button("🗑️ Vider l'historique complet"):
+                supabase.table("historique_mouvements").delete().neq("id", -1).execute()
+                st.success("Historique supprimé !")
+                st.rerun()
+        
+    except Exception as e:
+        st.error(f"Erreur technique : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

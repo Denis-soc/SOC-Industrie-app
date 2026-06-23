@@ -99,17 +99,17 @@ from datetime import date
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # 1. Initialisation sécurisée
+    # 1. Initialisation
     if 'panier_stock' not in st.session_state or not isinstance(st.session_state.panier_stock, list):
         st.session_state.panier_stock = []
     
     try:
-        # Récupération des données fraîches
+        # Récupération données Supabase
         df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
         df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
         
+        # --- A. TABLEAU ÉTAT DU STOCK ---
         if not df_stock.empty:
-            # --- A. TABLEAU ÉTAT DU STOCK ---
             st.subheader("État du stock détaillé")
             df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'taille', 'quantité']].copy()
             df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0)
@@ -135,13 +135,12 @@ with tab0:
                         })
                         st.rerun()
 
-            # --- C. PANIER (Format Tableau) ---
+            # --- C. PANIER ---
             if st.session_state.panier_stock:
                 st.subheader("🛒 Panier en attente")
                 df_panier = pd.DataFrame(st.session_state.panier_stock)
                 st.dataframe(df_panier, use_container_width=True)
                 
-                # Gestion Suppression
                 cols = st.columns([1, 1, 4])
                 if cols[0].button("🗑️ Vider le panier"):
                     st.session_state.panier_stock = []
@@ -166,21 +165,18 @@ with tab0:
                             "quantite": int(item['qte']), "code_chantier": str(item['chantier']), 
                             "collaborateur": str(item['nom']), "taille": str(item['taille'])
                         }).execute()
-                    
                     st.session_state.panier_stock = []
-                    st.success("Mise à jour réussie !")
                     st.rerun()
 
-            # --- D. HISTORIQUE ---
+            # --- D. HISTORIQUE & ACTIONS ---
             st.subheader("📜 Historique des mouvements")
             if not df_hist.empty:
                 st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
-
-            # --- E. ACTIONS HISTORIQUE (PDF & SUPPRESSION) ---
+            
             st.subheader("⚙️ Actions Historique")
             col_pdf, col_del = st.columns(2)
             
-           if col_pdf.button("📄 Exporter Historique en PDF"):
+            if col_pdf.button("📄 Exporter Historique en PDF"):
                 from fpdf import FPDF
                 pdf = FPDF(orientation='L')
                 pdf.add_page()
@@ -200,11 +196,11 @@ with tab0:
                     pdf.ln()
                 pdf_output = pdf.output(dest='S').encode('latin-1')
                 st.download_button("📥 Télécharger le PDF", pdf_output, "historique.pdf", "application/pdf")
+
             if col_del.button("🗑️ Vider l'historique complet"):
                 supabase.table("historique_mouvements").delete().neq("id", -1).execute()
-                st.success("Historique supprimé !")
                 st.rerun()
-        
+                
     except Exception as e:
         st.error(f"Erreur technique : {e}")
 with tab1:

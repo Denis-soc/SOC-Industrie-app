@@ -92,51 +92,94 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
-# Initialisation du panier en mémoire
+# 1. Initialisation de l'état du panier
 if 'panier' not in st.session_state:
     st.session_state.panier = []
 
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # --- FORMULAIRE PANIER ---
-    with st.expander("➕ Ajouter au panier", expanded=True):
-        with st.form("panier_form"):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                ref = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
-                type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
-                quantite = st.number_input("Quantité", min_value=1, step=1)
-            with col_b:
-                taille = st.text_input("Taille (ex: L, 42)")
-                collaborateur = st.text_input("Collaborateur")
-                code_chantier = st.text_input("Code Chantier")
-            
-            if st.form_submit_button("Ajouter à la liste"):
-                st.session_state.panier.append({
-                    "ref": ref, "type": type_mvt, "qte": quantite, 
-                    "taille": taille, "nom": collaborateur, "chantier": code_chantier
-                })
-
-    # --- AFFICHAGE ET MODIFICATION DU PANIER ---
-    if st.session_state.panier:
-        st.subheader("🛒 Panier en attente")
-        df_panier = pd.DataFrame(st.session_state.panier)
-        st.dataframe(df_panier)
+    try:
+        # 2. Récupération des données (Charger en premier)
+        response = supabase.table("materiel").select("*").execute()
+        df_stock = pd.DataFrame(response.data)
         
-        col_c, col_d = st.columns(2)
-        if col_c.button("❌ Vider le panier"):
-            st.session_state.panier = []
-            st.rerun()
+        if not df_stock.empty:
+            # 3. Affichage tableau
+            st.subheader("État du stock")
+            st.data_editor(
+                df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']],
+                column_config={
+                    "photo_url": st.column_config.ImageColumn("Photo"),
+                    "num_interne": "Réf. Interne",
+                    "Nom du Matériel": "Désignation",
+                    "quantité": "Stock"
+                },
+                use_container_width=True, disabled=True
+            )
+
+            # 4. Formulaire "Ajouter au Panier"
+            with st.expander("➕ Ajouter un mouvement au panier", expanded=True):
+                with st.form("panier_form"):
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        ref_select = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
+                        type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
+                        qte_input = st.number_input("Quantité", min_value=1, step=1)
+                    with col_b:
+                        taille = st.text_input("Taille")
+                        collaborateur = st.text_input("Collaborateur")
+                        chantier = st.text_input("Code Chantier")
+                    
+                    if st.form_submit_button("Ajouter à la liste"):
+                        st.session_state.panier.append({
+                            "ref": ref_select, "type": type_mvt, "qte": qte_input,
+                            "taille": taille, "nom": collaborateur, "chantier": chantier
+                        })
+                        st.rerun()
+
+            # 5. Gestion du panier
+            if st.session_state.panier:
+                st.subheader("🛒 Panier en attente")
+                df_panier = pd.DataFrame(st.session_state.panier)
+                st.dataframe(df_panier)
+                
+                col_c, col_d = st.columns(2)
+                if col_c.button("❌ Vider le panier"):
+                    st.session_state.panier = []
+                    st.rerun()
+                
+                if col_d.button("✅ Valider et mettre à jour le stock"):
+                    for item in st.session_state.panier:
+                        # Recherche des données actuelles
+                        art = df_stock[df_stock['num_interne'] == item['ref']].iloc[0]
+                        stock_act = int(art['quantité']) if pd.notnull(art['quantité']) else 0
+                        
+                        # Calcul
+                        new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
+                        
+                        # Mise à jour Supabase
+                        supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).execute()
+                        
+                        # Historisation
+                        supabase.table("historique_mouvements").insert({
+                            "date": str(date.today()),
+                            "num_interne": item['ref'],
+                            "type_mvt": item['type'],
+                            "quantite": item['qte'],
+                            "code_chantier": item['chantier'],
+                            "collaborateur": item['nom'],
+                            "taille": item['taille']
+                        }).execute()
+                    
+                    st.success("Mouvements validés et historique mis à jour !")
+                    st.session_state.panier = []
+                    st.rerun()
+        else:
+            st.warning("La base de données est vide.")
             
-        if col_d.button("✅ Valider et mettre à jour le stock"):
-            for item in st.session_state.panier:
-                # Logique de calcul et mise à jour Supabase ici...
-                # (Même logique que précédemment, appliquée à chaque item)
-                pass
-            st.success("Mouvements validés !")
-            st.session_state.panier = []
-            st.rerun()
+    except Exception as e:
+        st.error(f"Erreur : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

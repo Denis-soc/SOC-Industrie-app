@@ -160,39 +160,37 @@ with tab0:
                     st.rerun()
 
                 if st.button("✅ Valider tout le panier"):
-                    # --- NOUVEAU : Nettoyage des données ---
-                    # On remplace les NaN/None par des chaînes vides
                     for item in st.session_state.panier_stock:
-                        if isinstance(item.get('nom'), float): item['nom'] = ""
-                        if isinstance(item.get('chantier'), float): item['chantier'] = ""
-                        # Assurer que la quantité est un entier
-                        item['qte'] = int(item['qte']) if item['qte'] is not None else 0
-                    
-                    # --- Maintenant, on traite le panier ---
-                    for item in st.session_state.panier_stock:
-                        # 1. Calcul et mise à jour Supabase
-                        mask = (df_stock['num_interne'] == item['ref']) & (df_stock['taille'] == item['taille'])
-                        ligne = df_stock[mask]
+                        # Nettoyage pour garantir le typage
+                        ref_cible = str(item['ref']) # Force en string
+                        taille_cible = str(item['taille'])
+                        qte_a_ajuster = int(item['qte'])
+                        
+                        # Récupération de la ligne actuelle
+                        # On filtre d'abord en mémoire pour vérifier
+                        ligne = df_stock[(df_stock['num_interne'].astype(str) == ref_cible) & 
+                                         (df_stock['taille'].astype(str) == taille_cible)]
+                        
                         if not ligne.empty:
                             stock_act = int(ligne.iloc[0]['quantité'])
-                            new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
+                            new_stock = stock_act + qte_a_ajuster if item['type'] == "Entrée" else max(0, stock_act - qte_a_ajuster)
                             
-                            supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
+                            # Mise à jour avec conversion explicite
+                            supabase.table("materiel").update({"quantité": int(new_stock)}).eq("num_interne", ref_cible).eq("taille", taille_cible).execute()
                         
-                        # 2. Insertion dans l'historique
+                        # Insertion historique
                         supabase.table("historique_mouvements").insert({
-                            "date": str(date.today()), "num_interne": item['ref'], "type_mvt": item['type'], 
-                            "quantite": int(item['qte']), "code_chantier": str(item['chantier']), 
-                            "collaborateur": str(item['nom']), "taille": str(item['taille'])
+                            "date": str(date.today()), 
+                            "num_interne": ref_cible, 
+                            "type_mvt": item['type'], 
+                            "quantite": qte_a_ajuster, 
+                            "code_chantier": str(item['chantier']), 
+                            "collaborateur": str(item['nom']), 
+                            "taille": taille_cible
                         }).execute()
                     
-                    # 3. VIDER LE PANIER ET FORCER LE REFRESH
                     st.session_state.panier_stock = []
-                    
-                    # --- NOUVEAUTÉ : Petit délai pour laisser Supabase finir l'écriture ---
-                    import time
-                    time.sleep(0.5) 
-                    
+                    st.cache_data.clear() # On vide le cache pour recharger les données fraîches
                     st.success("Mise à jour réussie !")
                     st.rerun()
 

@@ -181,7 +181,7 @@ with tab0:
     except Exception as e:
         st.error(f"Erreur technique : {e}")
         # --- ACTIONS HISTORIQUE (PDF & SUPPRESSION) ---
-            st.subheader("⚙️ Actions Historique")
+        st.subheader("⚙️ Actions Historique")
             col_pdf, col_del = st.columns(2)
             
             # Bouton PDF

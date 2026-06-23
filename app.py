@@ -95,16 +95,17 @@ from datetime import date
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # 1. Initialisation SÉCURISÉE du panier (forcée en liste)
+    # 1. INITIALISATION SÉCURISÉE (On force une liste vide si rien n'existe)
     if 'panier' not in st.session_state or not isinstance(st.session_state.panier, list):
         st.session_state.panier = []
     
     try:
         # Récupération des données
-        df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
+        response = supabase.table("materiel").select("*").execute()
+        df_stock = pd.DataFrame(response.data)
         
         if not df_stock.empty:
-            # Affichage tableau
+            # Nettoyage affichage
             df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']].copy()
             df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0)
             
@@ -115,7 +116,7 @@ with tab0:
                 use_container_width=True, disabled=True
             )
 
-            # 2. Formulaire "Ajouter au Panier"
+            # 2. FORMULAIRE "Ajouter au Panier"
             with st.expander("➕ Ajouter un mouvement au panier", expanded=True):
                 with st.form("panier_form", clear_on_submit=True):
                     col_a, col_b = st.columns(2)
@@ -129,13 +130,18 @@ with tab0:
                         chantier = st.text_input("Code Chantier")
                     
                     if st.form_submit_button("Ajouter à la liste"):
+                        # Ajout sécurisé dans la liste
                         st.session_state.panier.append({
-                            "ref": ref_select, "type": type_mvt, "qte": int(qte_input),
-                            "taille": taille, "nom": collaborateur, "chantier": chantier
+                            "ref": ref_select, 
+                            "type": type_mvt, 
+                            "qte": int(qte_input),
+                            "taille": taille, 
+                            "nom": collaborateur, 
+                            "chantier": chantier
                         })
                         st.rerun()
 
-            # 3. Gestion du Panier (Affichage et Validation)
+            # 3. GESTION DU PANIER (Affichage et Validation)
             if st.session_state.panier:
                 st.subheader("🛒 Panier en attente")
                 # Construction sécurisée du DataFrame
@@ -149,15 +155,14 @@ with tab0:
                 
                 if col_d.button("✅ Valider tout"):
                     for item in st.session_state.panier:
-                        # Calcul du nouveau stock
+                        # Mise à jour Stock
                         art = df_stock[df_stock['num_interne'] == item['ref']].iloc[0]
                         stock_act = int(art['quantité']) if pd.notnull(art['quantité']) else 0
                         new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
                         
-                        # Mise à jour Supabase
                         supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).execute()
                         
-                        # Insertion historique
+                        # Insertion Historique
                         supabase.table("historique_mouvements").insert({
                             "date": str(date.today()),
                             "num_interne": item['ref'],
@@ -169,12 +174,12 @@ with tab0:
                         }).execute()
                     
                     st.session_state.panier = []
-                    st.success("Mouvements validés !")
+                    st.success("Opérations validées !")
                     st.rerun()
         else:
-            st.warning("Aucune donnée matérielle trouvée.")
+            st.info("Aucune donnée matérielle trouvée.")
     except Exception as e:
-        st.error(f"Erreur : {e}")
+        st.error(f"Erreur technique : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

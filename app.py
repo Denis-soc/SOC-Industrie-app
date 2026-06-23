@@ -107,107 +107,76 @@ def get_data():
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
-    # Initialisation
-    if 'panier_stock' not in st.session_state or not isinstance(st.session_state.panier_stock, list):
-        st.session_state.panier_stock = []
+    # CONFIGURATION DES NOMS DE COLONNES (À ADAPTER SI BESOIN)
+    COL_STOCK = "quantité"    # <-- Mettez exactement le nom de la colonne dans Supabase
+    COL_HISTO = "quantite"    # <-- Mettez exactement le nom de la colonne dans Supabase
     
-    # Lecture forcée sans cache
+    if 'panier_stock' not in st.session_state: st.session_state.panier_stock = []
+    
     @st.cache_data(ttl=0)
-    def get_data():
+    def fetch_data():
         df_s = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
         df_h = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
         return df_s, df_h
 
     try:
-        df_stock, df_hist = get_data()
+        df_stock, df_hist = fetch_data()
         
-        # --- A. TABLEAU ÉTAT DU STOCK ---
+        # --- A. AFFICHAGE STOCK ---
         if not df_stock.empty:
             st.subheader("État du stock détaillé")
             df_display = df_stock.copy()
-            # Nettoyage sécurisé de la colonne quantité
-            df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0).astype(int)
+            # Nettoyage sécurisé
+            df_display[COL_STOCK] = pd.to_numeric(df_display[COL_STOCK], errors='coerce').fillna(0).astype(int)
             st.dataframe(df_display, use_container_width=True)
 
             # --- B. FORMULAIRE ---
-            with st.expander("➕ Ajouter un mouvement au stock", expanded=True):
+            with st.expander("➕ Ajouter un mouvement", expanded=True):
                 with st.form("panier_form", clear_on_submit=True):
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        ref = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
-                        type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
-                        qte = st.number_input("Quantité", min_value=1, step=1)
-                    with col_b:
-                        taille = st.selectbox("Taille", options=st.session_state.liste_tailles)
-                        collab = st.text_input("Collaborateur")
-                        chantier = st.text_input("Code Chantier")
+                    c1, c2 = st.columns(2)
+                    ref = c1.selectbox("Réf", df_stock['num_interne'].unique())
+                    type_mvt = c1.radio("Type", ["Entrée", "Sortie"], horizontal=True)
+                    qte = c1.number_input("Quantité", min_value=1, step=1)
+                    taille = c2.selectbox("Taille", options=st.session_state.liste_tailles)
+                    nom = c2.text_input("Collaborateur")
+                    chantier = c2.text_input("Chantier")
                     
-                    if st.form_submit_button("Ajouter à la liste"):
-                        st.session_state.panier_stock.append({
-                            "ref": ref, "type": type_mvt, "qte": int(qte), 
-                            "taille": taille, "nom": str(collab), "chantier": str(chantier)
-                        })
+                    if st.form_submit_button("Ajouter"):
+                        st.session_state.panier_stock.append({"ref": ref, "type": type_mvt, "qte": int(qte), "taille": taille, "nom": nom, "chantier": chantier})
                         st.rerun()
 
-            # --- C. PANIER (Avec suppression) ---
+            # --- C. VALIDATION PANIER ---
             if st.session_state.panier_stock:
-                st.subheader("🛒 Panier en attente")
-                st.dataframe(pd.DataFrame(st.session_state.panier_stock), use_container_width=True)
+                st.subheader("🛒 Panier")
+                st.dataframe(pd.DataFrame(st.session_state.panier_stock))
                 
-                cols = st.columns([1, 1, 4])
-                if cols[0].button("🗑️ Vider le panier"):
-                    st.session_state.panier_stock = []
-                    st.rerun()
-                
-                index_a_supprimer = cols[1].selectbox("Supprimer ligne n°", range(len(st.session_state.panier_stock)))
-                if cols[1].button("Retirer cette ligne"):
-                    st.session_state.panier_stock.pop(index_a_supprimer)
-                    st.rerun()
-
                 if st.button("✅ Valider tout le panier"):
                     for item in st.session_state.panier_stock:
+                        # 1. Mise à jour Stock
                         mask = (df_stock['num_interne'] == item['ref']) & (df_stock['taille'] == item['taille'])
                         ligne = df_stock[mask]
                         if not ligne.empty:
-                            stock_act = int(ligne.iloc[0]['quantité'])
-                            new_qte = stock_act + int(item['qte']) if item['type'] == "Entrée" else max(0, stock_act - int(item['qte']))
-                            supabase.table("materiel").update({"quantité": new_qte}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
+                            actuel = int(ligne.iloc[0][COL_STOCK])
+                            nouveau = actuel + int(item['qte']) if item['type'] == "Entrée" else max(0, actuel - int(item['qte']))
+                            
+                            supabase.table("materiel").update({COL_STOCK: nouveau}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
                         
+                        # 2. Insertion Historique
                         supabase.table("historique_mouvements").insert({
                             "date": str(date.today()), "num_interne": item['ref'], "type_mvt": item['type'], 
-                            "quantite": int(item['qte']), "code_chantier": item['chantier'], 
-                            "collaborateur": item['nom'], "taille": item['taille']
+                            COL_HISTO: int(item['qte']), "code_chantier": item['chantier'], "collaborateur": item['nom'], "taille": item['taille']
                         }).execute()
+                    
                     st.session_state.panier_stock = []
-                    import time; time.sleep(0.5)
+                    st.success("Opération réussie !")
+                    import time; time.sleep(1)
                     st.rerun()
 
-            # --- D. HISTORIQUE & PDF TABLEAU ---
+            # --- D. HISTORIQUE ---
             st.subheader("📜 Historique")
             if not df_hist.empty:
                 st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
-            
-            st.subheader("⚙️ Actions Historique")
-            col_pdf, col_del = st.columns(2)
-            if col_pdf.button("📄 Exporter Historique en PDF"):
-                from fpdf import FPDF
-                pdf = FPDF(orientation='L'); pdf.add_page()
-                pdf.set_font("Arial", 'B', 16); pdf.cell(0, 10, "Historique des mouvements", ln=True, align='C')
-                pdf.set_font("Arial", 'B', 9)
-                cols_w = [25, 20, 20, 15, 20, 40, 40]
-                for h in ["Date", "Réf", "Mvt", "Qté", "Taille", "Collaborateur", "Chantier"]:
-                    pdf.cell(cols_w[cols_w.index(25) if h=="Date" else 0], 10, h, border=1) # simplification logique
-                pdf.ln()
-                pdf.set_font("Arial", size=9)
-                for _, r in df_hist.sort_values(by="date", ascending=False).iterrows():
-                    for i, d in enumerate([r.get('date',''), r.get('num_interne',''), r.get('type_mvt',''), r.get('quantite',''), r.get('taille',''), r.get('collaborateur',''), r.get('code_chantier','')]):
-                        pdf.cell(cols_w[i], 8, str(d), border=1)
-                    pdf.ln()
-                st.download_button("📥 Télécharger PDF", pdf.output(dest='S').encode('latin-1'), "historique.pdf", "application/pdf")
 
-            if col_del.button("🗑️ Vider l'historique"):
-                supabase.table("historique_mouvements").delete().neq("id", -1).execute()
-                st.rerun()
     except Exception as e:
         st.error(f"Erreur : {e}")
 with tab1:

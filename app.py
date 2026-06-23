@@ -96,8 +96,8 @@ with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
     # 1. INITIALISATION SÉCURISÉE (On force une liste vide si rien n'existe)
-    if 'panier' not in st.session_state or not isinstance(st.session_state.panier, list):
-        st.session_state.panier = []
+    if 'panier_stock' not in st.session_state or not isinstance(st.session_state.panier, list):
+        st.session_state.panier_stock = []
     
     try:
         # Récupération des données
@@ -117,8 +117,8 @@ with tab0:
             )
 
             # 2. FORMULAIRE "Ajouter au Panier"
-            with st.expander("➕ Ajouter un mouvement au panier", expanded=True):
-                with st.form("panier_form", clear_on_submit=True):
+            with st.expander("➕ Ajouter un mouvement au panier_stock", expanded=True):
+                with st.form("panier_stock_form", clear_on_submit=True):
                     col_a, col_b = st.columns(2)
                     with col_a:
                         ref_select = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
@@ -131,7 +131,7 @@ with tab0:
                     
                     if st.form_submit_button("Ajouter à la liste"):
                         # Ajout sécurisé dans la liste
-                        st.session_state.panier.append({
+                        st.session_state.panier_stock.append({
                             "ref": ref_select, 
                             "type": type_mvt, 
                             "qte": int(qte_input),
@@ -142,19 +142,19 @@ with tab0:
                         st.rerun()
 
             # 3. GESTION DU PANIER (Affichage et Validation)
-            if st.session_state.panier:
-                st.subheader("🛒 Panier en attente")
+            if st.session_state.panier_stock:
+                st.subheader("🛒 panier_stock en attente")
                 # Construction sécurisée du DataFrame
-                df_panier = pd.DataFrame(st.session_state.panier)
-                st.dataframe(df_panier, use_container_width=True)
+                df_panier = pd.DataFrame(st.session_state.panier_stock)
+                st.dataframe(df_panier_stock, use_container_width=True)
                 
                 col_c, col_d = st.columns(2)
-                if col_c.button("❌ Vider le panier"):
-                    st.session_state.panier = []
+                if col_c.button("❌ Vider le panier_stock"):
+                    st.session_state.panier_stock = []
                     st.rerun()
                 
                 if col_d.button("✅ Valider tout"):
-                    for item in st.session_state.panier:
+                    for item in st.session_state.panier_stock:
                         # Mise à jour Stock
                         art = df_stock[df_stock['num_interne'] == item['ref']].iloc[0]
                         stock_act = int(art['quantité']) if pd.notnull(art['quantité']) else 0

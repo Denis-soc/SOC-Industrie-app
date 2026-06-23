@@ -182,45 +182,24 @@ with tab0:
             
            if col_pdf.button("📄 Exporter Historique en PDF"):
                 from fpdf import FPDF
-                pdf = FPDF(orientation='L') # L pour Paysage, plus d'espace pour le tableau
+                pdf = FPDF(orientation='L')
                 pdf.add_page()
                 pdf.set_font("Arial", 'B', 16)
                 pdf.cell(0, 10, txt="Historique des mouvements", ln=True, align='C')
                 pdf.ln(5)
-                
-                # En-têtes du tableau (largeurs définies)
                 pdf.set_font("Arial", 'B', 9)
                 col_widths = [25, 20, 20, 15, 20, 40, 40]
                 headers = ["Date", "Réf", "Mvt", "Qté", "Taille", "Collaborateur", "Chantier"]
-                
-                for i, h in enumerate(headers):
-                    pdf.cell(col_widths[i], 10, h, border=1, align='C')
+                for i, h in enumerate(headers): pdf.cell(col_widths[i], 10, h, border=1, align='C')
                 pdf.ln()
-
-                # Contenu du tableau
                 pdf.set_font("Arial", size=9)
                 for _, row in df_hist.sort_values(by="date", ascending=False).iterrows():
-                    data = [
-                        str(row.get('date', '')),
-                        str(row.get('num_interne', '')),
-                        str(row.get('type_mvt', '')),
-                        str(row.get('quantite', '')),
-                        str(row.get('taille', '')),
-                        str(row.get('collaborateur', '')),
-                        str(row.get('code_chantier', ''))
-                    ]
-                    for i, d in enumerate(data):
-                        # On utilise multi_cell pour gérer le retour à la ligne si le texte est long
-                        pdf.cell(col_widths[i], 8, d, border=1, align='C')
+                    data = [str(row.get('date', '')), str(row.get('num_interne', '')), str(row.get('type_mvt', '')), 
+                            str(row.get('quantite', '')), str(row.get('taille', '')), str(row.get('collaborateur', '')), str(row.get('code_chantier', ''))]
+                    for i, d in enumerate(data): pdf.cell(col_widths[i], 8, d, border=1, align='C')
                     pdf.ln()
-                
                 pdf_output = pdf.output(dest='S').encode('latin-1')
-                st.download_button(
-                    label="📥 Télécharger le PDF (Tableau)", 
-                    data=pdf_output, 
-                    file_name="historique_tableau.pdf", 
-                    mime="application/pdf"
-                )
+                st.download_button("📥 Télécharger le PDF", pdf_output, "historique.pdf", "application/pdf")
             if col_del.button("🗑️ Vider l'historique complet"):
                 supabase.table("historique_mouvements").delete().neq("id", -1).execute()
                 st.success("Historique supprimé !")

@@ -92,23 +92,27 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
-# 1. Initialisation de l'état du panier
-if 'panier' not in st.session_state:
+# 1. Initialisation SÉCURISÉE du panier comme une LISTE
+if 'panier' not in st.session_state or not isinstance(st.session_state.panier, list):
     st.session_state.panier = []
 
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
     try:
-        # 2. Récupération des données (Charger en premier)
+        # Récupération des données
         response = supabase.table("materiel").select("*").execute()
         df_stock = pd.DataFrame(response.data)
         
         if not df_stock.empty:
-            # 3. Affichage tableau
+            # Affichage tableau
             st.subheader("État du stock")
+            # Conversion des None en 0 pour l'affichage propre
+            df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']].copy()
+            df_display['quantité'] = df_display['quantité'].fillna(0)
+            
             st.data_editor(
-                df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']],
+                df_display,
                 column_config={
                     "photo_url": st.column_config.ImageColumn("Photo"),
                     "num_interne": "Réf. Interne",
@@ -120,7 +124,7 @@ with tab0:
 
             # 4. Formulaire "Ajouter au Panier"
             with st.expander("➕ Ajouter un mouvement au panier", expanded=True):
-                with st.form("panier_form"):
+                with st.form("panier_form", clear_on_submit=True):
                     col_a, col_b = st.columns(2)
                     with col_a:
                         ref_select = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
@@ -149,16 +153,14 @@ with tab0:
                     st.session_state.panier = []
                     st.rerun()
                 
-                if col_d.button("✅ Valider et mettre à jour le stock"):
+                if col_d.button("✅ Valider tout"):
                     for item in st.session_state.panier:
-                        # Recherche des données actuelles
+                        # Calcul du stock
                         art = df_stock[df_stock['num_interne'] == item['ref']].iloc[0]
                         stock_act = int(art['quantité']) if pd.notnull(art['quantité']) else 0
-                        
-                        # Calcul
                         new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
                         
-                        # Mise à jour Supabase
+                        # Mise à jour Stock
                         supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).execute()
                         
                         # Historisation
@@ -172,12 +174,9 @@ with tab0:
                             "taille": item['taille']
                         }).execute()
                     
-                    st.success("Mouvements validés et historique mis à jour !")
                     st.session_state.panier = []
+                    st.success("Opérations validées !")
                     st.rerun()
-        else:
-            st.warning("La base de données est vide.")
-            
     except Exception as e:
         st.error(f"Erreur : {e}")
 with tab1:

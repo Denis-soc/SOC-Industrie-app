@@ -104,11 +104,10 @@ with tab0:
         st.session_state.panier_stock = []
     
     try:
-        # Récupération des données fraîches
         df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
         df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
         
-        # --- A. TABLEAU ÉTAT DU STOCK (Remis en place) ---
+        # --- A. TABLEAU ÉTAT DU STOCK ---
         if not df_stock.empty:
             st.subheader("État du stock détaillé")
             df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'taille', 'quantité']].copy()
@@ -135,15 +134,25 @@ with tab0:
                         })
                         st.rerun()
 
-            # --- C. PANIER (Avec boutons suppression comme Tab1) ---
+            # --- C. PANIER EN FORMAT TABLEAU (Affichage propre) ---
             if st.session_state.panier_stock:
                 st.subheader("🛒 Panier en attente")
-                for i, item in enumerate(st.session_state.panier_stock):
-                    cols = st.columns([5, 1])
-                    cols[0].write(f"{item['ref']} | {item['type']} | {item['qte']} | {item['taille']} | {item['nom']}")
-                    if cols[1].button("❌ Supprimer", key=f"del_{i}"):
-                        st.session_state.panier_stock.pop(i)
-                        st.rerun()
+                
+                # On affiche le panier sous forme de DataFrame (le look que vous aimez)
+                df_panier = pd.DataFrame(st.session_state.panier_stock)
+                st.dataframe(df_panier, use_container_width=True)
+                
+                # Suppression : Bouton pour vider ou supprimer par ligne
+                cols = st.columns([1, 1, 4])
+                if cols[0].button("🗑️ Vider le panier"):
+                    st.session_state.panier_stock = []
+                    st.rerun()
+                
+                # Pour supprimer une ligne spécifique, on liste les index
+                index_a_supprimer = cols[1].selectbox("Supprimer ligne n°", range(len(st.session_state.panier_stock)))
+                if cols[1].button("Retirer cette ligne"):
+                    st.session_state.panier_stock.pop(index_a_supprimer)
+                    st.rerun()
 
                 if st.button("✅ Valider tout le panier"):
                     for item in st.session_state.panier_stock:
@@ -164,7 +173,7 @@ with tab0:
                     st.success("Mise à jour réussie !")
                     st.rerun()
 
-            # --- D. HISTORIQUE (Remis en place) ---
+            # --- D. HISTORIQUE ---
             st.subheader("📜 Historique des mouvements")
             if not df_hist.empty:
                 st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)

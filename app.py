@@ -169,15 +169,15 @@ with tab0:
                         item['qte'] = int(item['qte']) if item['qte'] is not None else 0
                     
                     # --- Maintenant, on traite le panier ---
-                   for item in st.session_state.panier_stock:
+                    for item in st.session_state.panier_stock:
                         # 1. On cherche la ligne correspondant à l'article et à la taille
                         mask = (df_stock['num_interne'] == item['ref']) & (df_stock['taille'] == item['taille'])
                         ligne = df_stock[mask]
                         
-                   if not ligne.empty:
-                            # 2. Calcul du nouveau stock en Python
-                            stock_act = int(ligne.iloc[0]['quantité'])
-                            new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
+                       if not ligne.empty:
+                                # 2. Calcul du nouveau stock en Python
+                                stock_act = int(ligne.iloc[0]['quantité'])
+                                new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
                             
                             # 3. MISE À JOUR DANS SUPABASE
                             supabase.table("materiel").update({"quantité": new_stock}) \

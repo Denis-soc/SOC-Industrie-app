@@ -100,7 +100,7 @@ with tab0:
         st.session_state.panier_stock = []
     
     try:
-        # Récupération des données
+        # Récupération des données fraîches
         df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
         df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
         
@@ -158,12 +158,12 @@ with tab0:
                         # 2. Insertion Historique
                         supabase.table("historique_mouvements").insert({
                             "date": str(date.today()), "num_interne": item['ref'], 
-                            "type_mvt": item['type'], "quantite": item['qte'],
+                            "type_mvt": item['type'], "quantite": int(item['qte']),
                             "code_chantier": item['chantier'], "collaborateur": item['nom'], "taille": item['taille']
                         }).execute()
                     
                     st.session_state.panier_stock = []
-                    st.success("Stock mis à jour avec succès !")
+                    st.success("Mise à jour effectuée !")
                     st.rerun()
 
             # --- HISTORIQUE ---
@@ -174,7 +174,7 @@ with tab0:
             st.warning("Aucune donnée matérielle trouvée.")
             
     except Exception as e:
-        st.error(f"Erreur : {e}")
+        st.error(f"Erreur technique : {e}")
 with tab1:
     st.header("🛒 Catalogue du Matériel")
     

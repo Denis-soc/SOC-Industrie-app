@@ -119,8 +119,8 @@ with tab0:
         # --- A. TABLEAU ÉTAT DU STOCK ---
         if not df_stock.empty:
             st.subheader("État du stock détaillé")
-            df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'taille', 'quantité']].copy()
-            df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0)
+            df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'taille', 'quantite']].copy()
+            df_display['quantite'] = pd.to_numeric(df_display['quantite'], errors='coerce').fillna(0)
             st.data_editor(df_display, column_config={"photo_url": st.column_config.ImageColumn("Photo")}, use_container_width=True, disabled=True)
 
             # --- B. FORMULAIRE D'AJOUT ---
@@ -130,7 +130,7 @@ with tab0:
                     with col_a:
                         ref = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
                         type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
-                        qte = st.number_input("Quantité", min_value=1, step=1)
+                        qte = st.number_input("quantité", min_value=1, step=1)
                     with col_b:
                         taille = st.selectbox("Taille", options=st.session_state.liste_tailles)
                         collab = st.text_input("Collaborateur")

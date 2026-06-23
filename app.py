@@ -869,7 +869,7 @@ with tab5:
                         rafraichir_page()
                     except Exception as e:
                         st.error(f"Erreur lors de la suppression : {e}")
-                        with tab6:
+with tab6:
     st.header("⚙️ Administration & Gestion des Stocks")
     
     # 1. Ajouter un nouveau matériel

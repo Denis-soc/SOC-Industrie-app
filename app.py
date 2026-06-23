@@ -175,9 +175,9 @@ with tab0:
                         ligne = df_stock[mask]
                         
                        if not ligne.empty:
-                                # 2. Calcul du nouveau stock en Python
-                                stock_act = int(ligne.iloc[0]['quantité'])
-                                new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
+                            # 2. Calcul du nouveau stock en Python
+                            stock_act = int(ligne.iloc[0]['quantité'])
+                            new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
                             
                             # 3. MISE À JOUR DANS SUPABASE
                             supabase.table("materiel").update({"quantité": new_stock}) \

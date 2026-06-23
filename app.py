@@ -96,10 +96,6 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
-import streamlit as st
-import pandas as pd
-from datetime import date
-
 with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
@@ -148,43 +144,56 @@ with tab0:
                         })
                         st.rerun()
 
-            # --- GESTION DU PANIER (MODIFIABLE & SUPPRIMABLE) ---
+# --- GESTION DU PANIER (MODIFIABLE & SUPPRIMABLE) ---
             if st.session_state.panier_stock:
                 st.subheader("🛒 Panier en attente")
                 
-                # Conversion en DataFrame pour l'édition
+                # 1. Conversion en DataFrame
                 panier_df = pd.DataFrame(st.session_state.panier_stock)
                 
-                # Éditeur interactif avec suppression dynamique
+                # 2. Éditeur interactif avec gestion des types
                 edited_panier = st.data_editor(
                     panier_df,
-                    num_rows="dynamic", # Permet de supprimer des lignes via l'interface
+                    num_rows="dynamic", # Active le bouton de suppression de ligne
                     column_config={
-                        "taille": st.column_config.SelectboxColumn("Taille", options=st.session_state.liste_tailles),
-                        "qte": st.column_config.NumberColumn("Quantité", min_value=1, step=1)
+                        "qte": st.column_config.NumberColumn("Quantité", min_value=1, step=1, format="%d"),
+                        "taille": st.column_config.SelectboxColumn("Taille", options=st.session_state.liste_tailles)
                     },
                     use_container_width=True
                 )
                 
-                # Mise à jour du panier avec les modifs
+                # 3. Nettoyage des données avant traitement (pour éviter NaN)
+                # On remplace les cases vides par des valeurs par défaut pour éviter le crash
+                edited_panier = edited_panier.fillna({'qte': 0, 'taille': '', 'nom': '', 'chantier': ''})
                 st.session_state.panier_stock = edited_panier.to_dict('records')
-                
+
                 if st.button("✅ Valider tout le panier"):
                     for item in st.session_state.panier_stock:
-                        # 1. Mise à jour Stock Supabase
+                        # Sécurité : ignorer les lignes vides
+                        if item['ref'] is None or item['qte'] == 0:
+                            continue
+                            
+                        # Mise à jour Stock Supabase
                         mask = (df_stock['num_interne'] == item['ref']) & (df_stock['taille'] == item['taille'])
                         ligne = df_stock[mask]
                         
                         if not ligne.empty:
                             stock_act = int(ligne.iloc[0]['quantité'])
-                            new_stock = stock_act + item['qte'] if item['type'] == "Entrée" else max(0, stock_act - item['qte'])
+                            # Calcul avec cast sécurisé en int
+                            qte_item = int(item['qte'])
+                            new_stock = stock_act + qte_item if item['type'] == "Entrée" else max(0, stock_act - qte_item)
+                            
                             supabase.table("materiel").update({"quantité": new_stock}).eq("num_interne", item['ref']).eq("taille", item['taille']).execute()
                         
-                        # 2. Insertion Historique
+                        # Insertion Historique
                         supabase.table("historique_mouvements").insert({
-                            "date": str(date.today()), "num_interne": item['ref'], "type_mvt": item['type'], 
-                            "quantite": int(item['qte']), "code_chantier": item['chantier'], 
-                            "collaborateur": item['nom'], "taille": item['taille']
+                            "date": str(date.today()), 
+                            "num_interne": item['ref'], 
+                            "type_mvt": item['type'], 
+                            "quantite": int(item['qte']), 
+                            "code_chantier": str(item['chantier']), 
+                            "collaborateur": str(item['nom']), 
+                            "taille": str(item['taille'])
                         }).execute()
                     
                     st.session_state.panier_stock = []

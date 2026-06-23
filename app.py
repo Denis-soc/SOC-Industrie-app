@@ -162,7 +162,6 @@ with tab0:
                     
                     # --- Maintenant, on traite le panier ---
                     for item in st.session_state.panier_stock:
-                    for item in st.session_state.panier_stock:
                         # 1. Calcul et mise à jour Supabase
                         mask = (df_stock['num_interne'] == item['ref']) & (df_stock['taille'] == item['taille'])
                         ligne = df_stock[mask]

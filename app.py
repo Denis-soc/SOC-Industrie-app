@@ -869,3 +869,56 @@ with tab5:
                         rafraichir_page()
                     except Exception as e:
                         st.error(f"Erreur lors de la suppression : {e}")
+                        with tab6:
+    st.header("⚙️ Administration & Gestion des Stocks")
+    
+    # 1. Ajouter un nouveau matériel
+    with st.expander("➕ Créer une nouvelle fiche matériel"):
+        with st.form("ajout_materiel"):
+            col1, col2 = st.columns(2)
+            with col1:
+                nom_nouveau = st.text_input("Nom du matériel")
+                num_int_nouveau = st.text_input("N° Interne (ex: OUT-001)")
+            with col2:
+                cat_nouveau = st.selectbox("Catégorie", ["EPI", "Consommables", "Outillage", "Matériel Commun"])
+                quantite_initiale = st.number_input("Quantité initiale", min_value=0, step=1)
+            
+            if st.form_submit_button("Valider la création"):
+                if nom_nouveau and num_int_nouveau:
+                    try:
+                        supabase.table("materiel").insert({
+                            "Nom du Matériel": nom_nouveau,
+                            "num_interne": num_int_nouveau,
+                            "categorie": cat_nouveau,
+                            "quantité": quantite_initiale,
+                            "est_a_l_agence": True
+                        }).execute()
+                        st.success("Matériel ajouté !")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erreur : {e}")
+                else:
+                    st.warning("Veuillez remplir au moins le nom et le n° interne.")
+
+    st.divider()
+
+    # 2. Édition rapide du stock existant (Data Editor)
+    st.subheader("📝 Modification en masse du catalogue")
+    st.info("Vous pouvez modifier les noms ou quantités directement dans le tableau ci-dessous.")
+    
+    # On permet d'éditer le dataframe et on répercute les changements
+    df_editable = df_materiel_reel[['num_interne', 'Nom du Matériel', 'categorie', 'quantité']].copy()
+    
+    updated_df = st.data_editor(
+        df_editable, 
+        key="editor_stock",
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    if st.button("💾 Enregistrer toutes les modifications"):
+        # Logique simple pour mettre à jour chaque ligne modifiée
+        # Note : Dans une prod réelle, il est préférable de comparer ligne par ligne
+        st.warning("Fonctionnalité d'enregistrement en masse à coupler avec une boucle d'update Supabase.")
+        # Exemple rapide pour une ligne : 
+        # supabase.table("materiel").update({"quantité": ...}).eq("num_interne", ...).execute()

@@ -95,11 +95,11 @@ def rafraichir_page():
 import streamlit as st
 import pandas as pd
 from datetime import date
-    @st.cache_data(ttl=0) 
-    def get_data():
-        df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
-        df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
-        return df_stock, df_hist
+@st.cache_data(ttl=0) 
+def get_data():
+    df_stock = pd.DataFrame(supabase.table("materiel").select("*").execute().data)
+    df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
+    return df_stock, df_hist
 
     # Dans votre tab0, remplacez les lignes de récupération par :
     df_stock, df_hist = get_data()

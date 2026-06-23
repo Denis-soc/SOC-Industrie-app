@@ -96,47 +96,61 @@ with tab0:
     st.header("📦 Gestion des Stocks - Olivier")
     
     try:
-        # Récupération données
+        # Récupération des données
         response = supabase.table("materiel").select("*").execute()
         df = pd.DataFrame(response.data)
         
         if not df.empty:
-            # Affichage tableau (épuré)
-            st.dataframe(df[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']], use_container_width=True)
+            # Affichage du tableau avec images configurées
+            st.subheader("État du stock")
+            st.data_editor(
+                df[['photo_url', 'num_interne', 'Nom du Matériel', 'quantité']],
+                column_config={
+                    "photo_url": st.column_config.ImageColumn("Photo", help="Aperçu du matériel"),
+                    "num_interne": "Réf. Interne",
+                    "Nom du Matériel": "Désignation",
+                    "quantité": "Stock"
+                },
+                use_container_width=True,
+                disabled=True
+            )
             
             with st.form("mouvement_form"):
-                # Choix par référence interne
                 ref_select = st.selectbox("Choisir la Réf. Interne", df['num_interne'].unique())
                 
-                # Saisie des informations
                 col1, col2 = st.columns(2)
                 with col1:
                     date_op = st.date_input("Date de l'opération", date.today())
                     type_mvt = st.radio("Type", ["Entrée", "Sortie"])
                 with col2:
                     code_chantier = st.text_input("Code Chantier")
+                    # CORRECTION : La variable doit s'appeler 'quantite_mvt'
                     quantite_mvt = st.number_input("Quantité", min_value=1, step=1)
                 
                 if st.form_submit_button("Valider et Historiser"):
-                    # Calcul stock
                     article_data = df[df['num_interne'] == ref_select].iloc[0]
                     stock_actuel = int(article_data['quantité']) if pd.notnull(article_data['quantité']) else 0
-                    nouveau_stock = stock_actuel + int(quantité_mvt) if type_mvt == "Entrée" else max(0, stock_actuel - int(quantite_mvt))
+                    
+                    if type_mvt == "Entrée":
+                        nouveau_stock = stock_actuel + int(quantite_mvt)
+                    else:
+                        nouveau_stock = max(0, stock_actuel - int(quantite_mvt))
                     
                     # 1. Mise à jour du stock
                     supabase.table("materiel").update({"quantité": nouveau_stock}).eq("num_interne", ref_select).execute()
                     
-                    # 2. Enregistrement dans l'historique
+                    # 2. Enregistrement historique
                     supabase.table("historique_mouvements").insert({
                         "date": str(date_op),
                         "num_interne": ref_select,
                         "type_mvt": type_mvt,
-                        "quantite": int(quantité_mvt),
+                        "quantite": int(quantite_mvt),
                         "code_chantier": code_chantier
                     }).execute()
                     
                     st.success(f"Mouvement enregistré pour {ref_select} !")
                     st.rerun()
+                    
     except Exception as e:
         st.error(f"Erreur : {e}")
 with tab1:

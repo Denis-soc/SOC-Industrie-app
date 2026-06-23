@@ -79,7 +79,11 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📍 Carte de localisation du matériel",
     "⚙️ Administration Matériel"
 ])
-
+if 'liste_tailles' not in st.session_state:
+    st.session_state.liste_tailles = [
+        "", "S", "M", "L", "XL", "XXL", "XXXL", "XXXXL", 
+        "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52"
+    ]
 # Compatibilité st.rerun selon la version de Streamlit
 def rafraichir_page():
     try:
@@ -105,8 +109,9 @@ with tab0:
         df_hist = pd.DataFrame(supabase.table("historique_mouvements").select("*").execute().data)
         
         if not df_stock.empty:
-            # --- ÉTAT DU STOCK PAR TAILLE ---
-            st.subheader("État du stock détaillé")
+            # --- ÉTAT DU STOCK DÉTAILLÉ ---
+            st.subheader("État du stock")
+            # On s'assure que la colonne quantité est numérique pour le calcul
             df_display = df_stock[['photo_url', 'num_interne', 'Nom du Matériel', 'taille', 'quantité']].copy()
             df_display['quantité'] = pd.to_numeric(df_display['quantité'], errors='coerce').fillna(0)
             
@@ -116,18 +121,17 @@ with tab0:
                 use_container_width=True, disabled=True
             )
 
-            # --- FORMULAIRE D'AJOUT AVEC LISTE DE CHOIX ---
+            # --- FORMULAIRE D'AJOUT ---
             with st.expander("➕ Ajouter un mouvement au stock", expanded=True):
                 with st.form("panier_form", clear_on_submit=True):
                     col_a, col_b = st.columns(2)
                     with col_a:
                         ref = st.selectbox("Réf. Interne", df_stock['num_interne'].unique())
-                        # Filtrage dynamique des tailles
-                        tailles_dispos = df_stock[df_stock['num_interne'] == ref]['taille'].unique()
                         type_mvt = st.radio("Type", ["Entrée", "Sortie"], horizontal=True)
                         qte = st.number_input("Quantité", min_value=1, step=1)
                     with col_b:
-                        taille = st.selectbox("Taille", options=tailles_dispos)
+                        # Utilisation de la liste globale standardisée
+                        taille = st.selectbox("Taille", options=st.session_state.liste_tailles)
                         collab = st.text_input("Collaborateur")
                         chantier = st.text_input("Code Chantier")
                     
@@ -146,7 +150,7 @@ with tab0:
                 
                 if st.button("✅ Valider tout le panier"):
                     for item in st.session_state.panier_stock:
-                        # 1. Calcul et Mise à jour (Recherche précise par Ref + Taille)
+                        # 1. Calcul et Mise à jour du stock (Ref + Taille)
                         mask = (df_stock['num_interne'] == item['ref']) & (df_stock['taille'] == item['taille'])
                         ligne = df_stock[mask]
                         
@@ -165,7 +169,7 @@ with tab0:
                         }).execute()
                     
                     st.session_state.panier_stock = []
-                    st.success("Mise à jour effectuée !")
+                    st.success("Opération validée avec succès !")
                     st.rerun()
 
             # --- HISTORIQUE ---
@@ -173,7 +177,7 @@ with tab0:
             if not df_hist.empty:
                 st.dataframe(df_hist.sort_values(by="date", ascending=False), use_container_width=True)
         else:
-            st.warning("Aucune donnée matérielle trouvée.")
+            st.info("Aucune donnée matérielle trouvée.")
             
     except Exception as e:
         st.error(f"Erreur technique : {e}")

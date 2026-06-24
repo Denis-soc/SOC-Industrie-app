@@ -719,24 +719,20 @@ with tab5:
             col1, col2 = st.columns(2)
             with col1:
                 num = st.text_input("N° Interne")
-                nom = st.text_input("Nom du Matériel")
+                nom = st.text_input("Nom du matériel")
                 cat = st.selectbox("Catégorie", categories_officielles, key="add_cat")
                 
                 # Condition : Si EPI, on demande la taille
-                if cat == "EPI":
-                    taille = st.text_input("Taille")
-                else:
-                    taille = ""
+                taille = st.text_input("Taille") if cat == "EPI" else ""
                     
-                # Condition : Si Outillage ou Matériel Commun, on demande les dates et l'intervalle
+                # Condition : Si Outillage ou Matériel Commun
                 if cat in ["Outillage", "Matériel Commun"]:
                     date_achat = st.date_input("Date d'achat", value=None, key="add_achat")
                     perio = st.number_input("Intervalle / Périodicité contrôle (mois)", min_value=0, value=0, key="add_perio")
                     date_prochain = st.date_input("Date du prochain contrôle", value=None, key="add_prochain")
                 else:
-                    date_achat = None
+                    date_achat, date_prochain = None, None
                     perio = 0
-                    date_prochain = None
 
             with col2:
                 ref = st.text_input("Référence")
@@ -744,7 +740,6 @@ with tab5:
                 fourn = st.text_input("Fournisseur")
                 url_photo = st.text_input("URL de la photo (lien http)")
                 
-                # Si ce n'est pas un outillage/matériel commun, on cache la périodicité ici
                 if cat not in ["Outillage", "Matériel Commun"]:
                     perio = st.number_input("Périodicité contrôle (mois)", min_value=0, value=0, key="add_perio_autre")
             
@@ -754,22 +749,25 @@ with tab5:
                 if not num.strip():
                     st.warning("Le N° Interne est obligatoire.")
                 else:
-                    data = {
+                    # Construction brute
+                    data_brute = {
                         "num_interne": num, 
-                        "Nom du Matériel": nom, 
+                        "Nom du Matériel": nom, # Ajustez si le nom dans Supabase est différent (ex: "nom")
                         "categorie": cat, 
                         "taille": taille, 
                         "reference": ref, 
                         "num_serie": ns, 
                         "fournisseur": fourn, 
-                        "periodicite_controle": int(perio), 
+                        "intervalle_mois": int(perio), # Harmonisé avec votre BDD (intervalle_mois)
                         "photo_url": url_photo,
                         "date_achat": str(date_achat) if date_achat else None,
                         "date_prochain_controle": str(date_prochain) if date_prochain else None,
-                        # --- VALEURS PAR DÉFAUT POUR LA RÉSERVATION ---
                         "est_a_l_agence": True,
-                        "affectation_actuelle": ""
+                        "affectation_actuelle": None # Remplacé "" par None pour tuer l'erreur Array
                     }
+                    # NETTOYAGE : Élimine toutes les chaînes vides ""
+                    data = {k: v for k, v in data_brute.items() if v != ""}
+                    
                     try:
                         supabase.table("materiel").insert(data).execute()
                         st.success("Matériel ajouté !")
@@ -792,22 +790,11 @@ with tab5:
                         nouveau_num = st.text_input("Nouveau N° Interne", value=str(item.get("num_interne", "")))
                         nom = st.text_input("Nom du matériel", value=str(item.get("Nom du Matériel", "")))
                         
-                        cat_index = 0
-                        item_cat = item.get("categorie")
-                        if item_cat in categories_officielles:
-                            cat_index = categories_officielles.index(item_cat)
-                        
+                        cat_index = categories_officielles.index(item.get("categorie")) if item.get("categorie") in categories_officielles else 0
                         cat = st.selectbox("Catégorie", categories_officielles, index=cat_index, key="mod_cat")
-                        
-                        if cat == "EPI":
-                            taille = st.text_input("Taille", value=str(item.get("taille", "")))
-                        else:
-                            taille = ""
+                        taille = st.text_input("Taille", value=str(item.get("taille", ""))) if cat == "EPI" else ""
                             
-                        try:
-                            val_perio = int(item.get("periodicite_controle", 0))
-                        except:
-                            val_perio = 0
+                        val_perio = int(item.get("intervalle_mois", 0)) if item.get("intervalle_mois") else 0
                             
                         if cat in ["Outillage", "Matériel Commun"]:
                             val_achat = pd.to_datetime(item.get("date_achat")).date() if item.get("date_achat") else None
@@ -817,8 +804,7 @@ with tab5:
                             perio = st.number_input("Intervalle / Périodicité contrôle (mois)", min_value=0, value=val_perio, key="mod_perio")
                             date_prochain = st.date_input("Date du prochain contrôle", value=val_prochain, key="mod_prochain")
                         else:
-                            date_achat = None
-                            date_prochain = None
+                            date_achat, date_prochain = None, None
 
                     with col2:
                         ref = st.text_input("Référence", value=str(item.get("reference", "")))
@@ -835,7 +821,7 @@ with tab5:
                         if not nouveau_num.strip():
                             st.error("Le N° Interne ne peut pas être vide.")
                         else:
-                            upd = {
+                            upd_brut = {
                                 "num_interne": nouveau_num,
                                 "Nom du Matériel": nom, 
                                 "categorie": cat, 
@@ -843,17 +829,22 @@ with tab5:
                                 "reference": ref, 
                                 "num_serie": ns, 
                                 "fournisseur": fourn, 
-                                "periodicite_controle": int(perio), 
+                                "intervalle_mois": int(perio), 
                                 "photo_url": url_photo,
                                 "date_achat": str(date_achat) if date_achat else None,
                                 "date_prochain_controle": str(date_prochain) if date_prochain else None
                             }
+                            # Nettoyage anti-écrasement et anti-erreur de type
+                            upd = {k: v for k, v in upd_brut.items() if v != ""}
+                            upd["num_interne"] = nouveau_num
+
                             try:
                                 supabase.table("materiel").update(upd).eq("num_interne", sel).execute()
                                 st.success("Modifié avec succès !")
-                                rafraichir_page()
+                                st.rerun()
                             except Exception as e:
                                 st.error(f"Erreur lors de la modification : {e}")
+
     elif mode == "Supprimer" and not df_materiel_reel.empty:
         if "num_interne" in df_materiel_reel.columns:
             liste_numeros = [n for n in df_materiel_reel["num_interne"].tolist() if str(n).strip() != ""]
@@ -861,16 +852,15 @@ with tab5:
             
             if choix:
                 item_suppr = df_materiel_reel[df_materiel_reel["num_interne"] == choix].iloc[0]
-                st.warning(f"Attention, vous allez supprimer définitivement : {item_suppr.get('Nom du Matériel', 'Matériel inconnu')}")
+                st.warning(f"Attention, vous allez supprimer : {item_suppr.get('Nom du Matériel', 'Matériel inconnu')}")
                 
                 if st.button("Confirmer la suppression définitive"):
                     try:
                         supabase.table("materiel").delete().eq("num_interne", choix).execute()
                         st.success(f"N° {choix} supprimé.")
-                        rafraichir_page()
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Erreur lors de la suppression : {e}")
-# --- Début de votre onglet État des Stocks ---
 with tab6:
     st.header("📦 État des Stocks (Calculé en temps réel)")
     

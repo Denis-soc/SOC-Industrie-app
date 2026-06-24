@@ -20,8 +20,6 @@ except Exception as e:
     st.stop()
 
 # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
-# # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
-# # 3. CHARGEMENT DONNÉES SÉCURISÉ & NETTOYÉ
 def charger_materiel():
     try:
         response = supabase.table("materiel").select("*").execute()

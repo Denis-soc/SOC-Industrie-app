@@ -718,7 +718,7 @@ with tab5:
         with st.form("form_ajouter"):
             col1, col2 = st.columns(2)
             with col1:
-                num_interne = st.text_input("N° Interne")
+                num = st.text_input("N° Interne")
                 nom = st.text_input("Nom du matériel")
                 cat = st.selectbox("Catégorie", categories_officielles, key="add_cat")
                 

@@ -719,7 +719,7 @@ with tab5:
             col1, col2 = st.columns(2)
             with col1:
                 num = st.text_input("N° Interne")
-                nom = st.text_input("Nom du matériel")
+                nom = st.text_input("Nom du Matériel")
                 cat = st.selectbox("Catégorie", categories_officielles, key="add_cat")
                 
                 # Condition : Si EPI, on demande la taille
